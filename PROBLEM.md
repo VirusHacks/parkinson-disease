@@ -1,181 +1,105 @@
-# Problem Statement: MotorAssistEnv — Adaptive RL for Impaired Motor Control
+# Problem Statement — MotorAssistEnv: Closed-Loop DBS Agent for Parkinson's Disease
 
 ## 1. Summary
 
-Parkinson’s disease and related motor impairments create a difficult control problem: the user’s intended movement, the actual movement produced by the body, and the feedback received from the world are no longer aligned in a stable way. Tremor, delayed response, freezing, reduced initiation, and unstable fine motor control can turn ordinary daily tasks into repeated failures. These failures are not only physical. They also create frustration, fatigue, loss of confidence, and loss of independence.
+Parkinson's disease disrupts the basal ganglia circuit through pathological beta-band synchrony in the subthalamic nucleus (STN). This beta oscillation drives tremor, rigidity, and the progressive loss of voluntary motor function that makes everyday tasks — holding a cup, reaching for a door, writing — increasingly impossible.
 
-MotorAssistEnv is an OpenEnv-compatible reinforcement learning environment that frames this real-world challenge as a structured control and adaptation problem. The goal is to train agents that learn to compensate for impaired motor dynamics and improve performance on goal-directed tasks such as stabilizing a hand, reaching a target, grasping an object, and completing multi-step manipulation sequences.
+Deep Brain Stimulation (DBS) is the gold standard intervention. A surgically implanted electrode delivers high-frequency electrical pulses to the STN, suppressing the beta oscillation and partially restoring motor function. The challenge: DBS must be tuned continuously by a trained neurologist. Too little amplitude → beta persists, tremor grows. Too much → cortical side effects, battery drain, and patient discomfort. Suboptimal settings are the norm, not the exception.
 
-The core idea is not to simulate the entire biology of Parkinson’s disease. Instead, the environment models the *functional consequences* of impairment in a way that is useful for training, evaluation, and future research. This makes the problem both scientifically grounded and practically useful.
+**MotorAssistEnv** frames this as a sequential decision problem for a reinforcement learning agent. The agent acts as an autonomous closed-loop BCI (Brain-Computer Interface) programmer: it observes the patient's real-time brain state and issues DBS parameters step-by-step to maximise motor function while managing side effects.
 
-## 2. Why this problem matters
+---
 
-This is a real-world assistance problem, not a toy benchmark.
+## 2. Why This Problem Matters
 
-People with Parkinson’s disease often struggle with tasks that depend on smooth, reliable control:
-- reaching for objects,
-- holding a cup steady,
-- moving without freezing,
-- performing sequential hand actions,
-- and adapting to fatigue or symptom variation across time.
+This is not a toy benchmark. It targets a real unmet clinical need:
 
-From a human-centered perspective, the value of a system like this is clear: if an agent can learn to compensate for unstable motor dynamics in simulation, the same principles can later inform assistive interfaces, rehabilitation systems, prosthetic control, cursor stabilization, teleoperation support, or personalized motor assistance tools.
+- **1 million+ patients** in the US alone have Parkinson's disease. DBS is used in ~50,000+ patients worldwide.
+- **Suboptimal DBS programming** is identified as the #1 barrier to better outcomes. Programming is manual, expensive, requires specialist time, and degrades between clinic visits.
+- A learned closed-loop policy that automatically adapts stimulation could **improve patient quality of life continuously** — not just during clinic visits.
 
-From an RL perspective, this is a strong environment because it has:
-- stepwise interaction,
-- partially observable dynamics,
-- delayed consequences,
-- non-stationary disturbances,
-- and clear programmatic success criteria.
+From an RL perspective this environment provides:
+- Dense, step-wise feedback grounded in real neuroscience measurements
+- Partially observable dynamics (the agent cannot directly measure interneuron firing)
+- Non-stationary disturbances (tremor escalates deterministically from real simulation data)
+- A multi-objective trade-off: suppress oscillation, preserve force, limit side effects
+- Clear programmatic success criteria graded at episode end
 
-Those properties make it suitable for RL while still staying anchored in an authentic real-world use case.
+---
 
-## 3. Why reinforcement learning is needed
+## 3. Data Foundation — The Fleming Model
 
-This problem is not a static classification task. It is a sequential decision problem.
+The environment is backed by the **Fleming et al. (2023)** biophysical simulation:
 
-A classical supervised model can predict a movement correction from a single snapshot, but it struggles when:
-- the user’s state changes over time,
-- tremor amplitude varies,
-- action latency is non-constant,
-- small corrections can have large downstream effects,
-- and the correct strategy depends on the history of prior actions.
+> Fleming, J.E., Senneff, S. and Lowery, M.M. (2023).
+> *Multivariable closed-loop control of deep brain stimulation for Parkinson's disease.*
+> Journal of Neural Engineering, 20(5), p.056029.
 
-Reinforcement learning is a natural fit because the agent must learn *how to act over time* under uncertainty. The agent does not just output a final answer. It observes a state, chooses an action, receives feedback from the environment, and improves through repeated interaction.
+This peer-reviewed simulation models:
+- ~100 cortical neurons, ~100 STN neurons, GPe, GPi, Thalamus, and a motoneuron pool
+- 5+ million individual synaptic connections
+- A closed-loop DBS controller running for ~75 seconds of simulated brain time
+- Real physical units throughout: mV, mA, mN
 
-That is exactly what an assistive control problem needs:
-- not just prediction,
-- but adaptation,
-- correction,
-- and stability over a trajectory.
+The calibration pipeline (`brain_calibrator.py`) extracts a 100-step ground-truth trajectory (t=10.02–12.00 s, 20 ms intervals) from the simulation's CSV outputs. **Every number in the agent's observation came from a peer-reviewed neuroscience model — not synthetic approximation.**
 
-RL also allows us to encode a tradeoff between competing objectives:
-- reach the target,
-- stay stable,
-- minimize oscillation,
-- remain energy efficient,
-- and avoid unrealistic movements.
+---
 
-That tradeoff is difficult to express with a single heuristic rule, but it is well suited to reward-based learning.
+## 4. Agent's Role
 
-## 4. Problem objective
+The RL agent replaces the human neurologist. At each 20 ms step it receives the patient's brain state and must output:
 
-The objective of MotorAssistEnv is to train an agent that can learn stable, goal-directed motor control under simulated impairment.
+- `dbs_amplitude` (mA): How much electrical current to deliver to the STN electrode
+- `dbs_pulse_width` (ms): Width of each stimulation pulse (controls spatial spread)
+- `motor_command` (normalised float): The intended voluntary motor output (reaching/holding command)
 
-A successful agent should:
-1. stabilize an unstable motor signal,
-2. compensate for tremor and delay,
-3. complete reaching and grasping tasks,
-4. maintain position when required,
-5. and perform multi-step manipulation reliably.
+The agent's DBS choices directly affect the _next_ step's brain state via a bilinear entrainment lookup derived from the 12×15 DBS parameter sweep in the Fleming simulation.
 
-The agent should improve not only final success rate, but also the quality of motion: smoothness, stability, and robustness under stochastic impairment.
+---
 
-## 5. Environment design philosophy
+## 5. Environment Architecture
 
-The environment is designed to be professionally structured, reproducible, and useful for benchmark-style evaluation.
+```
+fleming-model-based-brain (real simulation data)
+         │
+         └── brain_calibrator.py
+                  │
+                  └── 100-step CalibratedBrainState
+                           │
+                           └── ParkinsonsMotorEnvironment (OpenEnv)
+                                    │
+                                    ├── tasks/      (3 clinical scenarios)
+                                    ├── graders/    (deterministic 0.0–1.0 scores)
+                                    └── inference.py (LLM agent loop)
 
-The design choices are:
+Visualisation (separate, demo only):
+  static/myosuite_demo/  →  /viewer endpoint
+  Tremor severity → 3D arm jitter in WebGL
+  As agent suppresses beta → arm smoothes out → patient performs task
+```
 
-### Real-world focus
-The environment represents an assistive motor-control setting inspired by daily tasks faced by people with Parkinsonian impairments.
+The MyoSuite 3D visualisation runs separately from the RL loop and reads real-time brain state from the FastAPI server to drive visual tremor in the arm model.
 
-### Structured interaction
-The agent acts through a clear step/reset/state API, with typed actions and observations.
+---
 
-### Verifiable success
-Every task has programmatic success criteria and measurable partial progress signals.
+## 6. What a Successful Agent Learns
 
-### Curriculum-friendly
-Tasks progress from easier to harder:
-- stabilization,
-- reaching,
-- grasping,
-- multi-step manipulation.
+An agent that achieves high reward on this environment will have learned:
 
-### Stochastic but controlled
-The environment includes realistic variability such as tremor amplitude, delay, and disturbance noise, but within bounded ranges so learning remains possible.
+1. **Recognise disease state** — rising `beta_arv` + growing `tremor_arv` = deteriorating condition
+2. **Use DBS proportionally** — more tremor/beta requires more stimulation, but not blindly
+3. **Find effective DBS parameters** — amplitude and pulse width together determine cortical entrainment
+4. **Balance treatment and side effects** — sustained high amplitude exhausts the side-effect budget
+5. **Compensate with motor command** — when brain state is bad, issue a stronger voluntary signal
 
-### Safety and anti-hacking
-Rewards are designed to discourage shortcuts such as freezing in place, oscillating to exploit a metric, or making unrealistic jumps.
+This mirrors exactly what a trained neurologist or a modern closed-loop DBS programmer does.
 
-## 6. Proposed task hierarchy
+---
 
-### Task 1: Stabilization
-The agent must keep an end effector or hand-like state close to a target position despite tremor and noise.
+## 7. Real-World Trajectory and Impact
 
-Why this matters:
-- It isolates the core stability challenge.
-- It gives the agent a learnable starting point.
-- It produces clear metrics for reward shaping.
+**Immediate:** A trained agent policy that maps {brain state → DBS parameters} is a direct prototype for firmware running on next-generation adaptive DBS implants (Medtronic Percept, Abbott Infinity).
 
-### Task 2: Reaching
-The agent must move from one position to another efficiently while remaining stable and avoiding oscillatory movement.
+**Near-term:** The environment serves as a reproducible benchmark for comparing DBS optimisation strategies — RL vs PID vs model-predictive control.
 
-Why this matters:
-- It introduces temporal planning.
-- It tests whether the agent can combine correction and movement.
-- It remains easy to verify objectively.
-
-### Task 3: Grasping and manipulation
-The agent must perform a longer sequence such as reach → stabilize → grasp → hold → place.
-
-Why this matters:
-- It is closer to real daily tasks.
-- It introduces long-horizon credit assignment.
-- It stresses the policy’s ability to remain stable over multiple phases.
-
-## 7. Reward design principles
-
-The reward function is the task specification.
-
-A good reward should:
-- give partial progress feedback,
-- reflect true task success,
-- penalize instability and excessive correction,
-- and resist reward hacking.
-
-The reward will combine:
-- distance-to-target reward,
-- stability reward,
-- smoothness reward,
-- task completion bonus,
-- and penalties for unrealistic or unsafe behavior.
-
-This is important because the agent should not merely “look good” in a narrow metric. It should actually become better at the intended task.
-
-## 8. Expected outputs and evaluation metrics
-
-The environment should produce results that can be clearly measured and compared.
-
-Key metrics:
-- success rate,
-- average final distance to target,
-- trajectory smoothness,
-- tremor reduction percentage,
-- time to completion,
-- timeout rate,
-- and stability under randomized disturbances.
-
-These metrics matter because a judge or reviewer should be able to see improvement without relying on subjective interpretation.
-
-## 9. Why this is a good OpenEnv project
-
-This problem fits the OpenEnv style because it is:
-- real-world and meaningful,
-- programmatically measurable,
-- multi-step and structured,
-- suitable for curriculum learning,
-- and strong enough to support a baseline and a trained agent comparison.
-
-It also aligns well with the expectation that an OpenEnv environment should include clear tasks, agent graders, partial reward signals, and a reproducible benchmark loop. The competition requirements emphasize real-world utility, deterministic graders, meaningful reward shaping, and visible learning improvement over time. fileciteturn0file0 fileciteturn1file0
-
-## 10. Intended impact
-
-MotorAssistEnv is meant to be more than a hackathon demo. It is a benchmark seed for a larger class of problems:
-- assistive motor control,
-- rehab policy learning,
-- personalized correction systems,
-- and eventually human-in-the-loop control support.
-
-The immediate goal is a strong, clean OpenEnv environment with meaningful RL structure. The longer-term goal is to establish a credible foundation for assistive agents that help people perform everyday tasks with more independence and less frustration.
+**Long-term:** Patients with Parkinson's disease regain the ability to perform daily motor tasks — holding utensils, signing names, typing — continuously optimised by AI rather than waiting months between clinic programming visits.

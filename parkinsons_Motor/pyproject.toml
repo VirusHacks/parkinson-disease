@@ -36,5 +36,11 @@ server = "parkinsons_Motor.server.app:main"
 
 [tool.setuptools]
 include-package-data = true
-packages = ["parkinsons_Motor", "parkinsons_Motor.server"]
-package-dir = { "parkinsons_Motor" = ".", "parkinsons_Motor.server" = "server" }
+packages = ["parkinsons_Motor", "parkinsons_Motor.server", "parkinsons_Motor.tasks", "parkinsons_Motor.graders"]
+
+[tool.setuptools.package-dir]
+"parkinsons_Motor"         = "."
+"parkinsons_Motor.server"  = "server"
+"parkinsons_Motor.tasks"   = "tasks"
+"parkinsons_Motor.graders" = "graders"
+

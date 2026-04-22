@@ -1,230 +1,112 @@
-# Tasks Design: MotorAssistEnv
+# Tasks Design — MotorAssistEnv (DBS Parkinson's Environment)
 
-## 1. Overview
+## Overview
 
-The task design in MotorAssistEnv follows a curriculum-based progression from simple to complex motor control problems.
+The three tasks are slices of the same real 100-step biophysical simulation, ordered by the clinical difficulty of the DBS programming challenge they present. Difficulty increases because the simulation's tremor dynamics are naturally progressive — early steps are calm, late steps are near-catastrophic.
 
-This is necessary because reinforcement learning requires:
-- non-zero success probability,
-- gradual exploration,
-- and increasing difficulty over time.
-
-If tasks are too difficult initially, the agent will never receive meaningful reward and learning will stall. :contentReference[oaicite:0]{index=0}
-
-The environment is structured into **three levels of difficulty**:
-- Easy (short horizon, high signal)
-- Medium (moderate horizon, partial observability)
-- Hard (long horizon, multi-phase tasks)
+All tasks share the same observation space, action space, and reward architecture. Only the episode window and grading thresholds change.
 
 ---
 
-## 2. Task Taxonomy
+## Task 1 — `beta_suppression` (Easy, 20 steps)
 
-We define tasks along two axes:
+**Clinical scenario:**  
+The patient has just been connected to their DBS device. Beta oscillation is near its pre-DBS peak (β_arv ≈ 0.74) but tremor has not yet built up significantly (tremor_arv ≈ 0.01–0.17). Muscle force is still at ~93% of healthy. The window of the simulation covered is t=10.02–10.40 s.
 
-### 2.1 Difficulty
-- Easy
-- Medium
-- Hard
+**Agent's job:**  
+Act as a DBS programmer who must find a stimulation setting that suppresses the beta oscillation below the clinical threshold (β_arv < 0.20) before tremor builds. This is the most forgiving window — a well-chosen single amplitude setting is sufficient. The agent must keep DBS ≤ 1.0 mA to avoid immediately exhausting the side-effect budget.
 
-### 2.2 Horizon Length
-- Short-horizon (single objective)
-- Medium-horizon (multi-step but linear)
-- Long-horizon (multi-phase with dependencies)
+**Grader weights:**
+| Component | Weight | Meaning |
+|---|---|---|
+| Beta suppression | 0.50 | Primary: did beta stay below threshold? |
+| Force preserved | 0.25 | Secondary: motor function not sacrificed |
+| Side-effect penalty | 0.15 | Safety: stayed within budget |
+| Amplitude efficiency | 0.10 | Bonus: minimum effective amplitude |
 
----
-
-## 3. Easy Tasks (Bootstrap Phase)
-
-### 3.1 Objective
-Learn basic stabilization and control under impairment.
-
-### 3.2 Example Tasks
-
-#### Task E1: Static Stabilization
-- Maintain position at a fixed target
-- No movement required
-- Only tremor + noise present
-
-#### Task E2: Micro Correction
-- Small displacement from target
-- Agent must correct and stabilize
+**Success threshold:** grader_score ≥ 0.60  
+**Episode length:** 20 steps (400 ms of simulated brain time)
 
 ---
 
-### 3.3 Properties
+## Task 2 — `tremor_correction` (Medium, 50 steps)
 
-| Property | Value |
-|--------|------|
-| Horizon | Short |
-| Noise | Low |
-| Delay | None / minimal |
-| Success Probability | High |
+**Clinical scenario:**  
+The episode covers the period when tremor is actively building (t=10.02–11.00 s). Tremor amplitude rises from 0.01 to 0.80 normalised. Muscle force declines from ~93% to ~30% of healthy. The DBS controller must react dynamically: when beta spikes, amplitude must increase; when side-effect load climbs, amplitude must be reduced.
 
----
+**Agent's job:**  
+Dynamically balance DBS amplitude (0–2.0 mA) and pulse width across 50 steps. The agent must prevent force from dropping below 35% of healthy while managing the cumulative side-effect budget (≤ 0.50). Unlike Task 1, a fixed setting will fail because the brain state is non-stationary.
 
-### 3.4 Why this stage matters
+**Grader weights:**
+| Component | Weight | Meaning |
+|---|---|---|
+| Force preserved | 0.50 | Primary: keep motor function above threshold |
+| Beta suppression | 0.25 | Secondary: target the oscillation driver |
+| Side-effect penalty | 0.15 | Safety: avoid cumulative stimulation overload |
+| Final state bonus | 0.10 | Reward for not collapsing at episode end |
 
-- Ensures early reward signal
-- Teaches agent control primitives
-- Prevents collapse due to sparse reward
-
----
-
-## 4. Medium Tasks (Control + Movement)
-
-### 4.1 Objective
-Combine movement + stabilization.
+**Success threshold:** grader_score ≥ 0.55  
+**Episode length:** 50 steps (1 second of simulated brain time)
 
 ---
 
-### 4.2 Example Tasks
+## Task 3 — `full_episode` (Hard, 100 steps)
 
-#### Task M1: Point-to-Point Reaching
-- Move from start → target
-- Moderate tremor
-- Minor delay
+**Clinical scenario:**  
+The full 100-step simulation (t=10.02–12.00 s, 2 seconds of brain time). By step 80+, tremor is near-maximum (0.99 normalised) and force has collapsed to ~4% of healthy. The DBS controller must find a policy that uses aggressive stimulation early to slow tremor progression, then sustains force through the severe late-episode phase — all while keeping the cumulative side-effect load below 0.70.
 
-#### Task M2: Hold After Reach
-- Reach target
-- Maintain position for N steps
+**Agent's job:**  
+This is the clinical optimisation problem in its full form. The agent must learn a dynamic policy across 100 steps that maximises cumulative muscle force preservation. Fixed settings fail — the agent must adapt as the brain state changes dramatically across the episode. This mirrors the real challenge of programming a Parkinson's patient's DBS device for day-to-day motor function.
 
----
+**Grader weights:**
+| Component | Weight | Meaning |
+|---|---|---|
+| Force preserved | 0.40 | Primary: sustained motor function |
+| Beta suppression | 0.20 | Oscillation suppression |
+| Side-effect penalty | 0.20 | Safety over a long horizon |
+| Amplitude efficiency | 0.10 | Appropriate amplitude use |
+| Final state bonus | 0.10 | Episode didn't collapse at end |
 
-### 4.3 Properties
-
-| Property | Value |
-|--------|------|
-| Horizon | Medium |
-| Noise | Moderate |
-| Delay | Present |
-| Success Probability | Medium |
+**Success threshold:** grader_score ≥ 0.50  
+**Episode length:** 100 steps (2 seconds of simulated brain time)
 
 ---
 
-### 4.4 Key challenges
+## Task Comparison
 
-- overshooting
-- oscillation
-- instability after reaching
+| Property | beta_suppression | tremor_correction | full_episode |
+|---|---|---|---|
+| Difficulty | Easy | Medium | Hard |
+| Steps | 20 | 50 | 100 |
+| Brain time covered | 400 ms | 1000 ms | 2000 ms |
+| Max DBS allowed | 1.0 mA | 2.0 mA | 3.0 mA |
+| Key challenge | Find correct amplitude | Dynamic response | Long-horizon policy |
+| Naive agent score | ~0.43 | ~0.88 | ~0.76 |
+| Success threshold | 0.60 | 0.55 | 0.50 |
+| Naive agent succeeds? | ❌ | ✅ | ✅ |
 
----
-
-## 5. Hard Tasks (Real-world Simulation)
-
-### 5.1 Objective
-Perform multi-step real-world motor sequences.
-
----
-
-### 5.2 Example Tasks
-
-#### Task H1: Reach → Stabilize → Hold
-- Sequential control phases
-- Must not lose stability
-
-#### Task H2: Pick-and-Place (Abstracted)
-- Move to object
-- stabilize
-- move to target location
-
-#### Task H3: Continuous Control Task
-- follow moving target trajectory
+> The naive agent (constant 1.0 mA / 0.13 ms) fails Easy but passes Medium/Hard — demonstrating that Task 1 genuinely requires the agent to _not_ overpower the stimulation in a short window.
 
 ---
 
-### 5.3 Properties
+## Curriculum Strategy
 
-| Property | Value |
-|--------|------|
-| Horizon | Long |
-| Noise | High |
-| Delay | Significant |
-| Stochastic Events | Yes |
+Tasks are designed to be run in order during training:
 
----
+1. **Phase 1 (bootstrap):** `beta_suppression` — teaches the agent that beta suppression matters and that low amplitude can be effective
+2. **Phase 2 (dynamic):** `tremor_correction` — teaches the agent to react to changing brain state
+3. **Phase 3 (full problem):** `full_episode` — the agent must apply everything it learned to the full clinical scenario
 
-### 5.4 Key challenges
-
-- delayed credit assignment
-- compounding errors
-- stability over time
+During inference, all 3 tasks are run independently and scored. The mean score across tasks represents the agent's overall clinical competence.
 
 ---
 
-## 6. Stochastic Variations (Realism Layer)
+## Evaluation Metrics per Task
 
-To avoid overfitting:
-
-- random tremor amplitude
-- random delay
-- noise injection
-- occasional “freeze” events
-
----
-
-### Why this matters
-
-Real-world motor systems are non-deterministic.
-
-Adding controlled stochasticity:
-- improves robustness
-- prevents policy collapse
-- aligns with real-world conditions
-
----
-
-## 7. Curriculum Strategy
-
-### Phase 1:
-- Only Easy tasks
-- High reward density
-
-### Phase 2:
-- Mix Easy + Medium
-
-### Phase 3:
-- Medium + Hard
-
-### Phase 4:
-- Fully mixed distribution
-
----
-
-### Key Principle
-
-> The agent must **experience success early** to learn.
-
----
-
-## 8. Task Evaluation Metrics
-
-Each task exposes:
-
-- success flag
-- completion time
-- stability score
-- trajectory smoothness
-- failure modes
-
----
-
-## 9. Failure Modes to Track
-
-- oscillation near target
-- freezing behavior
-- unstable corrections
-- failure to complete sequence
-
----
-
-## 10. Why this task design works
-
-This structure satisfies:
-
-- verifiable outcomes
-- progressive difficulty
-- multi-step interaction
-- measurable improvement
-
-These are the key properties expected in strong RL environments for OpenEnv-style systems.
+Each episode reports:
+- `grader_score` — deterministic float in [0.0, 1.0]
+- `episode_success` — boolean, True if score ≥ task threshold
+- `force_preserved` at episode end — direct motor function measure
+- `beta_arv` trajectory — how well the oscillation was suppressed
+- `side_effect_load` at episode end — cumulative stimulation safety
+- Per-step `reward` — dense signal for RL training

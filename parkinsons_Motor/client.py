@@ -1,12 +1,6 @@
-# Copyright (c) Meta Platforms, Inc. and affiliates.
-# All rights reserved.
-#
-# This source code is licensed under the BSD-style license found in the
-# LICENSE file in the root directory of this source tree.
-
 """Parkinsons Motor Environment Client."""
 
-from typing import Dict
+from typing import Any, Dict, Optional
 
 from openenv.core import EnvClient
 from openenv.core.client_types import StepResult
@@ -19,59 +13,69 @@ class ParkinsonsMotorEnv(
     EnvClient[ParkinsonsMotorAction, ParkinsonsMotorObservation, State]
 ):
     """
-    Client for the Parkinsons Motor Environment.
+    Client for the Parkinson's Motor (DBS) Environment.
 
-    This client maintains a persistent WebSocket connection to the environment server,
+    Maintains a persistent WebSocket connection to the environment server,
     enabling efficient multi-step interactions with lower latency.
-    Each client instance has its own dedicated environment session on the server.
+    Each client instance has its own dedicated environment session.
 
-    Example:
-        >>> # Connect to a running server
-        >>> with ParkinsonsMotorEnv(base_url="http://localhost:8000") as client:
-        ...     result = client.reset()
-        ...     print(result.observation.echoed_message)
-        ...
-        ...     result = client.step(ParkinsonsMotorAction(message="Hello!"))
-        ...     print(result.observation.echoed_message)
+    Example — local server:
+        >>> env = ParkinsonsMotorEnv(base_url="http://localhost:8000")
+        >>> result = await env.reset()
+        >>> result = await env.step(ParkinsonsMotorAction(dbs_amplitude=1.0))
+        >>> await env.close()
 
-    Example with Docker:
-        >>> # Automatically start container and connect
-        >>> client = ParkinsonsMotorEnv.from_docker_image("parkinsons_Motor-env:latest")
-        >>> try:
-        ...     result = client.reset()
-        ...     result = client.step(ParkinsonsMotorAction(message="Test"))
-        ... finally:
-        ...     client.close()
+    Example — Docker image:
+        >>> env = await ParkinsonsMotorEnv.from_docker_image("parkinsons-motor:latest")
+        >>> result = await env.reset()
+        >>> await env.close()
+
+    Example — Hugging Face Space:
+        >>> env = await ParkinsonsMotorEnv.from_url("https://<your-space>.hf.space")
+        >>> result = await env.reset()
+        >>> await env.close()
     """
 
-    def _step_payload(self, action: ParkinsonsMotorAction) -> Dict:
-        """
-        Convert ParkinsonsMotorAction to JSON payload for step message.
-
-        Args:
-            action: ParkinsonsMotorAction instance
-
-        Returns:
-            Dictionary representation suitable for JSON encoding
-        """
+    def _step_payload(self, action: ParkinsonsMotorAction) -> Dict[str, Any]:
+        """Convert ParkinsonsMotorAction to JSON payload for the step message."""
         return {
-            "message": action.message,
+            "motor_command":   action.motor_command,
+            "dbs_amplitude":   action.dbs_amplitude,
+            "dbs_pulse_width": action.dbs_pulse_width,
+            "task_id":         action.task_id,
         }
 
-    def _parse_result(self, payload: Dict) -> StepResult[ParkinsonsMotorObservation]:
-        """
-        Parse server response into StepResult[ParkinsonsMotorObservation].
-
-        Args:
-            payload: JSON response data from server
-
-        Returns:
-            StepResult with ParkinsonsMotorObservation
-        """
+    def _parse_result(self, payload: Dict[str, Any]) -> StepResult[ParkinsonsMotorObservation]:
+        """Parse the server response into a typed StepResult."""
         obs_data = payload.get("observation", {})
+
         observation = ParkinsonsMotorObservation(
-            echoed_message=obs_data.get("echoed_message", ""),
-            message_length=obs_data.get("message_length", 0),
+            # neural state
+            beta_arv=obs_data.get("beta_arv", 0.0),
+            tremor_arv=obs_data.get("tremor_arv", 0.0),
+            semg_arv=obs_data.get("semg_arv", 0.0),
+            # disease state
+            disease_severity=obs_data.get("disease_severity", 0.0),
+            beta_suppression=obs_data.get("beta_suppression", 0.0),
+            # motor output
+            force_amplitude=obs_data.get("force_amplitude", 0.0),
+            force_preserved=obs_data.get("force_preserved", 0.0),
+            effective_motor_output=obs_data.get("effective_motor_output", 0.0),
+            task_error=obs_data.get("task_error", 0.0),
+            # DBS state
+            dbs_amplitude_ma=obs_data.get("dbs_amplitude_ma", 0.0),
+            dbs_pulse_width_ms=obs_data.get("dbs_pulse_width_ms", 0.06),
+            dbs_entrainment=obs_data.get("dbs_entrainment", 0.0),
+            side_effect_load=obs_data.get("side_effect_load", 0.0),
+            # controller internals
+            scheduler_class=obs_data.get("scheduler_class", 1),
+            beta_ctrl_error=obs_data.get("beta_ctrl_error", 0.0),
+            sim_time_s=obs_data.get("sim_time_s", 0.0),
+            # task & grader
+            task_id=obs_data.get("task_id", "full_episode"),
+            grader_score=obs_data.get("grader_score", -1.0),
+            episode_success=obs_data.get("episode_success", False),
+            # base fields
             done=payload.get("done", False),
             reward=payload.get("reward"),
             metadata=obs_data.get("metadata", {}),
@@ -83,16 +87,8 @@ class ParkinsonsMotorEnv(
             done=payload.get("done", False),
         )
 
-    def _parse_state(self, payload: Dict) -> State:
-        """
-        Parse server response into State object.
-
-        Args:
-            payload: JSON response from state request
-
-        Returns:
-            State object with episode_id and step_count
-        """
+    def _parse_state(self, payload: Dict[str, Any]) -> State:
+        """Parse the server response into a State object."""
         return State(
             episode_id=payload.get("episode_id"),
             step_count=payload.get("step_count", 0),

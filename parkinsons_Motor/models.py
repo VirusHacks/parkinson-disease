@@ -24,6 +24,9 @@ class ParkinsonsMotorAction(Action):
     motor_command    : intended normalised force/torque in [-1, 1].
     dbs_amplitude    : DBS stimulation amplitude in mA [0, 5]. 0 = off.
     dbs_pulse_width  : DBS pulse width in ms [0.06, 0.20].
+    task_id          : task to run on reset (ignored during step).  One of
+                       'beta_suppression' | 'tremor_correction' | 'full_episode'.
+                       Leave empty to keep the current task.
     """
     motor_command: float = Field(
         default=0.0, ge=-1.0, le=1.0,
@@ -36,6 +39,10 @@ class ParkinsonsMotorAction(Action):
     dbs_pulse_width: float = Field(
         default=0.06, ge=0.06, le=0.20,
         description="DBS pulse width in ms",
+    )
+    task_id: str = Field(
+        default="",
+        description="Task ID to load on reset. Empty = keep current task.",
     )
 
 
@@ -106,6 +113,10 @@ class ParkinsonsMotorObservation(Observation):
     # ── simulation time ───────────────────────────────────────────────────────
     sim_time_s: float = Field(default=0.0, ge=0.0)
 
-    # legacy compat
-    echoed_message: str = Field(default="")
-    message_length: int = Field(default=0)
+    # ── task & grader ─────────────────────────────────────────────────────────
+    task_id: str = Field(default="full_episode",
+        description="Active task: 'beta_suppression' | 'tremor_correction' | 'full_episode'")
+    grader_score: float = Field(default=-1.0,
+        description="Final grader score in [0, 1]. -1.0 means episode not yet finished.")
+    episode_success: bool = Field(default=False,
+        description="True if grader_score >= task success_threshold at episode end.")

@@ -1,204 +1,131 @@
-# State and Action Space Design: MotorAssistEnv
+# State and Action Space — MotorAssistEnv (DBS Parkinson's Environment)
 
-## 1. Overview
+## Overview
 
-The effectiveness of an RL environment depends heavily on how the state and action spaces are defined.
-
-The design must balance:
-- realism,
-- learnability,
-- and stability.
-
-If the state is incomplete → agent cannot learn  
-If the action space is too large → training becomes unstable  
-If too simple → environment becomes unrealistic  
+The observation and action spaces are defined by the clinical reality of closed-loop DBS. Every field corresponds to a real physiological or device measurement — nothing is synthetic or abstract.
 
 ---
 
-## 2. State Space (Observation)
+## Observation Space (What the Agent Sees)
 
-The agent observes a structured state vector:
+The agent observes a 12-field state vector at each 20 ms timestep. All fields are normalised to [0, 1] unless stated otherwise.
 
-\[
-s_t = (x_t, v_t, g_t, \hat{u}_{t-1}, \text{impairment params})
-\]
+### Neural State (Brain Signals)
 
----
+| Field | Type | Range | Clinical meaning |
+|---|---|---|---|
+| `beta_arv` | float | [0, 1] | STN beta oscillation amplitude. 0 = fully suppressed, 1 = peak Parkinson's pathology. Pre-DBS baseline ≈ 0.78. |
+| `tremor_arv` | float | [0, 1] | Tremor amplitude envelope. Grows from ~0.01 to ~0.99 across the episode. |
+| `semg_arv` | float | [0, 1] | Surface EMG envelope. Mirrors the beta activity in the motor chain. |
 
-## 2.1 Core Components
+### Disease State (Derived)
 
-### Position
-\[
-x_t \in \mathbb{R}^d
-\]
+| Field | Type | Range | Clinical meaning |
+|---|---|---|---|
+| `disease_severity` | float | [0, 1] | Normalised tremor ARV — a direct proxy for how severe the Parkinson's state is right now. |
+| `beta_suppression` | float | [0, 1] | How much DBS has reduced beta from its peak. 0 = no suppression, 1 = fully suppressed. |
 
-Current end-effector position
+### Motor Output (Muscle Function)
 
----
+| Field | Type | Range | Clinical meaning |
+|---|---|---|---|
+| `force_amplitude` | float | [0, ∞) mN | Raw simulated muscle force. Healthy baseline = 59,752 mN. |
+| `force_preserved` | float | [0, 1] | Fraction of healthy motor force the patient currently produces. 1.0 = fully healthy. |
+| `effective_motor_output` | float | [-1, 1] | The agent's motor command after Parkinsonian distortion (tremor + beta interference). |
+| `task_error` | float | [0, 2] | Distance between intended and actual motor output: `|target - effective|`. |
 
-### Velocity
-\[
-v_t \in \mathbb{R}^d
-\]
+### DBS Device State
 
-Captures motion dynamics
+| Field | Type | Range | Clinical meaning |
+|---|---|---|---|
+| `dbs_amplitude_ma` | float | [0, 5] mA | DBS current delivered at the previous step. |
+| `dbs_pulse_width_ms` | float | [0.06, 0.20] ms | DBS pulse width delivered at the previous step. |
+| `dbs_entrainment` | float | [0, 1] | Fraction of cortical collateral axons entrained by DBS. Derived from the 12×15 parameter sweep table. |
+| `side_effect_load` | float | [0, 1] | Cumulative DBS side-effect proxy. High values = patient at risk of dyskinesia or discomfort. |
 
----
+### Controller Internals (Transparency)
 
-### Target
-\[
-g_t \in \mathbb{R}^d
-\]
+| Field | Type | Range | Clinical meaning |
+|---|---|---|---|
+| `scheduler_class` | int | {0, 1} | Which sub-controller is active: 0 = tremor controller, 1 = beta controller (active 99% of the time). |
+| `beta_ctrl_error` | float | (−∞, ∞) | Beta controller tracking error from the ground-truth PID. Positive = undershot. |
+| `sim_time_s` | float | [10.02, 12.00] | Simulation time in seconds. |
 
-Goal position
+### Task & Grader Fields
 
----
-
-### Previous Action / Control
-\[
-\hat{u}_{t-1}
-\]
-
-Helps model temporal consistency
-
----
-
-### Impairment Parameters
-
-- tremor amplitude
-- delay factor
-- noise level
-
----
-
-## 2.2 Optional (Advanced)
-
-- history window (last k states)
-- phase indicator (for multi-step tasks)
-- success flags
+| Field | Type | Notes |
+|---|---|---|
+| `task_id` | str | Active task: `beta_suppression` / `tremor_correction` / `full_episode` |
+| `grader_score` | float | Final grader score [0, 1]. Value is -1.0 until episode end. |
+| `episode_success` | bool | True if grader_score ≥ task success_threshold. |
 
 ---
 
-## 2.3 Design Rationale
+## Action Space (What the Agent Does)
 
-- position + target → task objective
-- velocity → dynamics awareness
-- previous action → smooth control
-- impairment params → adaptation
+The agent outputs 3 continuous values at each step:
 
----
-
-## 3. Partial Observability
-
-In real systems, not all internal states are visible.
-
-We optionally simulate this by:
-- adding noise to observations
-- hiding some variables
+| Field | Type | Range | Clinical meaning |
+|---|---|---|---|
+| `dbs_amplitude` | float | [0.0, 5.0] mA | DBS stimulation amplitude. 0 = off. Ground-truth optimal: 0.49–0.63 mA for the base simulation. Full suppression requires ≥ 2.0 mA. |
+| `dbs_pulse_width` | float | [0.06, 0.20] ms | DBS pulse width. Controls spatial spread of stimulation. Wider pulse → more cortical entrainment. |
+| `motor_command` | float | [-1.0, 1.0] | Intended voluntary motor output (e.g., the signal to hold a cup, reach for a door). |
+| `task_id` | str | optional | Passed only on `reset()` to select which clinical task to run. Ignored during `step()`. |
 
 ---
 
-### Why this matters
+## Physical Model — How Action Becomes Observation
 
-Encourages:
-- robust policies
-- better generalization
+### DBS Entrainment (One-Step Lag)
 
----
+When the agent specifies `(dbs_amplitude, dbs_pulse_width)`, the environment bilinearly interpolates the 12×15 entrainment lookup table (derived from the Fleming et al. DBS parameter sweep):
 
-## 4. Action Space
+```
+entrainment = bilinear_interp(
+    dbs_entrainment_table[12×15],
+    amplitude_axis[12],
+    pulse_width_axis[15],
+    dbs_amplitude, dbs_pulse_width
+)
+```
 
-We define a continuous control action:
+This entrainment value is then applied to the **next** step's brain state (one-step clinical lag), suppressing:
+- `beta_arv` by factor `(1 − entrainment)`
+- `tremor_arv` by factor `(1 − 0.6 × entrainment)`
+- `force_preserved` boosted by factor `(1 + 0.4 × entrainment)`
 
-\[
-a_t \in \mathbb{R}^d
-\]
+### Motor Distortion
 
----
+The patient's Parkinsonian brain distorts the motor command before it reaches the muscles:
 
-## 4.1 Interpretation
+```
+effective = motor_command
+            × (1 − 0.55 × beta_arv_effective)
+            × (1 − 0.30 × tremor_arv_effective)
+            + N(0, 0.12 × tremor_arv_effective)
+```
 
-Action represents a **correction signal** applied to movement.
-
----
-
-## 4.2 Action Constraints
-
-\[
-a_t \in [-a_{\max}, a_{\max}]
-\]
-
----
-
-## 4.3 Executed Control
-
-Due to impairment:
-
-\[
-u_t = f(a_t, \text{noise}, \text{delay}, \text{tremor})
-\]
+Where `beta_arv_effective` and `tremor_arv_effective` are already modulated by the current DBS entrainment from the previous step.
 
 ---
 
-## 4.4 Impairment Model
+## Partial Observability
 
-The actual executed action is:
+The agent does **not** observe:
+- The ground-truth DBS settings used by the Fleming model (available in metadata for debugging only)
+- Raw neural spike trains from individual STN neurons
+- The patient's intended target movement (only the normalised `target_output` context is available via `task_error`)
 
-\[
-u_t = a_t + \epsilon_t + \delta_t
-\]
-
-where:
-- \( \epsilon_t \sim \text{noise} \)
-- \( \delta_t \sim \text{tremor} \)
+This partial observability is clinically realistic: real closed-loop DBS systems measure LFP signals but not individual neuron activity.
 
 ---
 
-## 5. Transition Function
+## Design Rationale
 
-\[
-s_{t+1} = f(s_t, u_t)
-\]
-
----
-
-## 5.1 Dynamics
-
-- position updated via control
-- velocity updated accordingly
-- noise injected
-
----
-
-## 6. Temporal Structure
-
-The environment is:
-
-- sequential
-- time-dependent
-- partially observable
-
----
-
-## 7. Action Design Tradeoffs
-
-### Continuous vs Discrete
-
-| Choice | Reason |
-|------|------|
-| Continuous | realistic motor control |
-| Discrete | easier learning |
-
-We choose **continuous** for realism.
-
----
-
-### Direct vs Structured Actions
-
-We can extend to:
-
-```json
-{
-  "type": "stabilize",
-  "intensity": 0.3
-}
+| Choice | Justification |
+|---|---|
+| Continuous action space | Matches clinical DBS programmers who tune exact amplitude/pulse-width values |
+| One-step DBS lag | Reflects real hardware response delay of DBS implants |
+| Force preserved as primary signal | Clinicians care about functional motor output, not just the electrical measurement |
+| Side-effect load in observation | The agent must manage the trade-off between suppression and patient safety |
+| Normalised observations | Allows the agent to transfer across different disease severity levels |

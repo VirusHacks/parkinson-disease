@@ -5,3 +5,13 @@ runtime: fastapi
 app: server.app:app
 port: 8000
 
+tasks:
+  - id: beta_suppression
+    description: "Easy: suppress STN beta oscillation in the calm early phase (20 steps)"
+    difficulty: easy
+  - id: tremor_correction
+    description: "Medium: dynamically correct rising tremor while preserving muscle force (50 steps)"
+    difficulty: medium
+  - id: full_episode
+    description: "Hard: optimise full 100-step DBS episode — max force, min side-effects"
+    difficulty: hard
