@@ -1,0 +1,12 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(find \"/c/Users/daksh/OneDrive/Desktop/Hackathons/open-env-hackathon/parkinson-disease/park-sen/\" -maxdepth 1 -type f \\\\\\( -name \"*.log\" -o -name \"*.txt\" -o -name \"*.csv\" \\\\\\) -exec ls -lh {} \\\\;)",
+      "Bash(python -c ' *)",
+      "Bash(uv add *)",
+      "Bash(.venv/Scripts/python.exe -c ' *)",
+      "Bash(.venv/Scripts/python.exe brain_calibrator.py)",
+      "Bash(tee \"../calibration_output.txt\")"
+    ]
+  }
+}

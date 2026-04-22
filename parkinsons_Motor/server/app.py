@@ -42,11 +42,13 @@ except Exception as e:  # pragma: no cover
     ) from e
 
 try:
-    from ..models import ParkinsonsMotorAction, ParkinsonsMotorObservation
-    from .parkinsons_Motor_environment import ParkinsonsMotorEnvironment
-except ModuleNotFoundError:
     from models import ParkinsonsMotorAction, ParkinsonsMotorObservation
     from server.parkinsons_Motor_environment import ParkinsonsMotorEnvironment
+except ImportError:
+    from parkinsons_Motor.models import ParkinsonsMotorAction, ParkinsonsMotorObservation
+    from parkinsons_Motor.server.parkinsons_Motor_environment import (
+        ParkinsonsMotorEnvironment,
+    )
 
 
 # Create the app with web interface and README integration
@@ -104,6 +106,10 @@ if __name__ == "__main__":
     import argparse
 
     parser = argparse.ArgumentParser()
+    parser.add_argument("--host", default="0.0.0.0")
     parser.add_argument("--port", type=int, default=8000)
     args = parser.parse_args()
-    main(port=args.port)
+    if args.host == "0.0.0.0" and args.port == 8000:
+        main()
+    else:
+        main(host=args.host, port=args.port)

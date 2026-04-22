@@ -39,3 +39,5 @@ htmlcov/
 # Node tooling (optional local installs)
 node_modules/
 npm-debug.log*
+
+.env
