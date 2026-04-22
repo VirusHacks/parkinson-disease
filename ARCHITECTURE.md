@@ -1,14 +1,15 @@
-# Architecture: MotorAssistEnv
+# Architecture: MotorAssistEnv (DBS Parkinson's Environment)
 
 ## 1. Overview
 
-MotorAssistEnv is designed as a **modular RL system** that separates:
-- environment dynamics
-- reward / verification
-- agent learning
-- curriculum adaptation
+MotorAssistEnv is structured as a **medical BCI (Brain-Computer Interface) reinforcement learning system**. It cleanly separates:
+- Real-world biophysical brain simulation (offline)
+- OpenEnv RL task and state management (online)
+- Neurological grading (deterministic evaluation)
+- LLM/RL Agent learning (policy optimization)
+- 3D Visualisation (frontend representation)
 
-The goal is to create a **self-improving RL loop** while keeping the environment verifiable, stable, and hackathon-friendly.
+The goal is a **verifiable, scientifically grounded RL benchmark** that simulates real clinical DBS programming without subjective or "toy" scoring mechanisms.
 
 ---
 
@@ -16,252 +17,91 @@ The goal is to create a **self-improving RL loop** while keeping the environment
 
 ```
 +-------------------------------------------------------------+
-|                    SELF-IMPROVING LOOP                      |
+|                 OPENENV RL SYSTEM                           |
 +-------------------------------------------------------------+
 
-   +-------------------+
-   | Curriculum Engine |
-   | (difficulty ctrl) |
-   +---------+---------+
-             |
-             v
-   +-------------------+
-   | Impairment Model  |
-   | (tremor, delay)   |
-   +---------+---------+
-             |
-             v
-   +---------------------------+
-   |   MotorAssist Environment |
-   | (state, dynamics, tasks)  |
-   +---------+-----------------+
-             |
-             v
-   +---------------------------+
-   | RL Agent (PPO / GRPO)     |
-   | learns correction policy  |
-   +---------+-----------------+
-             |
-             v
-   +---------------------------+
-   | Reward & Verifier System  |
-   | (deterministic metrics)   |
-   +---------+-----------------+
-             |
-             v
-   +---------------------------+
-   | Training Loop (TRL)       |
-   | updates policy            |
-   +---------------------------+
-
-             ^
-             |
-   +---------------------------+
-   | Metrics & Logging         |
-   | (success, stability, etc) |
-   +---------------------------+
-```
-
----
-
-## 3. Key Design Decision: No LLM-as-Judge
-
-### ❌ Why NOT use LLM judge:
-- Non-deterministic → bad for evaluation
-- Easy to game → reward hacking risk
-- Slow → violates hackathon constraints
-- Judges prefer **verifiable rewards**
-
-### ✅ What we use instead:
-- Deterministic reward functions
-- Physics + metrics based evaluation
-
----
-
-## 4. Core Components
-
----
-
-### 4.1 Environment Layer
-
-Handles:
-- state transitions
-- physics / movement
-- impairment injection
+    +-------------------+
+    | Biophysical Data  |
+    | (Fleming model)   |
+    +---------+---------+
+              | (CSV timelines + tables)
+              v
+    +-------------------+
+    | Brain Calibrator  |
+    | (State + Lookups) |
+    +---------+---------+
+              |
+              v
+    +---------------------------+       +-------------------+
+    | MotorAssist Environment   | ----> | 3D Visualisation  |
+    | (OpenEnv step/reset API)  |       | (MyoSuite Demo)   |
+    +---------+-----------------+       +-------------------+
+              |
+              ^ (brain state)
+              |
+              v (DBS Action)
+    +---------------------------+
+    | Agent (LLM / PPO / GRPO)  |
+    | learns DBS tuning policy  |
+    +---------+-----------------+
+              |
+              v
+    +---------------------------+
+    | Grader / Verifier System  |
+    | (Deterministic 0.0 - 1.0) |
+    +---------------------------+
 
 ```
-state_t → action → impaired_action → next_state
-```
-
-Includes:
-- tremor noise
-- delay
-- stochastic disturbances
 
 ---
 
-### 4.2 Impairment Model
+## 3. Core Components
 
-Simulates Parkinson-like effects:
+### 3.1 Biophysical Data Layer (Ground Truth)
+The environment does not invent physics. It uses peer-reviewed biophysical simulation data from Fleming et al. (2023). 
+- **What it provides:** 100-step timelines of beta oscillation, tremor amplitude, and raw muscle force.
+- **Why it matters:** Agents train on real physiological dynamics, including non-stationary tremor build-up.
 
-```
-u_t = a_t + tremor + noise + delay
-```
+### 3.2 Brain Calibrator (`brain_calibrator.py`)
+Loads the raw `.csv` and `.txt` files into memory during environment initialization.
+- Converts raw signals to normalized `[0, 1]` ranges.
+- Provides a fast bilinear interpolation function to map the agent's `(amplitude, pulse_width)` to a cortical `entrainment` fraction.
 
-Types:
-- high-frequency tremor
-- latency
-- freezing events (rare)
+### 3.3 OpenEnv API (`server/parkinsons_Motor_environment.py`)
+Provides the standard `step()` and `reset()` interface.
+- **State Transition:** Applies the agent's DBS action to suppress the exact *next step's* pathological brain signals (1-step clinical lag).
+- **Sub-task Management:** Slices the 100-step timeline into 3 distinct tasks (Easy: 20 steps, Medium: 50 steps, Hard: 100 steps).
 
----
+### 3.4 Grader System (`graders/dbs_graders.py`)
+At the end of an episode, returns a fixed `[0.0, 1.0]` score.
+- **No LLM-as-Judge.** The grader is 100% deterministic math.
+- Factors in `force_preserved`, `beta_suppression`, `side_effect_load`, and `amplitude_efficiency`.
 
-### 4.3 RL Agent
-
-Learns:
-
-```
-correction = f(state)
-```
-
-Final control:
-
-```
-u_t = impaired_signal + correction
-```
-
----
-
-### 4.4 Reward & Verifier
-
-Deterministic evaluation:
-
-- distance to target
-- stability (variance)
-- smoothness
-- success condition
-
-No subjective scoring.
+### 3.5 3D Visualisation (`static/myosuite_demo/`)
+A completely separate frontend to showcase the AI's impact visually.
+- Reads `tremor_arv` from the OpenEnv backend.
+- Applies proportional jitter to a 3D musculoskeletal arm.
+- *Crucial detail:* The RL agent is not slowed down by rendering 3D physics during training.
 
 ---
 
-### 4.5 Curriculum Controller
+## 4. Key Design Decisions
 
-Adjusts difficulty dynamically:
+### 4.1 Dense vs. Sparse Reward
+The environment returns a **dense per-step reward** during interaction (`reward=0.68`). However, success is judged by a **sparse grader score** at the end of the episode (`grader_score=0.92`). This allows for smooth gradient updates while preserving objective benchmark evaluation.
 
-- tremor ↑ as agent improves
-- delay ↑
-- task complexity ↑
+### 4.2 Why Not Just Use MyoSuite for RL?
+MyoSuite calculates computationally heavy musculoskeletal physics. Training an RL agent inside it takes days. Since we already have the ground-truth `muscle_force` calculated by the Fleming neuroscience simulation, we use the raw math for the RL backend (instantaneous steps) and use MyoSuite solely as a visual "puppet" for human demonstrations.
 
----
-
-### 4.6 Training Loop
-
-- PPO / GRPO
-- rollout collection
-- reward computation
-- policy update
+### 4.3 Anti-Hacking Mechanisms
+- The simulation timeline advances deterministically. An agent cannot "pause" time.
+- The `side_effect_load` budget ensures the agent cannot simply max out DBS (3.0mA) to force a perfect muscle-force score.
 
 ---
 
-## 5. Data Flow (Step Function)
+## 5. Metrics Tracked
 
-```
-obs_t
-  ↓
-agent(action)
-  ↓
-impaired_action = apply_impairment(action)
-  ↓
-next_state = physics(impaired_action)
-  ↓
-reward = compute_reward(next_state)
-  ↓
-return (next_state, reward, done)
-```
-
----
-
-## 6. Stochasticity Design
-
-We introduce **controlled randomness**:
-
-| Component | Randomized |
-|----------|-----------|
-| Tremor amplitude | ✓ |
-| Delay | ✓ |
-| Noise | ✓ |
-| Freeze events | ✓ (rare) |
-
-### Why:
-- improves robustness
-- avoids overfitting
-- mimics real-world variability
-
----
-
-## 7. Safety & Anti-Hacking Layer
-
-- action clipping
-- penalty for oscillation
-- penalty for inactivity
-- timeout enforcement
-
----
-
-## 8. Metrics Layer
-
-Tracked continuously:
-
-- success rate
-- stability score
-- smoothness
-- tremor reduction %
-- completion time
-
----
-
-## 9. Optional Extensions (Advanced)
-
-### 9.1 Personalization Layer
-- different patient profiles
-
-### 9.2 Adversarial Noise Generator
-- increases difficulty where agent fails
-
-### 9.3 Hierarchical Tasks
-- multi-phase control
-
----
-
-## 10. Why This Architecture Works
-
-This system is:
-
-### ✔ Modular
-Each component is independent and testable
-
-### ✔ Verifiable
-No black-box reward
-
-### ✔ Scalable
-Can extend to biomechanics later
-
-### ✔ Learnable
-Curriculum ensures non-zero reward
-
-### ✔ Realistic
-Includes noise, delay, stochasticity
-
----
-
-## 11. Final Insight
-
-This is not a simulation of the brain.
-
-It is a system that learns:
-
-> **how to act under imperfect control**
-
-That is what makes it both:
-- scientifically meaningful
-- and practically useful
+- `force_preserved`: Primary proxy for patient mobility.
+- `beta_arv`: The pathological driver the agent must suppress.
+- `side_effect_load`: The penalty boundary.
+- `grader_score`: The objective Hackathon validation proxy.
