@@ -1,0 +1,12 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(mkdir -p /Users/vinay/vscode/hackathon/meta-hackathon/environment/parkinsons_Motor/static)",
+      "Bash(cp -R /Users/vinay/vscode/hackathon/meta-hackathon/models/myosuite_demo /Users/vinay/vscode/hackathon/meta-hackathon/environment/parkinsons_Motor/static/myosuite_demo)",
+      "Bash(PYTHONPATH=. .venv/bin/python *)",
+      "Bash(timeout 10 .venv/bin/uvicorn server.app:app --host 127.0.0.1 --port 8765 --log-level debug)",
+      "Bash(echo \"EXIT: $?\")",
+      "Bash(uv run *)"
+    ]
+  }
+}
