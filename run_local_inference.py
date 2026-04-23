@@ -17,6 +17,7 @@ import json
 import os
 import sys
 import textwrap
+import time
 from pathlib import Path
 from typing import List, Optional
 
@@ -76,7 +77,7 @@ Brain state fields:
   dbs_entrainment  — Fraction of cortical axons entrained by DBS last step
   sim_time_s       — Simulation time in seconds
 
-Goal: maximise force_preserved every step by tuning DBS to suppress beta.
+Goal: maximise force_preserved every step by tuning DBS to suppress beta without draining the side effect budget.
 
 Output ONLY valid JSON — no explanation, no markdown:
 {
@@ -86,8 +87,9 @@ Output ONLY valid JSON — no explanation, no markdown:
 }
 
 Clinical rules:
+- START LOW: If tremor is still extremely low (e.g., sim_time < 10.5), use very low amplitude (0.0 - 0.5) to explicitly preserve the side-effect budget!
 - beta_arv > 0.5 → raise dbs_amplitude
-- side_effect_load > 0.4 → lower dbs_amplitude  
+- side_effect_load > 0.4 → aggressively lower dbs_amplitude  
 - force_preserved < 0.3 → critical — use maximum safe DBS
 - Good starting pulse width: 0.13 ms
 - motor_command near 0.4 is a reasonable default
@@ -115,21 +117,24 @@ def _build_user_prompt(step: int, obs: dict, task_id: str, history: list) -> str
     """).strip()
 
 
-def _call_llm(client: OpenAI, step: int, obs: dict, task_id: str, history: list) -> str:
-    try:
-        resp = client.chat.completions.create(
-            model=MODEL_NAME,
-            messages=[
-                {"role": "system", "content": SYSTEM_PROMPT},
-                {"role": "user",   "content": _build_user_prompt(step, obs, task_id, history)},
-            ],
-            temperature=TEMPERATURE,
-            max_tokens=MAX_TOKENS,
-        )
-        return (resp.choices[0].message.content or "").strip()
-    except Exception as exc:
-        print(f"[DEBUG] LLM call failed: {exc}", flush=True)
-        return ""
+def _call_llm(client: OpenAI, step: int, obs: dict, task_id: str, history: list, max_retries: int = 3) -> str:
+    for attempt in range(max_retries):
+        try:
+            resp = client.chat.completions.create(
+                model=MODEL_NAME,
+                messages=[
+                    {"role": "system", "content": SYSTEM_PROMPT},
+                    {"role": "user",   "content": _build_user_prompt(step, obs, task_id, history)},
+                ],
+                temperature=TEMPERATURE,
+                max_tokens=MAX_TOKENS,
+            )
+            return (resp.choices[0].message.content or "").strip()
+        except Exception as exc:
+            delay = 2 ** attempt
+            print(f"[DEBUG] LLM call failed (attempt {attempt+1}/{max_retries}): {exc}. Retrying in {delay}s...", flush=True)
+            time.sleep(delay)
+    return ""
 
 
 def _parse_action(text: str) -> Optional[dict]:

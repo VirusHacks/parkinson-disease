@@ -1,0 +1,14 @@
+Who are the mentors and judges for the finale?
+We are proud to share the full list of mentors and judges who will be part of the in-person finale:
+Sanyam Bhutani, Partner Engineer at Meta
+Yash Khare, Partner Engineer at Meta
+Nilesh Pandey, Partner Engineer at Meta
+Adithya S Kolavi, ML Engineer at Hugging Face
+Adarsh Shirawalmath, ML Engineer at Hugging Face
+Arkadip Maitra, ML Engineer at Red Hat
+Aashay Sachdeva, Founding Team at Sarvam
+Deepa Dhevannan, Gen AI Solutions Architect
+Soumik Rakshit, ML Engineer at Zomato
+Ayush Satyam, Systems ML Engineer, Red Hat
+Parshant Sharma, Machine Learning Engineer at Red Hat
+These are practitioners actively working at the forefront of AI. The team has worked hard to bring them together so they can be around to help you make your environments even better.
