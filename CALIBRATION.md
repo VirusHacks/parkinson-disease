@@ -17,7 +17,7 @@ Anyone reading this should come away understanding:
 
 ### What It Is
 
-The `park-sen` folder contains a full biophysical simulation of a Parkinson's-affected brain, published in:
+The `fleming-model-based-brain` folder contains a full biophysical simulation of a Parkinson's-affected brain, published in:
 
 > **Fleming, J.E., Senneff, S. and Lowery, M.M. (2023)**  
 > *Multivariable closed-loop control of deep brain stimulation for Parkinson's disease*  
@@ -42,11 +42,11 @@ The `park-sen` folder contains a full biophysical simulation of a Parkinson's-af
 
 ## Part 2 — What the Simulation Produced
 
-The simulation ran for ~75 seconds of simulated time and produced two types of output:
+The simulation ran for ~120 minutes of simulated time and produced two types of output:
 
 ### Type A — Neural Recordings (`.mat` files)
 
-Binary MATLAB files stored in `park-sen/Model_Results/STN_Pop/` and `Motoneuron_Pop/`.
+Binary MATLAB files stored in `fleming-model-based-brain/Model_Results/STN_Pop/` and `Motoneuron_Pop/`.
 
 | File type | Contents | Count |
 |---|---|---|
