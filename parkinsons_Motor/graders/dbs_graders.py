@@ -19,7 +19,10 @@ from __future__ import annotations
 
 from typing import Any, Dict, List, Optional
 
-from ..tasks.dbs_tasks import DBSTask
+try:
+    from ..tasks.dbs_tasks import DBSTask
+except ImportError:
+    from tasks.dbs_tasks import DBSTask
 
 
 # ---------------------------------------------------------------------------

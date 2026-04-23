@@ -158,6 +158,8 @@ class ParkinsonsMotorEnvironment(Environment):
         # Random motor target in a realistic range (±0.6) to vary task demands
         self._target_output = round(random.uniform(-0.6, 0.6), 2)
 
+        if len(self._brain.timeline) == 0:
+            raise RuntimeError(f"Calibration failed remotely! Windows=0.")
         w = self._brain_window()
         return self._make_obs(
             w, effective=0.0, task_error=abs(self._target_output),

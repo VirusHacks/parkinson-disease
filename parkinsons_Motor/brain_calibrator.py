@@ -37,7 +37,7 @@ import numpy as np
 
 # ── paths ─────────────────────────────────────────────────────────────────────
 _HERE = Path(__file__).resolve().parent
-_PARK_SEN = _HERE.parent / "fleming-model-based-brain"
+_PARK_SEN = _HERE / "fleming-model-based-brain"
 _RESULTS = _PARK_SEN / "Model_Results"
 
 
@@ -115,13 +115,17 @@ class CalibratedBrainState:
 # ── CSV loaders ───────────────────────────────────────────────────────────────
 
 def _csv(name: str) -> Optional[np.ndarray]:
-    """Load a single-column CSV from Model_Results. Returns None if missing."""
+    """Load a single-column CSV. Memory-efficient to prevent OOM on HuggingFace."""
     p = _RESULTS / (name + ".csv")
     if not p.exists():
+        print(f"[calibrator] File not found: {p}", flush=True)
         return None
     try:
-        return np.loadtxt(str(p))
-    except Exception:
+        print(f"[calibrator] Loading {p.name} ({p.stat().st_size / 1e6:.2f} MB)...", flush=True)
+        with open(p, 'r') as f:
+            return np.array([float(line) for line in f if line.strip()], dtype=np.float32)
+    except Exception as e:
+        print(f"[calibrator] Error loading {p.name}: {e}", flush=True)
         return None
 
 
