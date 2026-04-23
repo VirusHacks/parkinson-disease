@@ -1,0 +1,221 @@
+{
+  "search_space": {
+    "amp": [
+      0.4,
+      0.6,
+      0.8,
+      1.0,
+      1.2,
+      1.4,
+      1.6
+    ],
+    "pw": [
+      0.06,
+      0.08,
+      0.1,
+      0.12
+    ],
+    "gain": [
+      1.0,
+      1.15,
+      1.3
+    ]
+  },
+  "top_candidates": [
+    {
+      "amp": 1.6,
+      "pw": 0.12,
+      "gain": 1.15,
+      "objective": 0.37694905372950777,
+      "public_summary": {
+        "mean": 0.34177113783873914,
+        "std": 0.017864118522664073,
+        "min": 0.32925036851903866,
+        "max": 0.37257420243485795
+      },
+      "public_successes": 0,
+      "heldout_score": 0.26429297014289765,
+      "heldout_success": false
+    },
+    {
+      "amp": 1.6,
+      "pw": 0.12,
+      "gain": 1.3,
+      "objective": 0.37591194045140097,
+      "public_summary": {
+        "mean": 0.339225319422703,
+        "std": 0.01587365503395784,
+        "min": 0.32733061946270703,
+        "max": 0.36647142692396706
+      },
+      "public_successes": 0,
+      "heldout_score": 0.271033565247916,
+      "heldout_success": false
+    },
+    {
+      "amp": 1.6,
+      "pw": 0.12,
+      "gain": 1.0,
+      "objective": 0.366712525416117,
+      "public_summary": {
+        "mean": 0.33514610533300393,
+        "std": 0.02169571092024908,
+        "min": 0.3075237017116439,
+        "max": 0.36837075790920304
+      },
+      "public_successes": 0,
+      "heldout_score": 0.24660231875450225,
+      "heldout_success": false
+    },
+    {
+      "amp": 1.6,
+      "pw": 0.1,
+      "gain": 1.3,
+      "objective": 0.35341539202169503,
+      "public_summary": {
+        "mean": 0.3195131332493,
+        "std": 0.01528414473252423,
+        "min": 0.30916354841633953,
+        "max": 0.3458337359313023
+      },
+      "public_successes": 0,
+      "heldout_score": 0.251488633036841,
+      "heldout_success": false
+    },
+    {
+      "amp": 1.6,
+      "pw": 0.1,
+      "gain": 1.15,
+      "objective": 0.3528176717696171,
+      "public_summary": {
+        "mean": 0.32076525721968424,
+        "std": 0.017479978833401872,
+        "min": 0.3074585841135008,
+        "max": 0.3507861982540198
+      },
+      "public_successes": 0,
+      "heldout_score": 0.24281606172188877,
+      "heldout_success": false
+    },
+    {
+      "amp": 1.6,
+      "pw": 0.1,
+      "gain": 1.0,
+      "objective": 0.34232179916745425,
+      "public_summary": {
+        "mean": 0.31395305204995483,
+        "std": 0.021608102040573517,
+        "min": 0.28540967412519724,
+        "max": 0.3462860363547924
+      },
+      "public_successes": 0,
+      "heldout_score": 0.22513848418428542,
+      "heldout_success": false
+    },
+    {
+      "amp": 1.4,
+      "pw": 0.12,
+      "gain": 1.3,
+      "objective": 0.32867033120134637,
+      "public_summary": {
+        "mean": 0.29794653071555555,
+        "std": 0.014824728475849371,
+        "min": 0.2877011645404911,
+        "max": 0.3234999894611259
+      },
+      "public_successes": 0,
+      "heldout_score": 0.22953321736502116,
+      "heldout_success": false
+    },
+    {
+      "amp": 1.4,
+      "pw": 0.12,
+      "gain": 1.15,
+      "objective": 0.32642807014369224,
+      "public_summary": {
+        "mean": 0.29784088496169037,
+        "std": 0.017243913692804366,
+        "min": 0.28330715518330163,
+        "max": 0.32722251683167425
+      },
+      "public_successes": 0,
+      "heldout_score": 0.21932109070135322,
+      "heldout_success": false
+    },
+    {
+      "amp": 1.4,
+      "pw": 0.12,
+      "gain": 1.0,
+      "objective": 0.31568641132523667,
+      "public_summary": {
+        "mean": 0.29088186821400536,
+        "std": 0.021741644544152162,
+        "min": 0.2610453391326857,
+        "max": 0.32248319203251075
+      },
+      "public_successes": 0,
+      "heldout_score": 0.2015996949817954,
+      "heldout_success": false
+    },
+    {
+      "amp": 0.4,
+      "pw": 0.06,
+      "gain": 1.3,
+      "objective": 0.31198247628176756,
+      "public_summary": {
+        "mean": 0.28133903292864915,
+        "std": 0.0147345749528353,
+        "min": 0.25647416832769465,
+        "max": 0.294798270418979
+      },
+      "public_successes": 0,
+      "heldout_score": 0.22884724727551525,
+      "heldout_success": false
+    },
+    {
+      "amp": 0.4,
+      "pw": 0.08,
+      "gain": 1.3,
+      "objective": 0.3038832447729854,
+      "public_summary": {
+        "mean": 0.2760016405742308,
+        "std": 0.01495482352180254,
+        "min": 0.2506122454076971,
+        "max": 0.28906289370733007
+      },
+      "public_successes": 0,
+      "heldout_score": 0.21080206719470124,
+      "heldout_success": false
+    },
+    {
+      "amp": 0.4,
+      "pw": 0.06,
+      "gain": 1.15,
+      "objective": 0.30252157864664186,
+      "public_summary": {
+        "mean": 0.27526787724987417,
+        "std": 0.020320830975766962,
+        "min": 0.24009147540809012,
+        "max": 0.28794877714342215
+      },
+      "public_successes": 0,
+      "heldout_score": 0.2155593942713963,
+      "heldout_success": false
+    }
+  ],
+  "best_candidate": {
+    "amp": 1.6,
+    "pw": 0.12,
+    "gain": 1.15,
+    "objective": 0.37694905372950777,
+    "public_summary": {
+      "mean": 0.34177113783873914,
+      "std": 0.017864118522664073,
+      "min": 0.32925036851903866,
+      "max": 0.37257420243485795
+    },
+    "public_successes": 0,
+    "heldout_score": 0.26429297014289765,
+    "heldout_success": false
+  }
+}

@@ -48,7 +48,7 @@ At every step, the agent receives a compact summary of the patient's current neu
 - `dbs_pulse_width`
 - `motor_command`
 
-Those actions influence the next step through a calibrated DBS entrainment model with a one-step lag. Stronger and better-targeted stimulation suppresses beta activity and reduces tremor, but excessive stimulation consumes the safety budget and hurts long-horizon performance.
+Those actions influence the next step through a calibrated entrainment lookup plus online latent dynamics. The current environment is not a simple replay anymore: it tracks patient-specific beta, tremor, force, fatigue, entrainment, and side-effect states, then updates them with task-aware constraints and patient-profile coefficients. Stronger and better-targeted stimulation suppresses beta activity and reduces tremor, but excessive stimulation accumulates side effects, hurts force, and can trigger benchmark penalties.
 
 In plain terms, the agent is learning when to intervene, how strongly to intervene, and how to trade symptom control against stimulation cost.
 
@@ -90,13 +90,19 @@ optional web demo / remote inference
 
 ## Task design
 
-The environment uses three tasks built from the same 100-step clinical trajectory. They share the same action/observation design and reward logic; difficulty comes from longer horizons, stricter trade-offs, and more severe tremor progression.
+The environment uses three clinically distinct tasks built from the same calibrated episode family. They share the same action/observation schema, but differ in horizon length, safety budget, pass threshold, and what kind of control behavior is rewarded.
 
 | Task | Difficulty | Steps | Main goal |
 |---|---|---:|---|
-| `beta_suppression` | Easy | 20 | Suppress early beta activity without overspending the side-effect budget |
-| `tremor_correction` | Medium | 50 | Dynamically respond as tremor rises and force begins to fall |
-| `full_episode` | Hard | 100 | Handle the full progression and optimize the full clinical trade-off |
+| `beta_suppression` | Easy | 24 | Early stabilization under a very tight safety budget |
+| `tremor_correction` | Medium | 48 | Active tremor rescue as force starts to degrade |
+| `full_episode` | Hard | 100 | Long-horizon control with cumulative side effects and recovery pressure |
+
+Current calibrated public ladder:
+
+- `beta_suppression`: `no_dbs`, `const_low`, `const_mid`, and `const_high` all fail; `safety_aware` passes all public runs.
+- `tremor_correction`: `no_dbs` and all constant policies fail; the searched rescue baseline used by `safety_aware` passes all public runs.
+- `full_episode`: passive and constant policies fail; `safety_aware` passes all public runs.
 
 ### What the agent must learn across tasks
 
@@ -116,7 +122,9 @@ At each step the agent observes a clinically grounded state vector. The most imp
 | Disease state | `disease_severity`, `beta_suppression` | Normalized severity and current suppression level |
 | Motor state | `force_amplitude`, `force_preserved`, `effective_motor_output`, `task_error` | Whether the patient can still produce useful movement |
 | DBS state | `dbs_amplitude_ma`, `dbs_pulse_width_ms`, `dbs_entrainment`, `side_effect_load` | What stimulation was applied and how much safety budget remains |
-| Transparency | `scheduler_class`, `beta_ctrl_error`, `sim_time_s` | Helpful controller and timeline context |
+| Temporal summaries | `beta_trend`, `tremor_trend`, `side_effect_rate`, `recent_dbs_avg_ma` | Short-horizon trend information needed for closed-loop control |
+| Safety and control | `side_effect_load`, `action_smoothness_cost`, `dbs_constraint_violation` | Whether the current strategy is clinically sustainable |
+| Evaluation metadata | `grader_score`, `episode_success`, `sim_time_s` | Benchmark-facing diagnostics exposed at the interface |
 
 Most continuous observation fields are normalized into `[0, 1]`, while force is also exposed in physical units.
 
@@ -134,21 +142,26 @@ The environment then maps `(dbs_amplitude, dbs_pulse_width)` onto the calibrated
 
 ## Reward design
 
-The dense per-step reward is:
+The dense per-step reward is a weighted combination of motor function, tracking quality, symptom suppression, safety, smoothness, and efficiency:
 
 ```text
-r_t = 0.50 * force_preserved_t
-    + 0.30 * (1 - task_error_t)
-    + 0.15 * dbs_entrainment_t
-    - 0.005 * dbs_amplitude_t
+r_t =
+    0.28 * force_preserved
+  + 0.20 * tracking_accuracy
+  + 0.16 * (1 - beta_arv)
+  + 0.12 * (1 - tremor_arv)
+  + 0.12 * safety
+  + 0.07 * (1 - smoothness_cost)
+  + 0.05 * efficiency
+  - 0.08 * constraint_violation
 ```
 
 This is designed to reflect the real treatment objective:
 
-- `force_preserved` is the primary signal because restored function is the real outcome.
-- `1 - task_error` rewards effective movement rather than pure stimulation.
-- `dbs_entrainment` rewards meaningful suppression of the pathological circuit.
-- The amplitude penalty discourages brute-force stimulation.
+- Force and tracking are rewarded directly because the benchmark is about useful function, not just pretty neural traces.
+- Beta and tremor suppression matter, but they are not allowed to dominate safety or motor quality.
+- Safety and smoothness make aggressive but clinically unstable controllers unattractive during training.
+- Constraint violations are penalized explicitly so policies cannot exploit task clipping.
 
 ### Episode-end grading
 
@@ -156,15 +169,21 @@ Each task is scored by a deterministic grader in `[0.0, 1.0]`. The grader combin
 
 - `force_score`
 - `beta_score`
-- `side_effect_score`
-- `amplitude_efficiency`
-- `final_state_bonus` where relevant
+- `tremor_score`
+- `tracking_score`
+- `safety_score`
+- `smoothness_score`
+- `efficiency_score`
+- `terminal_stability_score`
+- `recovery_score` where relevant
 
 Task weights shift by clinical goal:
 
-- `beta_suppression` prioritizes keeping beta below threshold
-- `tremor_correction` prioritizes preserving force while tremor ramps
-- `full_episode` balances force, beta, safety, and efficiency over a long horizon
+- `beta_suppression` rewards gentle early suppression and clean tracking
+- `tremor_correction` rewards active rescue instead of passive waiting
+- `full_episode` rewards long-horizon stability and punishes weak terminal control
+
+The grader also includes hard-failure logic for unsafe stimulation, repeated task-envelope violation, non-treatment on rescue tasks, and poor terminal quality on the hard task.
 
 This split between dense training reward and strict final grading makes the environment trainable while keeping evaluation objective and hard to game.
 
@@ -182,10 +201,11 @@ The calibrator:
 
 Important grounding choices:
 
-- Observation values come from calibrated simulation outputs, not invented generative dynamics
+- The episode is anchored to calibrated Fleming traces, but online transitions are now action-coupled and stateful rather than direct replay
 - Force is normalized against the healthy baseline from the source data
 - The reward and grader are tied to clinically interpretable quantities
-- Difficulty comes from the source trajectory itself, not artificial randomization
+- Patient variation is explicit through profile-dependent responsiveness, fatigue, recovery, and side-effect sensitivity
+- Difficulty comes from both the source trajectory and the calibrated closed-loop dynamics layered on top
 
 ## What makes this environment interesting for RL
 
@@ -292,7 +312,7 @@ The hosted demo currently lives at:
 ## Limits and current scope
 
 - This is a benchmark environment, not a clinical device or treatment recommendation system.
-- The online environment replays calibrated source dynamics; it does not simulate arbitrary new patient physiology.
+- The environment is grounded and action-coupled, but it is still a semi-mechanistic benchmark rather than a full physiological patient simulator.
 - The 3D visualization is for communication and demos, not for the training loop itself.
 - Real-world deployment would require patient-specific sensing, hardware constraints, safety validation, and clinical trials.
 
@@ -313,3 +333,4 @@ The README is the main project document. These files are extensions if you want 
 ## Vision
 
 MotorAssistEnv is a benchmark for adaptive neurostimulation: a place to test whether modern agents can learn to tune a brain implant under realistic trade-offs. If an agent can consistently preserve force, suppress pathological oscillation, and remain within a safety budget here, it becomes a compelling prototype for future closed-loop neuromodulation systems.
+        
