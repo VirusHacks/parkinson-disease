@@ -66,10 +66,67 @@ app.mount("/static", StaticFiles(directory=str(_static_dir)), name="static")
 
 
 _viewer_html_path = _static_dir / "myosuite_demo" / "index.html"
+_viewer_bundle_path = _static_dir / "myosuite_demo" / "dist" / "mujoco_wasm.js"
 
 
 @app.get("/viewer", response_class=HTMLResponse)
 async def viewer():
+    if not _viewer_bundle_path.exists():
+        return HTMLResponse(
+            content="""
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <title>Viewer Build Required</title>
+    <style>
+      body {
+        font-family: Arial, sans-serif;
+        margin: 0;
+        min-height: 100vh;
+        display: grid;
+        place-items: center;
+        background: #f4f6f8;
+        color: #1f2933;
+      }
+      main {
+        max-width: 720px;
+        padding: 32px;
+        background: white;
+        border: 1px solid #d9e2ec;
+        border-radius: 12px;
+        box-shadow: 0 12px 30px rgba(15, 23, 42, 0.08);
+      }
+      code {
+        background: #eef2f6;
+        padding: 2px 6px;
+        border-radius: 4px;
+      }
+      pre {
+        background: #111827;
+        color: #f9fafb;
+        padding: 16px;
+        border-radius: 8px;
+        overflow-x: auto;
+      }
+    </style>
+  </head>
+  <body>
+    <main>
+      <h1>Viewer frontend is not built</h1>
+      <p>
+        The API server is running, but the optional MyoSuite viewer needs a generated
+        <code>static/myosuite_demo/dist/mujoco_wasm.js</code> bundle that is not present in this checkout.
+      </p>
+      <p>Build the frontend assets inside <code>static/myosuite_demo</code>, then reload this page.</p>
+      <pre>cd static/myosuite_demo
+build_windows.bat</pre>
+    </main>
+  </body>
+</html>
+""",
+            status_code=503,
+        )
     html = _viewer_html_path.read_text(encoding="utf-8")
     # Inject base tag so all relative paths resolve against the static mount
     html = html.replace(
