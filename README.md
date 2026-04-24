@@ -94,7 +94,7 @@ The environment uses three clinically distinct tasks built from the same calibra
 
 | Task ID | Friendly name | Difficulty | Steps | Main goal |
 |---|---|---:|---:|---|
-| `beta_suppression` | Calm Start | Easy | 24 | Early stabilization under a very tight safety budget |
+| `beta_suppression` | Calm Start | Easy | 30 | Early stabilization under a very tight safety budget |
 | `tremor_correction` | Rescue Phase | Medium | 48 | Active tremor rescue as force starts to degrade |
 | `full_episode` | Full Episode | Hard | 100 | Long-horizon control with cumulative side effects and recovery pressure |
 
@@ -104,13 +104,13 @@ Plain-language meaning:
 - `tremor_correction` / `Rescue Phase`: the first real adaptive-control task
 - `full_episode` / `Full Episode`: the long-horizon benchmark
 
-Current calibrated public ladder:
+Expected public ladder shape:
 
 - `beta_suppression`: `no_dbs`, `const_low`, `const_mid`, and `const_high` all fail; `safety_aware` passes all public runs.
 - `tremor_correction`: `no_dbs` and all constant policies fail; `safety_aware` is currently marginal, passing `2/4` public runs.
-- `full_episode`: passive and constant policies fail; `safety_aware` passes all public runs.
+- `full_episode`: passive and constant policies fail; adaptive controllers should remain competitive but not trivial under the long-horizon safety budget.
 
-That baseline shape is intentional. The simple hand-designed controller is meant to solve the easy onboarding task, stay competitive but imperfect on the medium rescue task, and remain strong on the long-horizon task where conservative pacing matters more than fast rescue timing.
+That ladder shape is intentional. A simple hand-designed controller should solve the onboarding task, stay competitive but imperfect on the rescue task, and still need real pacing discipline on the long-horizon task.
 
 ### What the agent must learn across tasks
 
@@ -193,7 +193,7 @@ Task weights shift by clinical goal:
 
 The grader also includes hard-failure logic for unsafe stimulation, repeated task-envelope violation, non-treatment on rescue tasks, and poor terminal quality on the hard task.
 
-This split between dense training reward and strict final grading makes the environment trainable while keeping evaluation objective and hard to game.
+The dense reward tracks the same main objectives as the final grader and now adds small phase-aware shaping for recovery and late-episode stability on the longer tasks. That keeps training signal informative without collapsing the benchmark into a purely shaped objective.
 
 ## Calibration and scientific grounding
 
@@ -286,7 +286,7 @@ API_BASE_URL="https://api.openai.com/v1"
 MODEL_NAME="gpt-4o-mini"
 ```
 
-The inference script also accepts `HF_TOKEN` or `OPENAI_API_KEY`.
+The inference script also accepts `OPENAI_API_KEY`, `HF_TOKEN`, `LLM_PROVIDER`, `OPENAI_MODEL`, and `HF_MODEL_NAME`. If an OpenAI key is present, it will default to the OpenAI API unless you explicitly force another provider.
 
 ### 3. Run the baseline inference loop
 

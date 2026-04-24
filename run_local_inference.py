@@ -7,7 +7,7 @@ LLM through all 3 tasks, and emits the required OpenEnv stdout format.
 Usage:
     uv run --project parkinsons_Motor python run_local_inference.py
 
-Reads HF_TOKEN, API_BASE_URL, MODEL_NAME from .env or environment.
+Reads OpenAI or Hugging Face router settings from .env or environment.
 """
 
 from __future__ import annotations
@@ -51,9 +51,61 @@ def _load_dotenv(path: str = ".env") -> None:
 _load_dotenv(".env")
 
 LOCAL_SERVER_URL = "http://localhost:8000"
-API_KEY      = os.getenv("API_KEY") or os.getenv("OPENAI_API_KEY") or os.getenv("HF_TOKEN")
-API_BASE_URL = os.getenv("API_BASE_URL", "https://api.openai.com/v1")
-MODEL_NAME   = os.getenv("MODEL_NAME", "gpt-4o-mini")
+OPENAI_DEFAULT_BASE_URL = "https://api.openai.com/v1"
+OPENAI_DEFAULT_MODEL = "gpt-4o-mini"
+HF_ROUTER_HOST = "huggingface.co"
+
+
+def _looks_like_hf_router(url: Optional[str]) -> bool:
+    return bool(url and HF_ROUTER_HOST in url.lower())
+
+
+def _looks_like_openai_model(name: Optional[str]) -> bool:
+    if not name:
+        return False
+    normalized = name.strip().lower()
+    return "/" not in normalized and normalized.startswith(("gpt", "o", "text-embedding"))
+
+
+def _resolve_llm_config() -> tuple[str, str, str, str]:
+    provider = os.getenv("LLM_PROVIDER", "auto").strip().lower()
+
+    openai_key = os.getenv("OPENAI_API_KEY") or os.getenv("API_KEY")
+    hf_key = os.getenv("HF_TOKEN")
+
+    generic_base_url = os.getenv("API_BASE_URL")
+    generic_model = os.getenv("MODEL_NAME")
+
+    openai_base_url = os.getenv("OPENAI_BASE_URL")
+    openai_model = os.getenv("OPENAI_MODEL")
+
+    hf_base_url = os.getenv("HF_API_BASE_URL")
+    hf_model = os.getenv("HF_MODEL_NAME")
+
+    if provider in {"auto", "openai"} and openai_key:
+        base_url = openai_base_url or generic_base_url
+        if provider == "openai" or _looks_like_hf_router(base_url) or not base_url:
+            base_url = OPENAI_DEFAULT_BASE_URL
+
+        model_name = openai_model
+        if not model_name and generic_model and _looks_like_openai_model(generic_model):
+            model_name = generic_model
+        if not model_name:
+            model_name = OPENAI_DEFAULT_MODEL
+
+        return "openai", openai_key, base_url, model_name
+
+    if provider in {"auto", "hf", "huggingface"} and hf_key:
+        base_url = hf_base_url or generic_base_url or "https://router.huggingface.co/v1"
+        model_name = hf_model or generic_model or "Qwen/Qwen2.5-72B-Instruct"
+        return "huggingface", hf_key, base_url, model_name
+
+    raise RuntimeError(
+        "Missing LLM credentials. Set OPENAI_API_KEY/API_KEY for OpenAI or HF_TOKEN for the Hugging Face router."
+    )
+
+
+LLM_PROVIDER, API_KEY, API_BASE_URL, MODEL_NAME = _resolve_llm_config()
 BENCHMARK    = "parkinsons_Motor"
 
 DEFAULT_TASKS = ["beta_suppression", "tremor_correction", "full_episode"]
@@ -65,7 +117,7 @@ TASKS = [
 # Must match task n_steps exactly so grader runs at episode end
 MAX_STEPS = {"beta_suppression": 30, "tremor_correction": 48, "full_episode": 100}
 # Must match task success_threshold in scenarios.py
-SUCCESS_THRESHOLD = {"beta_suppression": 0.50, "tremor_correction": 0.36, "full_episode": 0.62}
+SUCCESS_THRESHOLD = {"beta_suppression": 0.50, "tremor_correction": 0.36, "full_episode": 0.66}
 TEMPERATURE = 0.2
 MAX_TOKENS  = 300
 REQUEST_SLEEP_SECONDS = float(os.getenv("INFERENCE_SLEEP_SECONDS", "0.5"))
@@ -148,7 +200,7 @@ _TASK_CONTEXT = {
     ),
     "full_episode": (
         "HARD — Full 100-step closed-loop episode. Patient may be refractory. "
-        "Ceiling: 2.4 mA. Side-effect BUDGET: 0.65 (trigger safety reduction if load > 0.55). "
+        "Ceiling: 2.4 mA. Side-effect BUDGET: 0.55 (trigger safety reduction if load > 0.47). "
         "THREE-PHASE STRATEGY (ESSENTIAL): "
         "Phase 1 (steps 1-15): Build entrainment at 0.8-1.2 mA. "
         "Phase 2 (steps 16-45): Push 1.2-1.8 mA during peak escalation — watch side_effect_load. "
@@ -173,7 +225,7 @@ def _build_user_prompt(step: int, obs: dict, task_id: str, history: list) -> str
     target = obs.get('target_output', 0)
 
     # Task-specific safety thresholds
-    _se_budgets = {"beta_suppression": 0.55, "tremor_correction": 0.60, "full_episode": 0.65}
+    _se_budgets = {"beta_suppression": 0.55, "tremor_correction": 0.60, "full_episode": 0.55}
     se_budget = _se_budgets.get(task_id, 0.44)
     se_warn = round(se_budget * 0.85, 3)
     se_crit = round(se_budget * 0.95, 3)
@@ -384,11 +436,9 @@ def _write_report(summary: Dict[str, Any]) -> None:
 # ── main ──────────────────────────────────────────────────────────────────────
 
 async def main() -> None:
-    if not API_KEY:
-        raise RuntimeError("Missing HF_TOKEN / API_KEY in .env")
-
     print(f"\n{'='*60}", flush=True)
     print(f"Parkinson's DBS Environment - LLM Baseline Run", flush=True)
+    print(f"Provider: {LLM_PROVIDER}", flush=True)
     print(f"Model  : {MODEL_NAME}", flush=True)
     print(f"Server : {LOCAL_SERVER_URL}", flush=True)
     print(f"Tasks  : {TASKS}", flush=True)

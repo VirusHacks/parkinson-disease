@@ -42,8 +42,9 @@ r_t = w_force  * force_preserved_t
 where `safety_t = clamp(1 - side_effect_load_t / budget)` and
 `efficiency_t = 1 - (amp / amp_max)`.
 
-**Weights are task-specific** — the training signal mirrors the evaluation grader
-so the agent cannot exploit misalignment between the two:
+**Weights are task-specific** — the training signal follows the same primary
+objectives as the evaluation grader, and longer-horizon tasks also receive small
+phase-aware shaping for recovery and late-episode stability:
 
 | Weight | beta_suppression | tremor_correction | full_episode |
 |---|---|---|---|
@@ -54,6 +55,11 @@ so the agent cannot exploit misalignment between the two:
 | `w_safety` | 0.14 | 0.22 | 0.36 |
 | `w_smooth` | 0.05 | 0.04 | 0.05 |
 | `w_eff` | 0.05 | 0.08 | 0.10 |
+
+For `tremor_correction` and `full_episode`, the environment adds a small
+task-specific shaping bonus that proxies the episode-end `recovery_score` and/or
+`terminal_stability_score`. This keeps dense reward better aligned with the final
+grader without letting those late-horizon terms dominate per-step learning.
 
 **Design invariant:** weights sum to ~1.0 per task (excluding the violation penalty)
 so reward is interpretable on a per-step [0, 1] scale.
@@ -219,7 +225,7 @@ Based on the calibrated Fleming trajectory with episode noise (std=0.08):
 | constant (1.0 mA, 0.13 ms, 130 Hz) | 0.44–0.56 | 0.35–0.48 | 0.30–0.42 |
 | constant (max_amp, max_pw, 130 Hz) | 0.30–0.42 | 0.28–0.38 | 0.20–0.30 |
 | safety_aware (adaptive rule-based) | 0.52–0.64 | 0.42–0.58 | 0.45–0.58 |
-| **success threshold** | **0.50** | **0.36** | **0.62** |
+| **success threshold** | **0.50** | **0.36** | **0.66** |
 
 A well-designed LLM agent reading the observation fields and following the action
 description strategy hints should reliably reach 0.52–0.65 on the easy task and

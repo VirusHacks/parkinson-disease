@@ -28,6 +28,10 @@ The simplest way to interact with the environment is running our local LLM basel
    MODEL_NAME=gpt-4o-mini
    ```
 
+   The benchmark runner also supports `OPENAI_API_KEY`, `HF_TOKEN`, `LLM_PROVIDER`,
+   `OPENAI_MODEL`, and `HF_MODEL_NAME`. If an OpenAI key is present, it defaults to
+   the OpenAI API unless you explicitly force another provider.
+
 2. **Run the Benchmark**:
    Start the LLM inference loop and local API which will evaluate your model against our 3 clinically-grounded tasks (`beta_suppression`, `tremor_correction`, `full_episode`).
    ```bash
@@ -63,9 +67,9 @@ This environment is not a toy. It leverages a rigorous 100-step trajectory proce
 
 ## Deploying to Hugging Face Spaces
 
-You can easily deploy your OpenEnv environment using the `openenv push` command:
+You can deploy this OpenEnv environment using the `openenv push` command:
 
 ```bash
-openenv push --namespace my-org
+openenv push .\parkinsons_Motor --repo-id your-namespace/parkinsons_Motor
 ```
 This enables the interactive visualization UI (`/web`) via our Gradio MyoSuite arm integration, API Documentation (`/docs`), and Persistent WebSocket evaluation.

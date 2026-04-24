@@ -21,6 +21,7 @@ dependencies = [
     # Environment-specific dependencies
     "numpy>=1.24.0",
     "scipy>=1.11.0",
+    "openai>=2.32.0",
 ]
 
 [project.optional-dependencies]
