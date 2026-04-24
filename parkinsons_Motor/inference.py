@@ -1,19 +1,21 @@
 """
-Inference Script — Parkinson's Motor (DBS) Environment
-=======================================================
-Runs an LLM agent against all three tasks and emits the required stdout:
+Inference Script - Parkinson's Motor (DBS) Environment.
 
-  [START] task=<task_id> env=parkinsons_Motor model=<model_name>
-  [STEP]  step=<n> action=<json> reward=<0.00> done=<true|false> error=<msg|null>
-  [END]   success=<true|false> steps=<n> score=<0.00> rewards=<r1,...>
+Runs an LLM agent against all three public tasks and emits OpenEnv-style logs.
 
-Environment variables required:
-  HF_TOKEN (or API_KEY / OPENAI_API_KEY) — API key
-  API_BASE_URL                            — inference endpoint
-  MODEL_NAME                              — model identifier
-  LOCAL_IMAGE_NAME                        — Docker image for the environment
-
-Runtime: < 20 min on 2 vCPU / 8 GB RAM (all three tasks combined).
+Environment variables:
+  LOCAL_IMAGE_NAME / IMAGE_NAME          Docker image for the environment
+  LLM_PROVIDER                          auto | openai | hf | huggingface
+  API_KEY / OPENAI_API_KEY              OpenAI-compatible API key
+  OPENAI_BASE_URL / API_BASE_URL        OpenAI-compatible base URL
+  OPENAI_MODEL / MODEL_NAME             OpenAI-compatible model name
+  HF_TOKEN                              Hugging Face router token
+  HF_API_BASE_URL / API_BASE_URL        Hugging Face router base URL
+  HF_MODEL_NAME / MODEL_NAME            Hugging Face model name
+  OPENAI_REQUEST_TIMEOUT_SECONDS        LLM request timeout (default: 120)
+  OPENAI_MAX_RETRIES                    LLM retry count (default: 4)
+  INFERENCE_REQUEST_SLEEP_SECONDS       Delay between successful steps (default: 0.5)
+  INFERENCE_TASK_SLEEP_SECONDS          Delay between tasks (default: 2.0)
 """
 
 from __future__ import annotations
@@ -23,12 +25,13 @@ import json
 import os
 import sys
 import textwrap
+import time
 from pathlib import Path
 from typing import List, Optional
 
 from openai import OpenAI
 
-# ── path setup ────────────────────────────────────────────────────────────────
+# -- path setup ---------------------------------------------------------------
 PACKAGE_ROOT = Path(__file__).resolve().parent
 REPO_ROOT = PACKAGE_ROOT.parent
 if str(REPO_ROOT) not in sys.path:
@@ -37,111 +40,185 @@ if str(REPO_ROOT) not in sys.path:
 from parkinsons_Motor import ParkinsonsMotorAction, ParkinsonsMotorEnv  # noqa: E402
 
 
-# ── env config ────────────────────────────────────────────────────────────────
+# -- env config ---------------------------------------------------------------
 
 def _load_dotenv(path: str = ".env") -> None:
-    env_path = Path(__file__).resolve().parent / path
+    env_path = REPO_ROOT / path
     if not env_path.exists():
         return
     for raw in env_path.read_text(encoding="utf-8").splitlines():
         line = raw.strip()
         if not line or line.startswith("#") or "=" not in line:
             continue
-        k, v = line.split("=", 1)
-        k = k.strip()
-        v = v.strip().strip('"').strip("'")
-        if k:
-            os.environ.setdefault(k, v)
+        key, value = line.split("=", 1)
+        key = key.strip()
+        value = value.strip().strip('"').strip("'")
+        if key:
+            os.environ.setdefault(key, value)
 
 
-_load_dotenv()
+_load_dotenv(".env")
 
-IMAGE_NAME   = os.getenv("LOCAL_IMAGE_NAME") or os.getenv("IMAGE_NAME") or "parkinsons-motor:latest"
-API_KEY      = os.getenv("HF_TOKEN") or os.getenv("API_KEY") or os.getenv("OPENAI_API_KEY")
-API_BASE_URL = os.getenv("API_BASE_URL") or "https://router.huggingface.co/v1"
-MODEL_NAME   = os.getenv("MODEL_NAME") or "Qwen/Qwen2.5-72B-Instruct"
-BENCHMARK    = "parkinsons_Motor"
+IMAGE_NAME = os.getenv("LOCAL_IMAGE_NAME") or os.getenv("IMAGE_NAME") or "parkinsons-motor:latest"
+OPENAI_DEFAULT_BASE_URL = "https://api.openai.com/v1"
+OPENAI_DEFAULT_MODEL = "gpt-4o-mini"
+HF_ROUTER_HOST = "huggingface.co"
 
-# Task execution config
-MAX_STEPS_PER_TASK = {
-    "beta_suppression":  20,   # Easy  — 20-step window
-    "tremor_correction": 50,   # Medium — 50-step window
-    "full_episode":      100,  # Hard   — full 100 steps
+
+def _looks_like_hf_router(url: Optional[str]) -> bool:
+    return bool(url and HF_ROUTER_HOST in url.lower())
+
+
+def _looks_like_openai_model(name: Optional[str]) -> bool:
+    if not name:
+        return False
+    normalized = name.strip().lower()
+    return "/" not in normalized and normalized.startswith(("gpt", "o", "text-embedding"))
+
+
+def _resolve_llm_config() -> tuple[str, str, str, str]:
+    provider = os.getenv("LLM_PROVIDER", "auto").strip().lower()
+
+    openai_key = os.getenv("OPENAI_API_KEY") or os.getenv("API_KEY")
+    hf_key = os.getenv("HF_TOKEN")
+
+    generic_base_url = os.getenv("API_BASE_URL")
+    generic_model = os.getenv("MODEL_NAME")
+
+    openai_base_url = os.getenv("OPENAI_BASE_URL")
+    openai_model = os.getenv("OPENAI_MODEL")
+
+    hf_base_url = os.getenv("HF_API_BASE_URL")
+    hf_model = os.getenv("HF_MODEL_NAME")
+
+    if provider in {"auto", "openai"} and openai_key:
+        base_url = openai_base_url or generic_base_url
+        if provider == "openai" or _looks_like_hf_router(base_url) or not base_url:
+            base_url = OPENAI_DEFAULT_BASE_URL
+
+        model_name = openai_model
+        if not model_name and generic_model and _looks_like_openai_model(generic_model):
+            model_name = generic_model
+        if not model_name:
+            model_name = OPENAI_DEFAULT_MODEL
+
+        return "openai", openai_key, base_url, model_name
+
+    if provider in {"auto", "hf", "huggingface"} and hf_key:
+        base_url = hf_base_url or generic_base_url or "https://router.huggingface.co/v1"
+        model_name = hf_model or generic_model or "Qwen/Qwen2.5-72B-Instruct"
+        return "huggingface", hf_key, base_url, model_name
+
+    raise RuntimeError(
+        "Missing LLM credentials. Set OPENAI_API_KEY/API_KEY for OpenAI or HF_TOKEN for the Hugging Face router."
+    )
+
+
+LLM_PROVIDER, API_KEY, API_BASE_URL, MODEL_NAME = _resolve_llm_config()
+BENCHMARK = "parkinsons_Motor"
+
+DEFAULT_TASKS = ["beta_suppression", "tremor_correction", "full_episode"]
+TASKS = [
+    task.strip()
+    for task in os.getenv("INFERENCE_TASKS", ",".join(DEFAULT_TASKS)).split(",")
+    if task.strip()
+]
+MAX_STEPS_PER_TASK = {"beta_suppression": 30, "tremor_correction": 48, "full_episode": 100}
+SUCCESS_SCORE_THRESHOLD = {"beta_suppression": 0.50, "tremor_correction": 0.36, "full_episode": 0.66}
+
+TEMPERATURE = float(os.getenv("OPENAI_TEMPERATURE", "0.2"))
+MAX_TOKENS = int(os.getenv("OPENAI_MAX_TOKENS", "300"))
+REQUEST_TIMEOUT_SECONDS = float(os.getenv("OPENAI_REQUEST_TIMEOUT_SECONDS", "120"))
+OPENAI_MAX_RETRIES = int(os.getenv("OPENAI_MAX_RETRIES", "4"))
+REQUEST_SLEEP_SECONDS = float(os.getenv("INFERENCE_REQUEST_SLEEP_SECONDS", "0.5"))
+TASK_SLEEP_SECONDS = float(os.getenv("INFERENCE_TASK_SLEEP_SECONDS", "2.0"))
+
+
+# -- LLM prompts --------------------------------------------------------------
+
+SYSTEM_PROMPT = textwrap.dedent(
+    """
+    You are a closed-loop Deep Brain Stimulation (DBS) controller for a Parkinson's patient.
+    Every 20ms you read the patient's brain state and output DBS settings as JSON.
+
+    KEY OBSERVATIONS
+      beta_arv         STN beta oscillation. Lower is better.
+      tremor_arv       Tremor envelope. Lower is better.
+      force_preserved  Fraction of healthy muscle force. Higher is better.
+      side_effect_load Cumulative stimulation burden. Stay inside task budget.
+      beta_trend       Negative means beta is improving.
+      tremor_trend     Negative means tremor is improving.
+      side_effect_rate Positive means burden is rising.
+      gamma_arv        Over-stimulation alarm. If high, reduce amplitude.
+      target_output    Copy this exactly into motor_command every step.
+      dbs_entrainment  How much DBS is currently suppressing beta.
+
+    OUTPUT FORMAT
+    Return JSON only:
+    {"dbs_amplitude": X, "dbs_pulse_width": X, "dbs_frequency": X}
+
+    RULES
+    - If tremor_arv > 0.55 or beta_arv > 0.60, use at least 1.2 mA until symptoms improve.
+    - If side_effect_load is near budget, reduce amplitude by 20-40%.
+    - If gamma_arv > 0.55, reduce amplitude immediately.
+    - Increase amplitude gradually when symptoms worsen.
+    - Reduce amplitude slowly once both beta and tremor are improving.
+    - Keep pulse width near 0.13 ms and frequency near 130 Hz unless there is a strong reason not to.
+    - Avoid abrupt amplitude jumps larger than 0.3 mA per step.
+    """
+).strip()
+
+
+_TASK_CONTEXT = {
+    "beta_suppression": (
+        "EASY. Ceiling: 1.5 mA. Side-effect budget: 0.55. "
+        "Prefer 0.9-1.1 mA early, then taper toward 0.7-0.8 mA once beta and tremor are controlled."
+    ),
+    "tremor_correction": (
+        "MEDIUM. Ceiling: 1.8 mA. Side-effect budget: 0.60. "
+        "Rescue tremor quickly with 1.2-1.5 mA, then drop to 0.7-1.0 mA maintenance."
+    ),
+    "full_episode": (
+        "HARD. Ceiling: 2.4 mA. Side-effect budget: 0.55. "
+        "Phase 1 build entrainment, phase 2 rescue symptoms, phase 3 preserve budget for stable maintenance."
+    ),
 }
-TEMPERATURE = 0.3
-MAX_TOKENS  = 200
-
-SUCCESS_SCORE_THRESHOLD = {
-    "beta_suppression":  0.60,
-    "tremor_correction": 0.55,
-    "full_episode":      0.50,
-}
-
-TASKS = list(MAX_STEPS_PER_TASK.keys())  # run in order: easy → medium → hard
 
 
-# ── LLM prompts ───────────────────────────────────────────────────────────────
+def _build_user_prompt(step: int, obs: dict, task_id: str, history: list[str]) -> str:
+    recent = "\n".join(history[-4:]) if history else "(first step)"
+    return textwrap.dedent(
+        f"""
+        Task: {task_id}
+        Step: {step}
+        Context: {_TASK_CONTEXT.get(task_id, "")}
 
-SYSTEM_PROMPT = textwrap.dedent("""
-You are an autonomous Deep Brain Stimulation (DBS) programmer for a Parkinson's patient.
+        Brain state:
+          beta_arv:         {obs.get('beta_arv', 0.0):.4f}
+          tremor_arv:       {obs.get('tremor_arv', 0.0):.4f}
+          force_preserved:  {obs.get('force_preserved', 0.0):.4f}
+          side_effect_load: {obs.get('side_effect_load', 0.0):.4f}
+          beta_trend:       {obs.get('beta_trend', 0.0):+.4f}
+          tremor_trend:     {obs.get('tremor_trend', 0.0):+.4f}
+          side_effect_rate: {obs.get('side_effect_rate', 0.0):+.4f}
+          gamma_arv:        {obs.get('gamma_arv', 0.0):.4f}
+          dbs_entrainment:  {obs.get('dbs_entrainment', 0.0):.4f}
+          stim_washout:     {obs.get('stim_washout', 0.0):.4f}
+          target_output:    {obs.get('target_output', 0.0):.4f}
+          tracking_accuracy:{obs.get('tracking_accuracy', 0.0):.4f}
 
-At each step you receive the patient's current brain state and must output a JSON action.
+        Recent steps:
+        {recent}
 
-The brain state contains:
-  beta_arv        — STN beta oscillation (0=suppressed, 1=peak Parkinson's)
-  tremor_arv      — Tremor amplitude (0=none, 1=maximum observed)
-  force_preserved — Fraction of healthy muscle force (1.0=fully healthy, 0.0=no motor output)
-  side_effect_load — Cumulative DBS side-effect load (keep below task budget)
-  dbs_entrainment — Fraction of cortical axons entrained by current DBS (0–1)
-  sim_time_s      — Current simulation time in seconds
-
-Your goal: preserve the patient's motor function (force_preserved as high as possible)
-by tuning DBS to suppress the beta oscillation, without exceeding the side-effect budget.
-
-Output ONLY valid JSON with these fields (no extra text):
-{
-  "motor_command":  <float, -1.0 to 1.0>,
-  "dbs_amplitude":  <float, 0.0 to 3.0, in mA>,
-  "dbs_pulse_width": <float, 0.06 to 0.20, in ms>
-}
-
-Clinical guidance:
-- beta_arv > 0.5 → increase dbs_amplitude (more suppression needed)
-- side_effect_load > 0.4 → reduce dbs_amplitude (side-effect budget at risk)
-- force_preserved < 0.3 → this is a critical failure state; use maximum DBS
-- dbs_pulse_width of 0.13 ms is a good balanced default
-- motor_command should match the target_output (around ±0.5) if available
-""").strip()
-
-
-def _build_user_prompt(step: int, obs_dict: dict, task_id: str, step_history: list) -> str:
-    recent = "\n".join(step_history[-5:]) if step_history else "None"
-    return textwrap.dedent(f"""
-    Task: {task_id}
-    Step: {step}
-
-    Current brain state:
-      beta_arv:        {obs_dict.get('beta_arv', 0):.3f}
-      tremor_arv:      {obs_dict.get('tremor_arv', 0):.3f}
-      force_preserved: {obs_dict.get('force_preserved', 0):.3f}
-      side_effect_load:{obs_dict.get('side_effect_load', 0):.3f}
-      dbs_entrainment: {obs_dict.get('dbs_entrainment', 0):.3f}
-      disease_severity:{obs_dict.get('disease_severity', 0):.3f}
-      sim_time_s:      {obs_dict.get('sim_time_s', 0):.2f}
-
-    Recent actions (last 5):
-    {recent}
-
-    Output your DBS action as JSON now.
-    """).strip()
+        Output JSON only now.
+        """
+    ).strip()
 
 
 def _parse_action(text: str) -> Optional[dict]:
-    """Extract JSON action dict from model response."""
     text = text.strip()
-    # Try to find a JSON block
     start = text.find("{")
-    end   = text.rfind("}") + 1
+    end = text.rfind("}") + 1
     if start == -1 or end == 0:
         return None
     try:
@@ -150,25 +227,54 @@ def _parse_action(text: str) -> Optional[dict]:
         return None
 
 
-def _action_from_dict(d: Optional[dict]) -> ParkinsonsMotorAction:
+def _action_from_dict(d: Optional[dict], target_output: float = 0.0) -> ParkinsonsMotorAction:
     if not d:
-        # Safe default: low-amplitude DBS, neutral motor command
-        return ParkinsonsMotorAction(motor_command=0.0, dbs_amplitude=0.5, dbs_pulse_width=0.13)
+        return ParkinsonsMotorAction(
+            motor_command=float(max(-1.0, min(1.0, target_output))),
+            dbs_amplitude=1.0,
+            dbs_pulse_width=0.13,
+            dbs_frequency=130.0,
+        )
     return ParkinsonsMotorAction(
-        motor_command  = float(max(-1.0, min(1.0,  d.get("motor_command",  0.0)))),
-        dbs_amplitude  = float(max(0.0,  min(5.0,  d.get("dbs_amplitude",  0.5)))),
-        dbs_pulse_width= float(max(0.06, min(0.20, d.get("dbs_pulse_width", 0.13)))),
+        motor_command=float(max(-1.0, min(1.0, target_output))),
+        dbs_amplitude=float(max(0.0, min(5.0, d.get("dbs_amplitude", 1.0)))),
+        dbs_pulse_width=float(max(0.06, min(0.20, d.get("dbs_pulse_width", 0.13)))),
+        dbs_frequency=float(max(60.0, min(185.0, d.get("dbs_frequency", 130.0)))),
     )
 
 
-# ── logging helpers ───────────────────────────────────────────────────────────
+def _call_llm(client: OpenAI, step: int, obs: dict, task_id: str, history: list[str]) -> str:
+    for attempt in range(OPENAI_MAX_RETRIES):
+        try:
+            response = client.chat.completions.create(
+                model=MODEL_NAME,
+                messages=[
+                    {"role": "system", "content": SYSTEM_PROMPT},
+                    {"role": "user", "content": _build_user_prompt(step, obs, task_id, history)},
+                ],
+                temperature=TEMPERATURE,
+                max_tokens=MAX_TOKENS,
+                timeout=REQUEST_TIMEOUT_SECONDS,
+            )
+            return (response.choices[0].message.content or "").strip()
+        except Exception as exc:
+            delay = min(2 ** attempt, 12)
+            print(
+                f"[DEBUG] LLM call failed (attempt {attempt + 1}/{OPENAI_MAX_RETRIES}): {exc}. Retrying in {delay}s...",
+                flush=True,
+            )
+            time.sleep(delay)
+    return ""
+
+
+# -- logging helpers ----------------------------------------------------------
 
 def log_start(task: str, env: str, model: str) -> None:
     print(f"[START] task={task} env={env} model={model}", flush=True)
 
 
 def log_step(step: int, action: str, reward: float, done: bool, error: Optional[str]) -> None:
-    err = error if error else "null"
+    err = error or "null"
     print(f"[STEP] step={step} action={action} reward={reward:.2f} done={str(done).lower()} error={err}", flush=True)
 
 
@@ -177,25 +283,21 @@ def log_end(success: bool, steps: int, score: float, rewards: List[float]) -> No
     print(f"[END] success={str(success).lower()} steps={steps} score={score:.2f} rewards={rewards_str}", flush=True)
 
 
-# ── single task runner ────────────────────────────────────────────────────────
+# -- single task runner -------------------------------------------------------
 
 async def run_task(env, client: OpenAI, task_id: str) -> tuple[float, bool]:
-    """
-    Run one complete task episode.  Returns (final_score, success).
-    """
     max_steps = MAX_STEPS_PER_TASK[task_id]
     log_start(task=task_id, env=BENCHMARK, model=MODEL_NAME)
 
     rewards: List[float] = []
-    step_history: List[str] = []
+    history: List[str] = []
     steps_taken = 0
     score = 0.0
     success = False
     final_error: Optional[str] = None
 
     try:
-        # Reset with chosen task
-        result = await env.reset()
+        result = await env.reset(task_id=task_id)
         obs = result.observation
         obs_dict = obs.model_dump() if hasattr(obs, "model_dump") else obs.__dict__
 
@@ -203,32 +305,17 @@ async def run_task(env, client: OpenAI, task_id: str) -> tuple[float, bool]:
             if result.done:
                 break
 
-            # Get model action
-            user_prompt = _build_user_prompt(step, obs_dict, task_id, step_history)
-            raw_text = ""
-            try:
-                completion = client.chat.completions.create(
-                    model=MODEL_NAME,
-                    messages=[
-                        {"role": "system", "content": SYSTEM_PROMPT},
-                        {"role": "user",   "content": user_prompt},
-                    ],
-                    temperature=TEMPERATURE,
-                    max_tokens=MAX_TOKENS,
-                    stream=False,
-                )
-                raw_text = (completion.choices[0].message.content or "").strip()
-            except Exception as exc:
-                raw_text = ""
-                final_error = str(exc)
-
+            raw_text = _call_llm(client, step, obs_dict, task_id, history)
             action_dict = _parse_action(raw_text)
-            action = _action_from_dict(action_dict)
-            action_str = json.dumps(action_dict or {
-                "motor_command": action.motor_command,
-                "dbs_amplitude": action.dbs_amplitude,
-                "dbs_pulse_width": action.dbs_pulse_width,
-            })
+            action = _action_from_dict(action_dict, target_output=obs_dict.get("target_output", 0.0))
+            action_str = json.dumps(
+                {
+                    "motor_command": round(action.motor_command, 3),
+                    "dbs_amplitude": round(action.dbs_amplitude, 3),
+                    "dbs_pulse_width": round(action.dbs_pulse_width, 3),
+                    "dbs_frequency": round(action.dbs_frequency, 1),
+                }
+            )
 
             error_for_step: Optional[str] = None
             try:
@@ -249,23 +336,25 @@ async def run_task(env, client: OpenAI, task_id: str) -> tuple[float, bool]:
             rewards.append(reward)
             steps_taken = step
             log_step(step, action_str, reward, done, error_for_step)
-            step_history.append(
-                f"Step {step}: amp={action.dbs_amplitude:.2f}mA pw={action.dbs_pulse_width:.3f}ms "
-                f"→ beta={obs_dict.get('beta_arv', 0):.3f} force={obs_dict.get('force_preserved', 0):.3f} "
-                f"reward={reward:+.3f}"
+
+            history.append(
+                f"step={step} amp={action.dbs_amplitude:.2f} pw={action.dbs_pulse_width:.3f} freq={action.dbs_frequency:.0f}"
+                f" -> beta={obs_dict.get('beta_arv', 0):.3f} tremor={obs_dict.get('tremor_arv', 0):.3f}"
+                f" force={obs_dict.get('force_preserved', 0):.3f} se={obs_dict.get('side_effect_load', 0):.3f}"
+                f" reward={reward:+.3f}"
             )
 
+            if not done and REQUEST_SLEEP_SECONDS > 0:
+                time.sleep(REQUEST_SLEEP_SECONDS)
+
             if done:
-                # Grader score is in observation at episode end
                 grader_score = obs_dict.get("grader_score", -1.0)
                 if grader_score >= 0:
                     score = grader_score
                 break
 
-        # If score wasn't emitted by grader (short episode), normalise rewards
         if score <= 0 and rewards:
-            score = sum(rewards) / len(rewards)
-            score = min(max(score, 0.0), 1.0)
+            score = min(max(sum(rewards) / len(rewards), 0.0), 1.0)
 
         success = final_error is None and score >= SUCCESS_SCORE_THRESHOLD[task_id]
 
@@ -275,13 +364,14 @@ async def run_task(env, client: OpenAI, task_id: str) -> tuple[float, bool]:
     return score, success
 
 
-# ── main ──────────────────────────────────────────────────────────────────────
+# -- main ---------------------------------------------------------------------
 
 async def main() -> None:
-    if not API_KEY:
-        raise RuntimeError(
-            "Missing API key. Set HF_TOKEN, API_KEY, or OPENAI_API_KEY before running."
-        )
+    print(f"Provider: {LLM_PROVIDER}", flush=True)
+    print(f"Model   : {MODEL_NAME}", flush=True)
+    print(f"Image   : {IMAGE_NAME}", flush=True)
+    print(f"Tasks   : {TASKS}", flush=True)
+    print(f"Timeout : {REQUEST_TIMEOUT_SECONDS}s", flush=True)
 
     client = OpenAI(base_url=API_BASE_URL, api_key=API_KEY)
     env = await ParkinsonsMotorEnv.from_docker_image(IMAGE_NAME)
@@ -290,23 +380,22 @@ async def main() -> None:
     all_success: dict[str, bool] = {}
 
     try:
-        for task_id in TASKS:
+        for idx, task_id in enumerate(TASKS):
             score, success = await run_task(env, client, task_id)
             all_scores[task_id] = score
             all_success[task_id] = success
-
+            if idx < len(TASKS) - 1 and TASK_SLEEP_SECONDS > 0:
+                time.sleep(TASK_SLEEP_SECONDS)
     finally:
         try:
             await env.close()
-        except Exception as e:
-            print(f"[DEBUG] env.close() error: {e}", flush=True)
+        except Exception as exc:
+            print(f"[DEBUG] env.close() error: {exc}", flush=True)
 
-    # Summary across all tasks
     print("\n[SUMMARY]", flush=True)
-    for tid in TASKS:
+    for task_id in TASKS:
         print(
-            f"  task={tid} score={all_scores.get(tid, 0):.2f} "
-            f"success={str(all_success.get(tid, False)).lower()}",
+            f"  task={task_id} score={all_scores.get(task_id, 0.0):.2f} success={str(all_success.get(task_id, False)).lower()}",
             flush=True,
         )
     mean_score = sum(all_scores.values()) / len(all_scores) if all_scores else 0.0

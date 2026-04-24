@@ -158,6 +158,9 @@ class ParkinsonsMotorEnvironment(Environment):
         self._medication_phase: float = 0.5  # L-DOPA cycle position
         self._med_phase_offset: float = 0.0  # per-episode phase offset
         self._battery_drain: float = 0.0     # cumulative battery drain proxy
+        self._initial_force_state: float = 0.0
+        self._initial_tremor_state: float = 0.0
+        self._initial_tracking_accuracy: float = 0.0
 
     # ------------------------------------------------------------------
     # helpers
@@ -204,6 +207,39 @@ class ParkinsonsMotorEnvironment(Environment):
         self._recent_pw.clear()
         self._recent_amp.append(0.0)
         self._recent_pw.append(0.06)
+        self._initial_force_state = self._force_state
+        self._initial_tremor_state = self._tremor_state
+
+    def _long_horizon_shaping(self, tracking_accuracy: float) -> float:
+        progress = (self._local_step + 1) / max(self._task.n_steps, 1)
+        target_force = max(self._task.target_force_preserved, 1e-6)
+        target_tremor = max(self._task.target_tremor_arv, 1e-6)
+        target_error = max(self._task.target_tracking_error, 1e-6)
+
+        terminal_proxy = _clamp(
+            0.45 * min(self._force_state / target_force, 1.0)
+            + 0.30 * (1.0 - min(self._tremor_state / target_tremor, 1.0))
+            + 0.25 * (1.0 - min((2.0 * (1.0 - tracking_accuracy)) / target_error, 1.0))
+        )
+
+        if self._task.task_id == "tremor_correction":
+            recovery_force = _clamp((self._force_state - self._initial_force_state + 0.12) / 0.28)
+            recovery_tremor = _clamp((self._initial_tremor_state - self._tremor_state + 0.08) / 0.24)
+            recovery_tracking = _clamp(
+                (tracking_accuracy - self._initial_tracking_accuracy + 0.06) / 0.20
+            )
+            recovery_proxy = _clamp(
+                0.40 * recovery_force + 0.40 * recovery_tremor + 0.20 * recovery_tracking
+            )
+            recovery_weight = min(progress / 0.5, 1.0)
+            terminal_weight = _clamp((progress - 0.65) / 0.35)
+            return 0.03 * recovery_proxy * recovery_weight + 0.02 * terminal_proxy * terminal_weight
+
+        if self._task.task_id == "full_episode":
+            terminal_weight = _clamp((progress - 0.75) / 0.25)
+            return 0.03 * terminal_proxy * terminal_weight
+
+        return 0.0
 
     def _clip_action(self, action: ParkinsonsMotorAction) -> Tuple[float, float, float, float]:
         amp_cap = self._task.max_dbs_amplitude * self._profile.max_amp_scale
@@ -385,6 +421,7 @@ class ParkinsonsMotorEnvironment(Environment):
             + w["safety"] * safety
             + w["smoothness"] * (1.0 - smoothness)
             + w["efficiency"] * efficiency
+            + self._long_horizon_shaping(tracking_accuracy)
             - 0.08 * violation
         )
         return float(_clamp(reward))
@@ -511,6 +548,7 @@ class ParkinsonsMotorEnvironment(Environment):
 
         base = self._brain_window(self._task.start_step)
         tracking_accuracy = _clamp(1.0 - abs(self._target_output) / 2.0)
+        self._initial_tracking_accuracy = tracking_accuracy
         return self._make_obs(
             sim_time_s=base.t_s,
             reward=0.0,

@@ -7,11 +7,11 @@ port: 8000
 
 tasks:
   - id: beta_suppression
-    description: "Easy: suppress STN beta oscillation in the calm early phase (20 steps)"
+    description: "Easy: suppress STN beta oscillation in the calm early phase (30 steps)"
     difficulty: easy
   - id: tremor_correction
-    description: "Medium: dynamically correct rising tremor while preserving muscle force (50 steps)"
+    description: "Medium: dynamically correct rising tremor while preserving muscle force (48 steps)"
     difficulty: medium
   - id: full_episode
-    description: "Hard: optimise full 100-step DBS episode — max force, min side-effects"
+    description: "Hard: optimize full 100-step DBS episode under a strict long-horizon side-effect budget"
     difficulty: hard

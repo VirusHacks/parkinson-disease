@@ -145,9 +145,9 @@ to a patient who simply responds less to the same DBS settings.
 | `n_steps` | 100 | Complete clinical episode |
 | `max_dbs_amplitude` | 2.4 mA | Highest available ceiling for the hardest scenario |
 | `max_dbs_pulse_width` | 0.20 ms | Full pulse-width range |
-| `max_side_effect_load` | 0.65 | Budget allows sustained 1.8 mA; only max (2.4 mA) is unsustainable |
+| `max_side_effect_load` | 0.55 | Stricter long-horizon safety budget; sustained high amplitude now exhausts the episode budget faster |
 | `target_force_preserved` | 0.60 | Sustained function across the full episode |
-| `success_threshold` | **0.62** | High threshold — requires multi-phase adaptive control |
+| `success_threshold` | **0.66** | Stricter high threshold — requires multi-phase adaptive control with cleaner budget management |
 
 **Why safety dominates (36% grader weight):** At 100 steps, an agent that runs
 maximum amplitude for the first 60 steps will exhaust the side-effect budget and
@@ -181,7 +181,7 @@ control sequence.
 | constant 1.0 mA, 130 Hz | 0.30–0.42 | No |
 | constant 2.4 mA (max), 130 Hz | 0.20–0.30 | No (side effects exhaust budget) |
 | safety_aware rule-based | 0.45–0.58 | No (misses threshold) |
-| adaptive multi-phase | 0.62–0.78 | Yes |
+| adaptive multi-phase | 0.66–0.78 | Yes |
 
 ---
 
@@ -231,7 +231,7 @@ stimulation — higher amplitude during escalation phases, genuine rest periods 
 stable phases — to extract therapeutic value while limiting adaptation.
 
 **Success threshold: 0.42** over 100 steps with a refractory patient is harder than
-0.62 on a mixed-profile full_episode.
+0.66 on a mixed-profile full_episode.
 
 ---
 
@@ -263,7 +263,7 @@ a policy that meaningfully reads and uses the patient profile context.
 |---|---|---|---|---|---|---|---|
 | `beta_suppression` | 5 | 30 | 1.5 mA | 0.55 | responsive | **0.50** | Core/Easy |
 | `tremor_correction` | 16 | 48 | 1.8 mA | 0.60 | balanced, responsive | **0.36** | Core/Medium |
-| `full_episode` | 0 | 100 | 2.4 mA | 0.65 | balanced, responsive, refractory | **0.62** | Core/Hard |
+| `full_episode` | 0 | 100 | 2.4 mA | 0.55 | balanced, responsive, refractory | **0.66** | Core/Hard |
 | `fragile_patient` | 12 | 64 | 1.4 mA | 0.26 | fragile | **0.44** | Expert |
 | `refractory_patient` | 0 | 100 | 2.2 mA | 0.48 | refractory | **0.42** | Expert |
 | `personalization_generalization` | 10 | 72 | 1.9 mA | 0.40 | all four | **0.45** | Expert |
@@ -286,7 +286,7 @@ These thresholds are calibrated so that:
   detect the tremor escalation signal and increase amplitude during steps 1–15. One-step
   reactive control is sufficient. Zero-shot LLM success probability: ~40–60%.
 
-- **Hard (0.62):** No constant policy reaches this. Requires multi-phase temporal reasoning
+- **Hard (0.66):** No constant policy reaches this. Requires multi-phase temporal reasoning
   across 100 steps. Zero-shot LLM success probability: ~5–20%. A policy trained with even
   a few episodes of RL should improve measurably.
 
