@@ -5,7 +5,8 @@ param(
 $ErrorActionPreference = "Stop"
 
 $ScriptDir = Split-Path -Parent $MyInvocation.MyCommand.Path
-$ProjectDir = Join-Path $ScriptDir "parkinsons_Motor"
+$ProjectRoot = Split-Path -Parent $ScriptDir
+$ProjectDir = Join-Path $ProjectRoot "parkinsons_Motor"
 $WebDir = Join-Path $ProjectDir "static\myosuite_demo"
 
 if (-not (Test-Path $ProjectDir)) {

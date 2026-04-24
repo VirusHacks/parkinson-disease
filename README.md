@@ -169,7 +169,7 @@ This is designed to reflect the real treatment objective:
 - Force and tracking are rewarded directly because the benchmark is about useful function, not just pretty neural traces.
 - Beta and tremor suppression matter, but they are not allowed to dominate safety or motor quality.
 - Safety and smoothness make aggressive but clinically unstable controllers unattractive during training.
-- Constraint violations are penalized explicitly so policies cannot exploit task clipping.
+- Constraint violations are penalized explicitly so policies cannot exploit task clipping.~
 
 ### Episode-end grading
 
