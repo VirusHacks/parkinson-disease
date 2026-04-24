@@ -42,5 +42,3 @@ npm-debug.log*
 
 .env
 
-outputs/runs/
-outputs/analysis/

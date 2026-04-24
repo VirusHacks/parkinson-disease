@@ -1,0 +1,17 @@
+{
+  "model_name": "Qwen/Qwen2.5-72B-Instruct",
+  "server_url": "http://localhost:8000",
+  "tasks": [
+    "beta_suppression"
+  ],
+  "request_sleep_seconds": 2.0,
+  "task_sleep_seconds": 5.0,
+  "mean_score": 0.5859093720722207,
+  "task_results": [
+    {
+      "task_id": "beta_suppression",
+      "score": 0.5859093720722207,
+      "success": false
+    }
+  ]
+}
