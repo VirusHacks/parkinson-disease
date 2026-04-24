@@ -17,7 +17,7 @@ Anyone reading this should come away understanding:
 
 ### What It Is
 
-The `fleming-model-based-brain` folder contains a full biophysical simulation of a Parkinson's-affected brain, published in:
+The `parkinsons_Motor/fleming-model-based-brain` folder contains the packaged biophysical simulation outputs used by the environment, published in:
 
 > **Fleming, J.E., Senneff, S. and Lowery, M.M. (2023)**  
 > *Multivariable closed-loop control of deep brain stimulation for Parkinson's disease*  
@@ -46,7 +46,7 @@ The simulation ran for ~120 minutes of simulated time and produced two types of 
 
 ### Type A — Neural Recordings (`.mat` files)
 
-Binary MATLAB files stored in `fleming-model-based-brain/Model_Results/STN_Pop/` and `Motoneuron_Pop/`.
+Binary MATLAB files stored in `parkinsons_Motor/fleming-model-based-brain/Model_Results/STN_Pop/` and `parkinsons_Motor/fleming-model-based-brain/Model_Results/Motoneuron_Pop/`.
 
 | File type | Contents | Count |
 |---|---|---|
@@ -340,8 +340,8 @@ This mirrors exactly what a trained neurologist or a modern clinical DBS program
 
 | File | Purpose |
 |---|---|
-| `parkinsons_Motor/brain_calibrator.py` | Loads all data, computes features, builds `CalibratedBrainState` |
-| `parkinsons_Motor/models.py` | Pydantic schemas for `Action` and `Observation` |
+| `parkinsons_Motor/core/calibration.py` | Exposes the calibration interface that loads all data, computes features, and builds `CalibratedBrainState` |
+| `parkinsons_Motor/core/models.py` | Pydantic schemas for `Action` and `Observation` |
 | `parkinsons_Motor/server/parkinsons_Motor_environment.py` | RL environment using calibrated data |
 | `park-sen/Model_Results/*.csv` | 34 CSV files — ground truth simulation signals |
 | `park-sen/Model_Results/STN_Pop/` | 102 STN voltage recordings (`.mat`) |
@@ -366,7 +366,7 @@ Fleming model (NEURON simulation)
          └── .txt files (DBS parameter sweep)
                   └── Extract: entrainment lookup table (12×15)
 
-         ↓  brain_calibrator.py
+         ↓  core/calibration.py
 
 CalibratedBrainState
   100-step timeline of WindowFeatures (t=10.02s to 12.00s)

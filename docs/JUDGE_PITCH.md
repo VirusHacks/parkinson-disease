@@ -36,7 +36,7 @@ Instead of arbitrary difficulty scaling, we sliced the true biological timeline 
 The deterministic graders return continuous matrices in `[0.0, 1.0]`, combining efficiency multipliers, penalty deductions for exceeding side effects, and final-state "motor collapse" bonuses. 
 
 ### Environment Design & Code Quality (35/35 Combined)
-* **Biological Pre-Computation**: Rather than relying on naive compute that drags API calls to a halt, `brain_calibrator.py` accurately extracts and pre-caches the multivariable PID tracking models from the biological simulation into high-speed mathematical matrices.
+* **Biological Pre-Computation**: Rather than relying on naive compute that drags API calls to a halt, `core/calibration.py` accurately exposes the pre-cached multivariable PID tracking models from the biological simulation as high-speed lookup and calibration utilities.
 * **Rigorous OpenEnv Implementation**: Absolute, zero-compromise adherence to typed Pydantic structures for `ParkinsonsMotorObservation` and `ParkinsonsMotorAction`.
 * **State Management**: Beautiful step/reset pipelines through a modular FastApi backend, ensuring asynchronous multi-connection inference support. 
 

@@ -42,10 +42,10 @@ except Exception as e:  # pragma: no cover
     ) from e
 
 try:
-    from models import ParkinsonsMotorAction, ParkinsonsMotorObservation
+    from core.models import ParkinsonsMotorAction, ParkinsonsMotorObservation
     from server.parkinsons_Motor_environment import ParkinsonsMotorEnvironment
 except ImportError:
-    from parkinsons_Motor.models import ParkinsonsMotorAction, ParkinsonsMotorObservation
+    from parkinsons_Motor.core.models import ParkinsonsMotorAction, ParkinsonsMotorObservation
     from parkinsons_Motor.server.parkinsons_Motor_environment import (
         ParkinsonsMotorEnvironment,
     )

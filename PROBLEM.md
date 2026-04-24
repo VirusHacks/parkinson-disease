@@ -78,7 +78,7 @@ The simulation ran for ~75 seconds of simulated time and included:
 - **DBS electrode:** Extracellular stimulation modelled with Finite-Element methods for current spread in tissue.
 - **Total connections:** 5+ million individual synaptic connections modelled stochastically.
 
-The simulation's output (stored in `fleming-model-based-brain/Model_Results/`) includes:
+The simulation's output (stored in `parkinsons_Motor/fleming-model-based-brain/Model_Results/`) includes:
 - 102 STN voltage traces (`.mat` files)
 - 102 motoneuron voltage traces and spike times (`.mat` files)
 - 34 CSV files of controller signals, sampled at 100 timesteps (t=10.02–12.00 s)
@@ -86,7 +86,7 @@ The simulation's output (stored in `fleming-model-based-brain/Model_Results/`) i
 
 ### 3.3 What "Calibration" Means Here
 
-The `brain_calibrator.py` module loads all simulation outputs and builds a `CalibratedBrainState` — a ground-truth 100-step timeline with the following at every timestep:
+The `core/calibration.py` module exposes the calibration interface that loads all simulation outputs and builds a `CalibratedBrainState` — a ground-truth 100-step timeline with the following at every timestep:
 
 - Normalized neural signals (beta_arv, tremor_arv, semg_arv)
 - Raw muscle force (mN) and force_preserved fraction
@@ -105,7 +105,7 @@ Every observation the RL agent will ever see is a transformation of this calibra
                     DATA LAYER (offline, fixed)
 ═══════════════════════════════════════════════════════════════════
 
-  fleming-model-based-brain/
+  parkinsons_Motor/fleming-model-based-brain/
   ├── Model_Results/              ← 34 CSV controller files
   │   ├── tremor_ARV_Observer_values.csv
   │   ├── beta_ARV_Observer_values.csv
@@ -119,7 +119,7 @@ Every observation the RL agent will ever see is a transformation of this calibra
                     CALIBRATION (runs once, cached)
 ═══════════════════════════════════════════════════════════════════
 
-  parkinsons_Motor/brain_calibrator.py
+  parkinsons_Motor/core/calibration.py
   └── calibrate() → CalibratedBrainState
       ├── 100-step timeline of WindowFeatures
       ├── Normalization bounds (from actual data maxima)
@@ -133,7 +133,7 @@ Every observation the RL agent will ever see is a transformation of this calibra
   parkinsons_Motor/
   ├── tasks/dbs_tasks.py          ← 3 clinical task specs (frozen dataclasses)
   ├── graders/dbs_graders.py      ← 3 deterministic graders (0.0–1.0)
-  ├── models.py                   ← Pydantic Action + Observation types
+  ├── core/models.py              ← Pydantic Action + Observation types
   ├── server/
   │   ├── parkinsons_Motor_environment.py  ← reset/step/state logic
   │   └── app.py                           ← FastAPI server

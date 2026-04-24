@@ -1,0 +1,3772 @@
+{
+  "public": {
+    "beta_suppression": {
+      "no_dbs": {
+        "summary": {
+          "mean": 0.4079789509786928,
+          "std": 0.004262787645211717,
+          "min": 0.4005973974522481,
+          "max": 0.41055313031469254
+        },
+        "successes": 0,
+        "num_runs": 4,
+        "profiles": [
+          "responsive",
+          "responsive",
+          "responsive",
+          "responsive"
+        ],
+        "runs": [
+          {
+            "score": 0.41055313031469254,
+            "success": false,
+            "patient_profile_id": "responsive",
+            "score_details": {
+              "force_score": 0.6073255840089881,
+              "beta_score": 0.4878925213194413,
+              "tremor_score": 0.336047484788557,
+              "tracking_score": 0.9334926786973493,
+              "safety_score": 1.0,
+              "smoothness_score": 1.0,
+              "terminal_stability_score": 0.4920037044444282,
+              "recovery_score": 0.0580133651046118,
+              "efficiency_score": 0.4901122354359946,
+              "overall_score": 0.41055313031469254
+            }
+          },
+          {
+            "score": 0.4104728572834665,
+            "success": false,
+            "patient_profile_id": "responsive",
+            "score_details": {
+              "force_score": 0.6071965108577853,
+              "beta_score": 0.4878925213194413,
+              "tremor_score": 0.336047484788557,
+              "tracking_score": 0.9330173464972709,
+              "safety_score": 1.0,
+              "smoothness_score": 1.0,
+              "terminal_stability_score": 0.4800154879313283,
+              "recovery_score": 0.04544320261725593,
+              "efficiency_score": 0.49006060617551345,
+              "overall_score": 0.4104728572834665
+            }
+          },
+          {
+            "score": 0.4005973974522481,
+            "success": false,
+            "patient_profile_id": "responsive",
+            "score_details": {
+              "force_score": 0.599759396337689,
+              "beta_score": 0.4878925213194413,
+              "tremor_score": 0.336047484788557,
+              "tracking_score": 0.8618775196839286,
+              "safety_score": 1.0,
+              "smoothness_score": 1.0,
+              "terminal_stability_score": 0.449915520291455,
+              "recovery_score": 0.03029222263195791,
+              "efficiency_score": 0.487085760367475,
+              "overall_score": 0.4005973974522481
+            }
+          },
+          {
+            "score": 0.4102924188643641,
+            "success": false,
+            "patient_profile_id": "responsive",
+            "score_details": {
+              "force_score": 0.6070473527667246,
+              "beta_score": 0.4878925213194413,
+              "tremor_score": 0.336047484788557,
+              "tracking_score": 0.9317374301413415,
+              "safety_score": 1.0,
+              "smoothness_score": 1.0,
+              "terminal_stability_score": 0.47366477272383756,
+              "recovery_score": 0.041739738868444565,
+              "efficiency_score": 0.4900009429390892,
+              "overall_score": 0.4102924188643641
+            }
+          }
+        ]
+      },
+      "const_low": {
+        "summary": {
+          "mean": 0.6064283331404794,
+          "std": 0.004487939034360291,
+          "min": 0.5986562953803874,
+          "max": 0.6090934365685831
+        },
+        "successes": 0,
+        "num_runs": 4,
+        "profiles": [
+          "responsive",
+          "responsive",
+          "responsive",
+          "responsive"
+        ],
+        "runs": [
+          {
+            "score": 0.6090783682673455,
+            "success": false,
+            "patient_profile_id": "responsive",
+            "score_details": {
+              "force_score": 0.5635308700876931,
+              "beta_score": 0.4656704414528873,
+              "tremor_score": 0.3351749248277859,
+              "tracking_score": 0.9326817412391357,
+              "safety_score": 1.0,
+              "smoothness_score": 0.9899305555555555,
+              "terminal_stability_score": 0.4628897517900253,
+              "recovery_score": 0.058144706670576196,
+              "efficiency_score": 0.3492494684394594,
+              "overall_score": 0.6090783682673455
+            }
+          },
+          {
+            "score": 0.6090934365685831,
+            "success": false,
+            "patient_profile_id": "responsive",
+            "score_details": {
+              "force_score": 0.5634622415735877,
+              "beta_score": 0.4656704414528873,
+              "tremor_score": 0.3351749248277859,
+              "tracking_score": 0.9329073936658514,
+              "safety_score": 1.0,
+              "smoothness_score": 0.9899305555555555,
+              "terminal_stability_score": 0.45170116187959203,
+              "recovery_score": 0.04545354882139124,
+              "efficiency_score": 0.34922887988522777,
+              "overall_score": 0.6090934365685831
+            }
+          },
+          {
+            "score": 0.5986562953803874,
+            "success": false,
+            "patient_profile_id": "responsive",
+            "score_details": {
+              "force_score": 0.55559134830488,
+              "beta_score": 0.4656704414528873,
+              "tremor_score": 0.3351749248277859,
+              "tracking_score": 0.8574096031144203,
+              "safety_score": 1.0,
+              "smoothness_score": 0.9899305555555555,
+              "terminal_stability_score": 0.4173795153473599,
+              "recovery_score": 0.028862671086278657,
+              "efficiency_score": 0.34686761190461546,
+              "overall_score": 0.5986562953803874
+            }
+          },
+          {
+            "score": 0.6088852323456015,
+            "success": false,
+            "patient_profile_id": "responsive",
+            "score_details": {
+              "force_score": 0.5632920986482124,
+              "beta_score": 0.4656704414528873,
+              "tremor_score": 0.3351749248277859,
+              "tracking_score": 0.9314204835738447,
+              "safety_score": 1.0,
+              "smoothness_score": 0.9899305555555555,
+              "terminal_stability_score": 0.44517672279847764,
+              "recovery_score": 0.041564240024838106,
+              "efficiency_score": 0.3491778370076152,
+              "overall_score": 0.6088852323456015
+            }
+          }
+        ]
+      },
+      "const_mid": {
+        "summary": {
+          "mean": 0.3330941588043801,
+          "std": 0.004455788326786559,
+          "min": 0.325379228867685,
+          "max": 0.33584066198928464
+        },
+        "successes": 0,
+        "num_runs": 4,
+        "profiles": [
+          "responsive",
+          "responsive",
+          "responsive",
+          "responsive"
+        ],
+        "runs": [
+          {
+            "score": 0.3356495851908493,
+            "success": false,
+            "patient_profile_id": "responsive",
+            "score_details": {
+              "force_score": 0.5007647953566718,
+              "beta_score": 0.5794255502192955,
+              "tremor_score": 0.3936024015094258,
+              "tracking_score": 0.937086247851574,
+              "safety_score": 0.0,
+              "smoothness_score": 0.9752314814814815,
+              "terminal_stability_score": 0.41562319145891197,
+              "recovery_score": 0.05771241739477245,
+              "efficiency_score": 0.19278393560066986,
+              "overall_score": 0.3356495851908493
+            }
+          },
+          {
+            "score": 0.33584066198928464,
+            "success": false,
+            "patient_profile_id": "responsive",
+            "score_details": {
+              "force_score": 0.5008168703056082,
+              "beta_score": 0.5794255502192955,
+              "tremor_score": 0.3936024015094258,
+              "tracking_score": 0.9386057219030088,
+              "safety_score": 0.0,
+              "smoothness_score": 0.9752314814814815,
+              "terminal_stability_score": 0.4084233996607337,
+              "recovery_score": 0.046780799194855505,
+              "efficiency_score": 0.19279209400933656,
+              "overall_score": 0.33584066198928464
+            }
+          },
+          {
+            "score": 0.325379228867685,
+            "success": false,
+            "patient_profile_id": "responsive",
+            "score_details": {
+              "force_score": 0.49291682194456904,
+              "beta_score": 0.5794255502192955,
+              "tremor_score": 0.3936024015094258,
+              "tracking_score": 0.8624762079724108,
+              "safety_score": 0.0,
+              "smoothness_score": 0.9752314814814815,
+              "terminal_stability_score": 0.36999452856759374,
+              "recovery_score": 0.027361705008686343,
+              "efficiency_score": 0.1915544197661071,
+              "overall_score": 0.325379228867685
+            }
+          },
+          {
+            "score": 0.33550715916970153,
+            "success": false,
+            "patient_profile_id": "responsive",
+            "score_details": {
+              "force_score": 0.5005530247793945,
+              "beta_score": 0.5794255502192955,
+              "tremor_score": 0.3936024015094258,
+              "tracking_score": 0.9361955490243962,
+              "safety_score": 0.0,
+              "smoothness_score": 0.9752314814814815,
+              "terminal_stability_score": 0.4021861758386295,
+              "recovery_score": 0.04345686072526639,
+              "efficiency_score": 0.19275075821022977,
+              "overall_score": 0.33550715916970153
+            }
+          }
+        ]
+      },
+      "const_high": {
+        "summary": {
+          "mean": 0.48358439711104223,
+          "std": 0.0016033652937214342,
+          "min": 0.4808082982610685,
+          "max": 0.48456085242861635
+        },
+        "successes": 0,
+        "num_runs": 4,
+        "profiles": [
+          "responsive",
+          "responsive",
+          "responsive",
+          "responsive"
+        ],
+        "runs": [
+          {
+            "score": 0.48456085242861635,
+            "success": false,
+            "patient_profile_id": "responsive",
+            "score_details": {
+              "force_score": 0.8182475750482476,
+              "beta_score": 0.9899637551824405,
+              "tremor_score": 0.9610983459766527,
+              "tracking_score": 0.9644812076975036,
+              "safety_score": 0.0,
+              "smoothness_score": 0.9583333333333334,
+              "terminal_stability_score": 0.7940831397092786,
+              "recovery_score": 0.26697244483673616,
+              "efficiency_score": 0.0,
+              "overall_score": 0.48456085242861635
+            }
+          },
+          {
+            "score": 0.4844419528947991,
+            "success": false,
+            "patient_profile_id": "responsive",
+            "score_details": {
+              "force_score": 0.8181418016528513,
+              "beta_score": 0.9899637551824405,
+              "tremor_score": 0.9610983459766527,
+              "tracking_score": 0.9636314094428879,
+              "safety_score": 0.0,
+              "smoothness_score": 0.9583333333333334,
+              "terminal_stability_score": 0.7860583066459923,
+              "recovery_score": 0.25609687769266676,
+              "efficiency_score": 0.0,
+              "overall_score": 0.4844419528947991
+            }
+          },
+          {
+            "score": 0.4808082982610685,
+            "success": false,
+            "patient_profile_id": "responsive",
+            "score_details": {
+              "force_score": 0.8153516697126526,
+              "beta_score": 0.9899637551824405,
+              "tremor_score": 0.9610983459766527,
+              "tracking_score": 0.9370711300820653,
+              "safety_score": 0.0,
+              "smoothness_score": 0.9583333333333334,
+              "terminal_stability_score": 0.7736301304879523,
+              "recovery_score": 0.25008008633286294,
+              "efficiency_score": 0.0,
+              "overall_score": 0.4808082982610685
+            }
+          },
+          {
+            "score": 0.48452648485968497,
+            "success": false,
+            "patient_profile_id": "responsive",
+            "score_details": {
+              "force_score": 0.8182020464056301,
+              "beta_score": 0.9899637551824405,
+              "tremor_score": 0.9610983459766527,
+              "tracking_score": 0.964255516146566,
+              "safety_score": 0.0,
+              "smoothness_score": 0.9583333333333334,
+              "terminal_stability_score": 0.782864532400154,
+              "recovery_score": 0.25261914998260115,
+              "efficiency_score": 0.0,
+              "overall_score": 0.48452648485968497
+            }
+          }
+        ]
+      },
+      "safety_aware": {
+        "summary": {
+          "mean": 0.6257436910029914,
+          "std": 0.001572460979471039,
+          "min": 0.6231332043409623,
+          "max": 0.6273240804951971
+        },
+        "successes": 4,
+        "num_runs": 4,
+        "profiles": [
+          "responsive",
+          "responsive",
+          "responsive",
+          "responsive"
+        ],
+        "runs": [
+          {
+            "score": 0.6273240804951971,
+            "success": true,
+            "patient_profile_id": "responsive",
+            "score_details": {
+              "force_score": 0.5983568539002143,
+              "beta_score": 0.4871328646628006,
+              "tremor_score": 0.3358562147854247,
+              "tracking_score": 0.9414076483837492,
+              "safety_score": 1.0,
+              "smoothness_score": 0.9965856481481481,
+              "terminal_stability_score": 0.48306423353007144,
+              "recovery_score": 0.04884284979693804,
+              "efficiency_score": 0.4438961119497775,
+              "overall_score": 0.6273240804951971
+            }
+          },
+          {
+            "score": 0.6261042849368057,
+            "success": true,
+            "patient_profile_id": "responsive",
+            "score_details": {
+              "force_score": 0.5974650986573881,
+              "beta_score": 0.4871328646628006,
+              "tremor_score": 0.3358562147854247,
+              "tracking_score": 0.9325673754248828,
+              "safety_score": 1.0,
+              "smoothness_score": 0.9965856481481481,
+              "terminal_stability_score": 0.4706132413661458,
+              "recovery_score": 0.04483226624845399,
+              "efficiency_score": 0.4435704726602721,
+              "overall_score": 0.6261042849368057
+            }
+          },
+          {
+            "score": 0.6231332043409623,
+            "success": true,
+            "patient_profile_id": "responsive",
+            "score_details": {
+              "force_score": 0.5951753560631142,
+              "beta_score": 0.4871328646628006,
+              "tremor_score": 0.3358562147854247,
+              "tracking_score": 0.9112097512813351,
+              "safety_score": 1.0,
+              "smoothness_score": 0.9965856481481481,
+              "terminal_stability_score": 0.46988258193274746,
+              "recovery_score": 0.045187033556107814,
+              "efficiency_score": 0.44273433498959647,
+              "overall_score": 0.6231332043409623
+            }
+          },
+          {
+            "score": 0.6264131942390004,
+            "success": true,
+            "patient_profile_id": "responsive",
+            "score_details": {
+              "force_score": 0.5976784394576801,
+              "beta_score": 0.4871328646628006,
+              "tremor_score": 0.3358562147854247,
+              "tracking_score": 0.934824704814073,
+              "safety_score": 1.0,
+              "smoothness_score": 0.9965856481481481,
+              "terminal_stability_score": 0.465849557458124,
+              "recovery_score": 0.04299976300467606,
+              "efficiency_score": 0.44364837760917875,
+              "overall_score": 0.6264131942390004
+            }
+          }
+        ]
+      },
+      "reference": {
+        "summary": {
+          "mean": 0.5234058457428149,
+          "std": 0.0029620808116927223,
+          "min": 0.5183139031854626,
+          "max": 0.5256915883162568
+        },
+        "successes": 0,
+        "num_runs": 4,
+        "profiles": [
+          "responsive",
+          "responsive",
+          "responsive",
+          "responsive"
+        ],
+        "runs": [
+          {
+            "score": 0.5256915883162568,
+            "success": false,
+            "patient_profile_id": "responsive",
+            "score_details": {
+              "force_score": 0.5251249774899407,
+              "beta_score": 0.46689078901997627,
+              "tremor_score": 0.3385210835853929,
+              "tracking_score": 0.9398922198812414,
+              "safety_score": 0.7545974709339857,
+              "smoothness_score": 0.9600346826567407,
+              "terminal_stability_score": 0.43095772901801305,
+              "recovery_score": 0.054120986950829286,
+              "efficiency_score": 0.28476227434317447,
+              "overall_score": 0.5256915883162568
+            }
+          },
+          {
+            "score": 0.5247550307752372,
+            "success": false,
+            "patient_profile_id": "responsive",
+            "score_details": {
+              "force_score": 0.524385296111999,
+              "beta_score": 0.46689078901997627,
+              "tremor_score": 0.3385210835853929,
+              "tracking_score": 0.933151538842302,
+              "safety_score": 0.7545974709339857,
+              "smoothness_score": 0.9600346826567407,
+              "terminal_stability_score": 0.4175943786552335,
+              "recovery_score": 0.04532682755344036,
+              "efficiency_score": 0.28457573842565026,
+              "overall_score": 0.5247550307752372
+            }
+          },
+          {
+            "score": 0.5183139031854626,
+            "success": false,
+            "patient_profile_id": "responsive",
+            "score_details": {
+              "force_score": 0.5194614361317176,
+              "beta_score": 0.46689078901997627,
+              "tremor_score": 0.3385210835853929,
+              "tracking_score": 0.8865580053304913,
+              "safety_score": 0.7545974709339857,
+              "smoothness_score": 0.9600346826567407,
+              "terminal_stability_score": 0.4001287122287277,
+              "recovery_score": 0.03570076293448948,
+              "efficiency_score": 0.2833340189954026,
+              "overall_score": 0.5183139031854626
+            }
+          },
+          {
+            "score": 0.5248628606943029,
+            "success": false,
+            "patient_profile_id": "responsive",
+            "score_details": {
+              "force_score": 0.5244511651203047,
+              "beta_score": 0.46689078901997627,
+              "tremor_score": 0.3385210835853929,
+              "tracking_score": 0.9339553748569046,
+              "safety_score": 0.7545974709339857,
+              "smoothness_score": 0.9600346826567407,
+              "terminal_stability_score": 0.4118083951905504,
+              "recovery_score": 0.04240979969452857,
+              "efficiency_score": 0.28459234954533924,
+              "overall_score": 0.5248628606943029
+            }
+          }
+        ]
+      }
+    },
+    "tremor_correction": {
+      "no_dbs": {
+        "summary": {
+          "mean": 0.09959326648405463,
+          "std": 0.02618081776459812,
+          "min": 0.05456808290262272,
+          "max": 0.11731471204616933
+        },
+        "successes": 0,
+        "num_runs": 4,
+        "profiles": [
+          "responsive",
+          "balanced",
+          "balanced",
+          "balanced"
+        ],
+        "runs": [
+          {
+            "score": 0.1095251199678054,
+            "success": false,
+            "patient_profile_id": "responsive",
+            "score_details": {
+              "force_score": 0.3874749324199369,
+              "beta_score": 0.3283268964895554,
+              "tremor_score": 0.15444588594676043,
+              "tracking_score": 0.8121391501268094,
+              "safety_score": 1.0,
+              "smoothness_score": 1.0,
+              "terminal_stability_score": 0.17596337880585558,
+              "recovery_score": 0.05817394328969944,
+              "efficiency_score": 0.2998218076988695,
+              "overall_score": 0.1095251199678054
+            }
+          },
+          {
+            "score": 0.11731471204616933,
+            "success": false,
+            "patient_profile_id": "balanced",
+            "score_details": {
+              "force_score": 0.353258969843654,
+              "beta_score": 0.32232954040261486,
+              "tremor_score": 0.139609087861204,
+              "tracking_score": 0.898684307979496,
+              "safety_score": 1.0,
+              "smoothness_score": 1.0,
+              "terminal_stability_score": 0.20472920812893783,
+              "recovery_score": 0.05802118904694126,
+              "efficiency_score": 0.2798851764166072,
+              "overall_score": 0.11731471204616933
+            }
+          },
+          {
+            "score": 0.05456808290262272,
+            "success": false,
+            "patient_profile_id": "balanced",
+            "score_details": {
+              "force_score": 0.3248730492560076,
+              "beta_score": 0.32232954040261486,
+              "tremor_score": 0.139609087861204,
+              "tracking_score": 0.6375465663262019,
+              "safety_score": 1.0,
+              "smoothness_score": 1.0,
+              "terminal_stability_score": 0.080158605950693,
+              "recovery_score": 0.029720115806833813,
+              "efficiency_score": 0.2685308081815486,
+              "overall_score": 0.05456808290262272
+            }
+          },
+          {
+            "score": 0.11696515101962107,
+            "success": false,
+            "patient_profile_id": "balanced",
+            "score_details": {
+              "force_score": 0.3523831213372071,
+              "beta_score": 0.32232954040261486,
+              "tremor_score": 0.139609087861204,
+              "tracking_score": 0.8921256008411975,
+              "safety_score": 1.0,
+              "smoothness_score": 1.0,
+              "terminal_stability_score": 0.21231769228370517,
+              "recovery_score": 0.05589003555920363,
+              "efficiency_score": 0.2795348370140285,
+              "overall_score": 0.11696515101962107
+            }
+          }
+        ]
+      },
+      "const_low": {
+        "summary": {
+          "mean": 0.2666265143603048,
+          "std": 0.025907137596745487,
+          "min": 0.2221545117222416,
+          "max": 0.2846655725964077
+        },
+        "successes": 0,
+        "num_runs": 4,
+        "profiles": [
+          "responsive",
+          "balanced",
+          "balanced",
+          "balanced"
+        ],
+        "runs": [
+          {
+            "score": 0.27583036906999336,
+            "success": false,
+            "patient_profile_id": "responsive",
+            "score_details": {
+              "force_score": 0.35409021990614714,
+              "beta_score": 0.3259600678462659,
+              "tremor_score": 0.15393167516888143,
+              "tracking_score": 0.80790674554018,
+              "safety_score": 1.0,
+              "smoothness_score": 0.9966435185185185,
+              "terminal_stability_score": 0.15626786722217315,
+              "recovery_score": 0.0572345236146628,
+              "efficiency_score": 0.23800300905583582,
+              "overall_score": 0.27583036906999336
+            }
+          },
+          {
+            "score": 0.2846655725964077,
+            "success": false,
+            "patient_profile_id": "balanced",
+            "score_details": {
+              "force_score": 0.3153607210185076,
+              "beta_score": 0.31939317225562924,
+              "tremor_score": 0.13900309966827754,
+              "tracking_score": 0.8986488266655364,
+              "safety_score": 1.0,
+              "smoothness_score": 0.9965277777777778,
+              "terminal_stability_score": 0.19331073232924964,
+              "recovery_score": 0.058203851090235126,
+              "efficiency_score": 0.21971930832047915,
+              "overall_score": 0.2846655725964077
+            }
+          },
+          {
+            "score": 0.2221545117222416,
+            "success": false,
+            "patient_profile_id": "balanced",
+            "score_details": {
+              "force_score": 0.2906739581647841,
+              "beta_score": 0.31939317225562924,
+              "tremor_score": 0.13900309966827754,
+              "tracking_score": 0.6305080761464656,
+              "safety_score": 1.0,
+              "smoothness_score": 0.9965277777777778,
+              "terminal_stability_score": 0.07339212351234042,
+              "recovery_score": 0.027698251070700508,
+              "efficiency_score": 0.21149038736923798,
+              "overall_score": 0.2221545117222416
+            }
+          },
+          {
+            "score": 0.2838556040525766,
+            "success": false,
+            "patient_profile_id": "balanced",
+            "score_details": {
+              "force_score": 0.31415308017828586,
+              "beta_score": 0.31939317225562924,
+              "tremor_score": 0.13900309966827754,
+              "tracking_score": 0.8914452889284101,
+              "safety_score": 1.0,
+              "smoothness_score": 0.9965277777777778,
+              "terminal_stability_score": 0.19845496766955512,
+              "recovery_score": 0.05573962826258644,
+              "efficiency_score": 0.21931676137373857,
+              "overall_score": 0.2838556040525766
+            }
+          }
+        ]
+      },
+      "const_mid": {
+        "summary": {
+          "mean": 0.049334994255999784,
+          "std": 0.08545071664251035,
+          "min": 0.0,
+          "max": 0.19733997702399914
+        },
+        "successes": 0,
+        "num_runs": 4,
+        "profiles": [
+          "responsive",
+          "balanced",
+          "balanced",
+          "balanced"
+        ],
+        "runs": [
+          {
+            "score": 0.19733997702399914,
+            "success": false,
+            "patient_profile_id": "responsive",
+            "score_details": {
+              "force_score": 0.3339049737158178,
+              "beta_score": 0.407574846468748,
+              "tremor_score": 0.19593337363776633,
+              "tracking_score": 0.8158668492868056,
+              "safety_score": 0.3526924233844918,
+              "smoothness_score": 0.9917438271604938,
+              "terminal_stability_score": 0.15167253363571817,
+              "recovery_score": 0.053343338044632704,
+              "efficiency_score": 0.1870208152247562,
+              "overall_score": 0.19733997702399914
+            }
+          },
+          {
+            "score": 0.0,
+            "success": false,
+            "patient_profile_id": "balanced",
+            "score_details": {
+              "force_score": 0.2737564856236349,
+              "beta_score": 0.3726511833025031,
+              "tremor_score": 0.172287110132668,
+              "tracking_score": 0.9039120838265776,
+              "safety_score": 0.0,
+              "smoothness_score": 0.9914351851851851,
+              "terminal_stability_score": 0.19507005897219165,
+              "recovery_score": 0.05778774807227788,
+              "efficiency_score": 0.1622738711331143,
+              "overall_score": 0.0
+            }
+          },
+          {
+            "score": 0.0,
+            "success": false,
+            "patient_profile_id": "balanced",
+            "score_details": {
+              "force_score": 0.2548855452344661,
+              "beta_score": 0.3726511833025031,
+              "tremor_score": 0.172287110132668,
+              "tracking_score": 0.6340069254875443,
+              "safety_score": 0.0,
+              "smoothness_score": 0.9914351851851851,
+              "terminal_stability_score": 0.06592948522479594,
+              "recovery_score": 0.019267230583763284,
+              "efficiency_score": 0.15778678086280082,
+              "overall_score": 0.0
+            }
+          },
+          {
+            "score": 0.0,
+            "success": false,
+            "patient_profile_id": "balanced",
+            "score_details": {
+              "force_score": 0.27325502740381225,
+              "beta_score": 0.3726511833025031,
+              "tremor_score": 0.172287110132668,
+              "tracking_score": 0.8959415624367035,
+              "safety_score": 0.0,
+              "smoothness_score": 0.9914351851851851,
+              "terminal_stability_score": 0.19805957024573434,
+              "recovery_score": 0.055057060393288004,
+              "efficiency_score": 0.16215463551195644,
+              "overall_score": 0.0
+            }
+          }
+        ]
+      },
+      "const_high": {
+        "summary": {
+          "mean": 0.21751251555489334,
+          "std": 0.021639481777212845,
+          "min": 0.18902655441110122,
+          "max": 0.24996984788743876
+        },
+        "successes": 0,
+        "num_runs": 4,
+        "profiles": [
+          "responsive",
+          "balanced",
+          "balanced",
+          "balanced"
+        ],
+        "runs": [
+          {
+            "score": 0.24996984788743876,
+            "success": false,
+            "patient_profile_id": "responsive",
+            "score_details": {
+              "force_score": 0.873336835186558,
+              "beta_score": 0.9942304962665132,
+              "tremor_score": 0.7899877099112858,
+              "tracking_score": 0.9256880333454851,
+              "safety_score": 0.0,
+              "smoothness_score": 0.9791666666666666,
+              "terminal_stability_score": 0.42913119225872487,
+              "recovery_score": 0.06056750105136305,
+              "efficiency_score": 7.807722865601835e-16,
+              "overall_score": 0.24996984788743876
+            }
+          },
+          {
+            "score": 0.21517018773436797,
+            "success": false,
+            "patient_profile_id": "balanced",
+            "score_details": {
+              "force_score": 0.778105035810936,
+              "beta_score": 0.9931828795460043,
+              "tremor_score": 0.6660946866330817,
+              "tracking_score": 0.9431198306701731,
+              "safety_score": 0.0,
+              "smoothness_score": 0.9791666666666666,
+              "terminal_stability_score": 0.38875235529810886,
+              "recovery_score": 0.05565154467795047,
+              "efficiency_score": 7.140678059087576e-16,
+              "overall_score": 0.21517018773436797
+            }
+          },
+          {
+            "score": 0.18902655441110122,
+            "success": false,
+            "patient_profile_id": "balanced",
+            "score_details": {
+              "force_score": 0.7654829812800726,
+              "beta_score": 0.9931828795460043,
+              "tremor_score": 0.6660946866330817,
+              "tracking_score": 0.8402316292255405,
+              "safety_score": 0.0,
+              "smoothness_score": 0.9791666666666666,
+              "terminal_stability_score": 0.3271816068611959,
+              "recovery_score": 0.04197641694005777,
+              "efficiency_score": 7.096115779212376e-16,
+              "overall_score": 0.18902655441110122
+            }
+          },
+          {
+            "score": 0.21588347218666543,
+            "success": false,
+            "patient_profile_id": "balanced",
+            "score_details": {
+              "force_score": 0.7779038169302792,
+              "beta_score": 0.9931828795460043,
+              "tremor_score": 0.6660946866330817,
+              "tracking_score": 0.9412554105454656,
+              "safety_score": 0.0,
+              "smoothness_score": 0.9791666666666666,
+              "terminal_stability_score": 0.3971150038214892,
+              "recovery_score": 0.057664988195453126,
+              "efficiency_score": 7.139967653974518e-16,
+              "overall_score": 0.21588347218666543
+            }
+          }
+        ]
+      },
+      "safety_aware": {
+        "summary": {
+          "mean": 0.3291680271997781,
+          "std": 0.019862151103951592,
+          "min": 0.31479977008741156,
+          "max": 0.363383035217272
+        },
+        "successes": 1,
+        "num_runs": 4,
+        "profiles": [
+          "responsive",
+          "balanced",
+          "balanced",
+          "balanced"
+        ],
+        "runs": [
+          {
+            "score": 0.363383035217272,
+            "success": true,
+            "patient_profile_id": "responsive",
+            "score_details": {
+              "force_score": 0.8961800221750386,
+              "beta_score": 0.9941660352561987,
+              "tremor_score": 0.829433563222332,
+              "tracking_score": 0.9472070621366457,
+              "safety_score": 0.0,
+              "smoothness_score": 0.9845293209876543,
+              "terminal_stability_score": 0.45286323746866386,
+              "recovery_score": 0.051793770493376246,
+              "efficiency_score": 0.22387255019113364,
+              "overall_score": 0.363383035217272
+            }
+          },
+          {
+            "score": 0.31783755561057514,
+            "success": false,
+            "patient_profile_id": "balanced",
+            "score_details": {
+              "force_score": 0.7947537750662059,
+              "beta_score": 0.9833188958355841,
+              "tremor_score": 0.6869145859505823,
+              "tracking_score": 0.9413941615705198,
+              "safety_score": 0.0,
+              "smoothness_score": 0.983912037037037,
+              "terminal_stability_score": 0.40213784973866035,
+              "recovery_score": 0.05381245514533445,
+              "efficiency_score": 0.2024679676556876,
+              "overall_score": 0.31783755561057514
+            }
+          },
+          {
+            "score": 0.31479977008741156,
+            "success": false,
+            "patient_profile_id": "balanced",
+            "score_details": {
+              "force_score": 0.7932451321506125,
+              "beta_score": 0.9833188958355841,
+              "tremor_score": 0.6869145859505823,
+              "tracking_score": 0.9295911576883071,
+              "safety_score": 0.0,
+              "smoothness_score": 0.983912037037037,
+              "terminal_stability_score": 0.3955718196515116,
+              "recovery_score": 0.04840928597910982,
+              "efficiency_score": 0.2023187796340345,
+              "overall_score": 0.31479977008741156
+            }
+          },
+          {
+            "score": 0.32065174788385364,
+            "success": false,
+            "patient_profile_id": "balanced",
+            "score_details": {
+              "force_score": 0.7952514364126538,
+              "beta_score": 0.9833188958355841,
+              "tremor_score": 0.6869145859505823,
+              "tracking_score": 0.9455146952522888,
+              "safety_score": 0.0,
+              "smoothness_score": 0.983912037037037,
+              "terminal_stability_score": 0.4183615701920551,
+              "recovery_score": 0.060037333152778094,
+              "efficiency_score": 0.2025171808332808,
+              "overall_score": 0.32065174788385364
+            }
+          }
+        ]
+      },
+      "reference": {
+        "summary": {
+          "mean": 0.20626308265904658,
+          "std": 0.03253408121944641,
+          "min": 0.1651939055500396,
+          "max": 0.2563155575955347
+        },
+        "successes": 0,
+        "num_runs": 4,
+        "profiles": [
+          "responsive",
+          "balanced",
+          "balanced",
+          "balanced"
+        ],
+        "runs": [
+          {
+            "score": 0.2563155575955347,
+            "success": false,
+            "patient_profile_id": "responsive",
+            "score_details": {
+              "force_score": 0.3272687401626694,
+              "beta_score": 0.33710107231446446,
+              "tremor_score": 0.16546168636004283,
+              "tracking_score": 0.8753518396055068,
+              "safety_score": 0.8800733916926521,
+              "smoothness_score": 0.9799880206754887,
+              "terminal_stability_score": 0.1782312270146191,
+              "recovery_score": 0.05337044928626683,
+              "efficiency_score": 0.1904342647058749,
+              "overall_score": 0.2563155575955347
+            }
+          },
+          {
+            "score": 0.20088025823880518,
+            "success": false,
+            "patient_profile_id": "balanced",
+            "score_details": {
+              "force_score": 0.2745544604047757,
+              "beta_score": 0.32649965712545453,
+              "tremor_score": 0.14721790391782624,
+              "tracking_score": 0.8992584735520348,
+              "safety_score": 0.6634109247308706,
+              "smoothness_score": 0.9788699465531251,
+              "terminal_stability_score": 0.19183964264931258,
+              "recovery_score": 0.05455208970903874,
+              "efficiency_score": 0.17065878268347168,
+              "overall_score": 0.20088025823880518
+            }
+          },
+          {
+            "score": 0.1651939055500396,
+            "success": false,
+            "patient_profile_id": "balanced",
+            "score_details": {
+              "force_score": 0.26370959808989275,
+              "beta_score": 0.32649965712545453,
+              "tremor_score": 0.14721790391782624,
+              "tracking_score": 0.7403786864840314,
+              "safety_score": 0.6634109247308706,
+              "smoothness_score": 0.9788699465531251,
+              "terminal_stability_score": 0.12766213050765346,
+              "recovery_score": 0.02485058619265962,
+              "efficiency_score": 0.1677203169312581,
+              "overall_score": 0.1651939055500396
+            }
+          },
+          {
+            "score": 0.2026626092518069,
+            "success": false,
+            "patient_profile_id": "balanced",
+            "score_details": {
+              "force_score": 0.2741744508180253,
+              "beta_score": 0.32649965712545453,
+              "tremor_score": 0.14721790391782624,
+              "tracking_score": 0.900418900484156,
+              "safety_score": 0.6634109247308706,
+              "smoothness_score": 0.9788699465531251,
+              "terminal_stability_score": 0.20569377887319523,
+              "recovery_score": 0.0547133456942534,
+              "efficiency_score": 0.17055581732312344,
+              "overall_score": 0.2026626092518069
+            }
+          }
+        ]
+      }
+    },
+    "full_episode": {
+      "no_dbs": {
+        "summary": {
+          "mean": 0.5116910099549268,
+          "std": 0.06834326078281724,
+          "min": 0.39597491827428444,
+          "max": 0.5737008736837306
+        },
+        "successes": 0,
+        "num_runs": 4,
+        "profiles": [
+          "responsive",
+          "balanced",
+          "balanced",
+          "balanced"
+        ],
+        "runs": [
+          {
+            "score": 0.5737008736837306,
+            "success": false,
+            "patient_profile_id": "responsive",
+            "score_details": {
+              "force_score": 0.4042105141569441,
+              "beta_score": 0.36752204820910367,
+              "tremor_score": 0.22580688704563978,
+              "tracking_score": 0.7706991139958176,
+              "safety_score": 1.0,
+              "smoothness_score": 1.0,
+              "terminal_stability_score": 0.1376215551808162,
+              "recovery_score": 0.09760184344295048,
+              "efficiency_score": 0.3396828862392007,
+              "overall_score": 0.5737008736837306
+            }
+          },
+          {
+            "score": 0.5402157464656315,
+            "success": false,
+            "patient_profile_id": "balanced",
+            "score_details": {
+              "force_score": 0.38246260441870533,
+              "beta_score": 0.3526357671923639,
+              "tremor_score": 0.2093429767559073,
+              "tracking_score": 0.9023137520248279,
+              "safety_score": 1.0,
+              "smoothness_score": 1.0,
+              "terminal_stability_score": 0.18742950094200936,
+              "recovery_score": 0.05473496482584034,
+              "efficiency_score": 0.32157866495196347,
+              "overall_score": 0.5402157464656315
+            }
+          },
+          {
+            "score": 0.39597491827428444,
+            "success": false,
+            "patient_profile_id": "balanced",
+            "score_details": {
+              "force_score": 0.35210044023899584,
+              "beta_score": 0.3526357671923639,
+              "tremor_score": 0.2093429767559073,
+              "tracking_score": 0.5732001577410776,
+              "safety_score": 1.0,
+              "smoothness_score": 1.0,
+              "terminal_stability_score": 0.06508022987001946,
+              "recovery_score": 0.07670030604815553,
+              "efficiency_score": 0.3094337992800797,
+              "overall_score": 0.39597491827428444
+            }
+          },
+          {
+            "score": 0.5368725013960605,
+            "success": false,
+            "patient_profile_id": "balanced",
+            "score_details": {
+              "force_score": 0.3806367741405435,
+              "beta_score": 0.3526357671923639,
+              "tremor_score": 0.2093429767559073,
+              "tracking_score": 0.8777137041987639,
+              "safety_score": 1.0,
+              "smoothness_score": 1.0,
+              "terminal_stability_score": 0.2058577415953745,
+              "recovery_score": 0.047358372736569454,
+              "efficiency_score": 0.32084833284069875,
+              "overall_score": 0.5368725013960605
+            }
+          }
+        ]
+      },
+      "const_low": {
+        "summary": {
+          "mean": 0.4921269106099724,
+          "std": 0.06129856552894906,
+          "min": 0.3860367663484049,
+          "max": 0.5308850840914988
+        },
+        "successes": 0,
+        "num_runs": 4,
+        "profiles": [
+          "responsive",
+          "balanced",
+          "balanced",
+          "balanced"
+        ],
+        "runs": [
+          {
+            "score": 0.5240688487267136,
+            "success": false,
+            "patient_profile_id": "responsive",
+            "score_details": {
+              "force_score": 0.38348006934409856,
+              "beta_score": 0.36115608500114654,
+              "tremor_score": 0.22542528184047395,
+              "tracking_score": 0.7665409466840628,
+              "safety_score": 1.0,
+              "smoothness_score": 0.9987380952380952,
+              "terminal_stability_score": 0.135329395872953,
+              "recovery_score": 0.0965352981547441,
+              "efficiency_score": 0.2861370928301715,
+              "overall_score": 0.5240688487267136
+            }
+          },
+          {
+            "score": 0.5308850840914988,
+            "success": false,
+            "patient_profile_id": "balanced",
+            "score_details": {
+              "force_score": 0.3582624686639673,
+              "beta_score": 0.34576789351904846,
+              "tremor_score": 0.20889563758061896,
+              "tracking_score": 0.9020786687790625,
+              "safety_score": 1.0,
+              "smoothness_score": 0.9986964285714286,
+              "terminal_stability_score": 0.18720442487206063,
+              "recovery_score": 0.05477224626876692,
+              "efficiency_score": 0.26905539065357936,
+              "overall_score": 0.5308850840914988
+            }
+          },
+          {
+            "score": 0.3860367663484049,
+            "success": false,
+            "patient_profile_id": "balanced",
+            "score_details": {
+              "force_score": 0.3299939762015386,
+              "beta_score": 0.34576789351904846,
+              "tremor_score": 0.20889563758061896,
+              "tracking_score": 0.5672584170889039,
+              "safety_score": 1.0,
+              "smoothness_score": 0.9986964285714286,
+              "terminal_stability_score": 0.0604612565748788,
+              "recovery_score": 0.0744532805977714,
+              "efficiency_score": 0.2592320895228854,
+              "overall_score": 0.3860367663484049
+            }
+          },
+          {
+            "score": 0.5275169432732721,
+            "success": false,
+            "patient_profile_id": "balanced",
+            "score_details": {
+              "force_score": 0.3568195240779669,
+              "beta_score": 0.34576789351904846,
+              "tremor_score": 0.20889563758061896,
+              "tracking_score": 0.8767236930253358,
+              "safety_score": 1.0,
+              "smoothness_score": 0.9986964285714286,
+              "terminal_stability_score": 0.20602062224752332,
+              "recovery_score": 0.04729160160914164,
+              "efficiency_score": 0.26855396740994425,
+              "overall_score": 0.5275169432732721
+            }
+          }
+        ]
+      },
+      "const_mid": {
+        "summary": {
+          "mean": 0.528171710265057,
+          "std": 0.06969977205747334,
+          "min": 0.41122316416800686,
+          "max": 0.5953291911065491
+        },
+        "successes": 0,
+        "num_runs": 4,
+        "profiles": [
+          "responsive",
+          "balanced",
+          "balanced",
+          "balanced"
+        ],
+        "runs": [
+          {
+            "score": 0.5953291911065491,
+            "success": false,
+            "patient_profile_id": "responsive",
+            "score_details": {
+              "force_score": 0.38622781511495113,
+              "beta_score": 0.4697533144963474,
+              "tremor_score": 0.26959421621527346,
+              "tracking_score": 0.7802876735766024,
+              "safety_score": 1.0,
+              "smoothness_score": 0.9969206349206349,
+              "terminal_stability_score": 0.1419160269362689,
+              "recovery_score": 0.09632039214217342,
+              "efficiency_score": 0.2571351799273026,
+              "overall_score": 0.5953291911065491
+            }
+          },
+          {
+            "score": 0.5547357965515604,
+            "success": false,
+            "patient_profile_id": "balanced",
+            "score_details": {
+              "force_score": 0.3374506900873941,
+              "beta_score": 0.41317566673388595,
+              "tremor_score": 0.2442903985746302,
+              "tracking_score": 0.9062766784693271,
+              "safety_score": 0.7575442423194204,
+              "smoothness_score": 0.9968095238095238,
+              "terminal_stability_score": 0.19037688342059772,
+              "recovery_score": 0.0558080663599288,
+              "efficiency_score": 0.22701706534546717,
+              "overall_score": 0.5547357965515604
+            }
+          },
+          {
+            "score": 0.41122316416800686,
+            "success": false,
+            "patient_profile_id": "balanced",
+            "score_details": {
+              "force_score": 0.3127637016794735,
+              "beta_score": 0.41317566673388595,
+              "tremor_score": 0.2442903985746302,
+              "tracking_score": 0.5750088529858517,
+              "safety_score": 0.7575442423194204,
+              "smoothness_score": 0.9968095238095238,
+              "terminal_stability_score": 0.06280039850182378,
+              "recovery_score": 0.0737781562421937,
+              "efficiency_score": 0.22026928851396885,
+              "overall_score": 0.41122316416800686
+            }
+          },
+          {
+            "score": 0.551398689234112,
+            "success": false,
+            "patient_profile_id": "balanced",
+            "score_details": {
+              "force_score": 0.3363699681522731,
+              "beta_score": 0.41317566673388595,
+              "tremor_score": 0.2442903985746302,
+              "tracking_score": 0.8807854745652521,
+              "safety_score": 0.7575442423194204,
+              "smoothness_score": 0.9968095238095238,
+              "terminal_stability_score": 0.20882340564087581,
+              "recovery_score": 0.04910611479005772,
+              "efficiency_score": 0.22672166801653407,
+              "overall_score": 0.551398689234112
+            }
+          }
+        ]
+      },
+      "const_high": {
+        "summary": {
+          "mean": 0.21783300676373044,
+          "std": 0.01942512498027378,
+          "min": 0.18898789059266366,
+          "max": 0.2437597413438046
+        },
+        "successes": 0,
+        "num_runs": 4,
+        "profiles": [
+          "responsive",
+          "balanced",
+          "balanced",
+          "balanced"
+        ],
+        "runs": [
+          {
+            "score": 0.2437597413438046,
+            "success": false,
+            "patient_profile_id": "responsive",
+            "score_details": {
+              "force_score": 0.8731614829423793,
+              "beta_score": 0.9752180943065115,
+              "tremor_score": 0.7567150354119545,
+              "tracking_score": 0.9075948298251004,
+              "safety_score": 0.0,
+              "smoothness_score": 0.99,
+              "terminal_stability_score": 0.46763222581234576,
+              "recovery_score": 0.088825015273239,
+              "efficiency_score": 0.0,
+              "overall_score": 0.2437597413438046
+            }
+          },
+          {
+            "score": 0.21994302531437873,
+            "success": false,
+            "patient_profile_id": "balanced",
+            "score_details": {
+              "force_score": 0.7645585016734525,
+              "beta_score": 0.9668213936652754,
+              "tremor_score": 0.6352977476710093,
+              "tracking_score": 0.9429429182385443,
+              "safety_score": 0.0,
+              "smoothness_score": 0.99,
+              "terminal_stability_score": 0.3414078361689132,
+              "recovery_score": 0.05664014525618338,
+              "efficiency_score": 0.0,
+              "overall_score": 0.21994302531437873
+            }
+          },
+          {
+            "score": 0.18898789059266366,
+            "success": false,
+            "patient_profile_id": "balanced",
+            "score_details": {
+              "force_score": 0.7420069018362685,
+              "beta_score": 0.9668213936652754,
+              "tremor_score": 0.6352977476710093,
+              "tracking_score": 0.7871833885918833,
+              "safety_score": 0.0,
+              "smoothness_score": 0.99,
+              "terminal_stability_score": 0.2838801161480433,
+              "recovery_score": 0.08509373236063439,
+              "efficiency_score": 0.0,
+              "overall_score": 0.18898789059266366
+            }
+          },
+          {
+            "score": 0.21864136980407475,
+            "success": false,
+            "patient_profile_id": "balanced",
+            "score_details": {
+              "force_score": 0.763110387183048,
+              "beta_score": 0.9668213936652754,
+              "tremor_score": 0.6352977476710093,
+              "tracking_score": 0.9329848989761604,
+              "safety_score": 0.0,
+              "smoothness_score": 0.99,
+              "terminal_stability_score": 0.3512951081755957,
+              "recovery_score": 0.0545885665197377,
+              "efficiency_score": 0.0,
+              "overall_score": 0.21864136980407475
+            }
+          }
+        ]
+      },
+      "safety_aware": {
+        "summary": {
+          "mean": 0.6293567846839809,
+          "std": 0.019044242949396148,
+          "min": 0.6067966253722779,
+          "max": 0.6595638397778039
+        },
+        "successes": 0,
+        "num_runs": 4,
+        "profiles": [
+          "responsive",
+          "balanced",
+          "balanced",
+          "balanced"
+        ],
+        "runs": [
+          {
+            "score": 0.6595638397778039,
+            "success": false,
+            "patient_profile_id": "responsive",
+            "score_details": {
+              "force_score": 0.3989070518467568,
+              "beta_score": 0.4607733098766663,
+              "tremor_score": 0.26941706731016896,
+              "tracking_score": 0.9076169365872773,
+              "safety_score": 1.0,
+              "smoothness_score": 0.9897293554341261,
+              "terminal_stability_score": 0.2057555965737534,
+              "recovery_score": 0.06259916316289676,
+              "efficiency_score": 0.25697006236156084,
+              "overall_score": 0.6595638397778039
+            }
+          },
+          {
+            "score": 0.6257181135508249,
+            "success": false,
+            "patient_profile_id": "balanced",
+            "score_details": {
+              "force_score": 0.33067447449496296,
+              "beta_score": 0.40222726894521704,
+              "tremor_score": 0.24160994826504428,
+              "tracking_score": 0.9098444212611401,
+              "safety_score": 0.9597060420265858,
+              "smoothness_score": 0.9890995994189185,
+              "terminal_stability_score": 0.19342167148376094,
+              "recovery_score": 0.0380683965090271,
+              "efficiency_score": 0.22553562633522795,
+              "overall_score": 0.6257181135508249
+            }
+          },
+          {
+            "score": 0.6067966253722779,
+            "success": false,
+            "patient_profile_id": "balanced",
+            "score_details": {
+              "force_score": 0.3232720171185998,
+              "beta_score": 0.40222726894521704,
+              "tremor_score": 0.24160994826504428,
+              "tracking_score": 0.8037504287441042,
+              "safety_score": 0.9597060420265858,
+              "smoothness_score": 0.9890995994189185,
+              "terminal_stability_score": 0.17932383101296423,
+              "recovery_score": 0.04918373294461137,
+              "efficiency_score": 0.2234834931393215,
+              "overall_score": 0.6067966253722779
+            }
+          },
+          {
+            "score": 0.6253485600350174,
+            "success": false,
+            "patient_profile_id": "balanced",
+            "score_details": {
+              "force_score": 0.3307916988878369,
+              "beta_score": 0.40222726894521704,
+              "tremor_score": 0.24160994826504428,
+              "tracking_score": 0.9045408841826155,
+              "safety_score": 0.9597060420265858,
+              "smoothness_score": 0.9890995994189185,
+              "terminal_stability_score": 0.20260869686753946,
+              "recovery_score": 0.03697717248922022,
+              "efficiency_score": 0.22556812366088017,
+              "overall_score": 0.6253485600350174
+            }
+          }
+        ]
+      },
+      "reference": {
+        "summary": {
+          "mean": 0.5179366100838518,
+          "std": 0.04743581818171625,
+          "min": 0.444521271649339,
+          "max": 0.5771747849024024
+        },
+        "successes": 0,
+        "num_runs": 4,
+        "profiles": [
+          "responsive",
+          "balanced",
+          "balanced",
+          "balanced"
+        ],
+        "runs": [
+          {
+            "score": 0.5771747849024024,
+            "success": false,
+            "patient_profile_id": "responsive",
+            "score_details": {
+              "force_score": 0.3734091731825734,
+              "beta_score": 0.3840552608197817,
+              "tremor_score": 0.23801021548565543,
+              "tracking_score": 0.854633008214895,
+              "safety_score": 1.0,
+              "smoothness_score": 0.9862902744534405,
+              "terminal_stability_score": 0.17976586985857623,
+              "recovery_score": 0.09813409808555512,
+              "efficiency_score": 0.2484837833213611,
+              "overall_score": 0.5771747849024024
+            }
+          },
+          {
+            "score": 0.5257861547330013,
+            "success": false,
+            "patient_profile_id": "balanced",
+            "score_details": {
+              "force_score": 0.33246354647706744,
+              "beta_score": 0.3686433171432898,
+              "tremor_score": 0.21773249150700008,
+              "tracking_score": 0.9063070424132071,
+              "safety_score": 1.0,
+              "smoothness_score": 0.985592902920717,
+              "terminal_stability_score": 0.19073772940484215,
+              "recovery_score": 0.04882412420951404,
+              "efficiency_score": 0.22860184961937538,
+              "overall_score": 0.5257861547330013
+            }
+          },
+          {
+            "score": 0.444521271649339,
+            "success": false,
+            "patient_profile_id": "balanced",
+            "score_details": {
+              "force_score": 0.31616738989581195,
+              "beta_score": 0.3686433171432898,
+              "tremor_score": 0.21773249150700008,
+              "tracking_score": 0.6856430201353015,
+              "safety_score": 1.0,
+              "smoothness_score": 0.985592902920717,
+              "terminal_stability_score": 0.1268422285002118,
+              "recovery_score": 0.07820395764974958,
+              "efficiency_score": 0.2237778240934742,
+              "overall_score": 0.444521271649339
+            }
+          },
+          {
+            "score": 0.5242642290506646,
+            "success": false,
+            "patient_profile_id": "balanced",
+            "score_details": {
+              "force_score": 0.33205890089514273,
+              "beta_score": 0.3686433171432898,
+              "tremor_score": 0.21773249150700008,
+              "tracking_score": 0.8929815265955118,
+              "safety_score": 1.0,
+              "smoothness_score": 0.985592902920717,
+              "terminal_stability_score": 0.20431344222456885,
+              "recovery_score": 0.04232909634423859,
+              "efficiency_score": 0.2284820655091519,
+              "overall_score": 0.5242642290506646
+            }
+          }
+        ]
+      }
+    }
+  },
+  "extended": {
+    "fragile_patient": {
+      "no_dbs": {
+        "summary": {
+          "mean": 0.21513260334967782,
+          "std": 0.027465212715949434,
+          "min": 0.1700492896830389,
+          "max": 0.23846121146466914
+        },
+        "successes": 0,
+        "num_runs": 4,
+        "profiles": [
+          "fragile",
+          "fragile",
+          "fragile",
+          "fragile"
+        ],
+        "runs": [
+          {
+            "score": 0.21591072586863136,
+            "success": false,
+            "patient_profile_id": "fragile",
+            "score_details": {
+              "force_score": 0.2613020495551598,
+              "beta_score": 0.3020092518926871,
+              "tremor_score": 0.11152747047876387,
+              "tracking_score": 0.7685758115523421,
+              "safety_score": 1.0,
+              "smoothness_score": 1.0,
+              "terminal_stability_score": 0.15499893610922,
+              "recovery_score": 0.05516496714420488,
+              "efficiency_score": 0.22858183653349917,
+              "overall_score": 0.21591072586863136
+            }
+          },
+          {
+            "score": 0.23846121146466914,
+            "success": false,
+            "patient_profile_id": "fragile",
+            "score_details": {
+              "force_score": 0.26955824672034967,
+              "beta_score": 0.3020092518926871,
+              "tremor_score": 0.11152747047876387,
+              "tracking_score": 0.8793347699218172,
+              "safety_score": 1.0,
+              "smoothness_score": 1.0,
+              "terminal_stability_score": 0.17425160923910424,
+              "recovery_score": 0.05416408557446689,
+              "efficiency_score": 0.2318843153995751,
+              "overall_score": 0.23846121146466914
+            }
+          },
+          {
+            "score": 0.1700492896830389,
+            "success": false,
+            "patient_profile_id": "fragile",
+            "score_details": {
+              "force_score": 0.24611946097361315,
+              "beta_score": 0.3020092518926871,
+              "tremor_score": 0.11152747047876387,
+              "tracking_score": 0.5737148576329624,
+              "safety_score": 1.0,
+              "smoothness_score": 1.0,
+              "terminal_stability_score": 8.333240707306211e-10,
+              "recovery_score": 0.0,
+              "efficiency_score": 0.2225088011008805,
+              "overall_score": 0.1700492896830389
+            }
+          },
+          {
+            "score": 0.23610918638237188,
+            "success": false,
+            "patient_profile_id": "fragile",
+            "score_details": {
+              "force_score": 0.2686781337373633,
+              "beta_score": 0.3020092518926871,
+              "tremor_score": 0.11152747047876387,
+              "tracking_score": 0.8668226441553532,
+              "safety_score": 1.0,
+              "smoothness_score": 1.0,
+              "terminal_stability_score": 0.1757752122843765,
+              "recovery_score": 0.037620467515858735,
+              "efficiency_score": 0.23153227020638056,
+              "overall_score": 0.23610918638237188
+            }
+          }
+        ]
+      },
+      "const_low": {
+        "summary": {
+          "mean": 0.3041318398121228,
+          "std": 0.02818371103549273,
+          "min": 0.2583928604019604,
+          "max": 0.3288449127406389
+        },
+        "successes": 0,
+        "num_runs": 4,
+        "profiles": [
+          "fragile",
+          "fragile",
+          "fragile",
+          "fragile"
+        ],
+        "runs": [
+          {
+            "score": 0.30338753565632093,
+            "success": false,
+            "patient_profile_id": "fragile",
+            "score_details": {
+              "force_score": 0.19906009212774875,
+              "beta_score": 0.29351102524896194,
+              "tremor_score": 0.11035768648952508,
+              "tracking_score": 0.7533893316432494,
+              "safety_score": 0.5951352466299444,
+              "smoothness_score": 0.9965953947368421,
+              "terminal_stability_score": 0.1437602178601514,
+              "recovery_score": 0.05063525821036968,
+              "efficiency_score": 0.15876329140179896,
+              "overall_score": 0.30338753565632093
+            }
+          },
+          {
+            "score": 0.3288449127406389,
+            "success": false,
+            "patient_profile_id": "fragile",
+            "score_details": {
+              "force_score": 0.2052929160845024,
+              "beta_score": 0.29351102524896194,
+              "tremor_score": 0.11035768648952508,
+              "tracking_score": 0.8794062007153315,
+              "safety_score": 0.5951352466299444,
+              "smoothness_score": 0.9965953947368421,
+              "terminal_stability_score": 0.1748375114655243,
+              "recovery_score": 0.05469103166564443,
+              "efficiency_score": 0.1607346445789779,
+              "overall_score": 0.3288449127406389
+            }
+          },
+          {
+            "score": 0.2583928604019604,
+            "success": false,
+            "patient_profile_id": "fragile",
+            "score_details": {
+              "force_score": 0.1867982041773178,
+              "beta_score": 0.29351102524896194,
+              "tremor_score": 0.11035768648952508,
+              "tracking_score": 0.5566914898052986,
+              "safety_score": 0.5951352466299444,
+              "smoothness_score": 0.9965953947368421,
+              "terminal_stability_score": 1.0084078628519733e-14,
+              "recovery_score": 0.0,
+              "efficiency_score": 0.15488503141290552,
+              "overall_score": 0.2583928604019604
+            }
+          },
+          {
+            "score": 0.325902050449571,
+            "success": false,
+            "patient_profile_id": "fragile",
+            "score_details": {
+              "force_score": 0.20440374929796404,
+              "beta_score": 0.29351102524896194,
+              "tremor_score": 0.11035768648952508,
+              "tracking_score": 0.8644274855794862,
+              "safety_score": 0.5951352466299444,
+              "smoothness_score": 0.9965953947368421,
+              "terminal_stability_score": 0.17338587131694536,
+              "recovery_score": 0.03625558094546705,
+              "efficiency_score": 0.1604534138267785,
+              "overall_score": 0.325902050449571
+            }
+          }
+        ]
+      },
+      "const_mid": {
+        "summary": {
+          "mean": 0.0,
+          "std": 0.0,
+          "min": 0.0,
+          "max": 0.0
+        },
+        "successes": 0,
+        "num_runs": 4,
+        "profiles": [
+          "fragile",
+          "fragile",
+          "fragile",
+          "fragile"
+        ],
+        "runs": [
+          {
+            "score": 0.0,
+            "success": false,
+            "patient_profile_id": "fragile",
+            "score_details": {
+              "force_score": 0.14664161846478652,
+              "beta_score": 0.3667028840225821,
+              "tremor_score": 0.13201128785863128,
+              "tracking_score": 0.7502162511027096,
+              "safety_score": 0.0,
+              "smoothness_score": 0.9915460526315789,
+              "terminal_stability_score": 0.1423908499646398,
+              "recovery_score": 0.04891812230479903,
+              "efficiency_score": 0.10175521062999343,
+              "overall_score": 0.0
+            }
+          },
+          {
+            "score": 0.0,
+            "success": false,
+            "patient_profile_id": "fragile",
+            "score_details": {
+              "force_score": 0.15304040718312664,
+              "beta_score": 0.3667028840225821,
+              "tremor_score": 0.13201128785863128,
+              "tracking_score": 0.8829863295445475,
+              "safety_score": 0.0,
+              "smoothness_score": 0.9915460526315789,
+              "terminal_stability_score": 0.17491041819188632,
+              "recovery_score": 0.053795175060315115,
+              "efficiency_score": 0.10300571676809189,
+              "overall_score": 0.0
+            }
+          },
+          {
+            "score": 0.0,
+            "success": false,
+            "patient_profile_id": "fragile",
+            "score_details": {
+              "force_score": 0.13648952833518121,
+              "beta_score": 0.3667028840225821,
+              "tremor_score": 0.13201128785863128,
+              "tracking_score": 0.5550465781630745,
+              "safety_score": 0.0,
+              "smoothness_score": 0.9915460526315789,
+              "terminal_stability_score": 8.115031791571224e-16,
+              "recovery_score": 0.0,
+              "efficiency_score": 0.09977120215895055,
+              "overall_score": 0.0
+            }
+          },
+          {
+            "score": 0.0,
+            "success": false,
+            "patient_profile_id": "fragile",
+            "score_details": {
+              "force_score": 0.15216097486181115,
+              "beta_score": 0.3667028840225821,
+              "tremor_score": 0.13201128785863128,
+              "tracking_score": 0.8671873172239524,
+              "safety_score": 0.0,
+              "smoothness_score": 0.9915460526315789,
+              "terminal_stability_score": 0.1730944473825662,
+              "recovery_score": 0.03553297187567922,
+              "efficiency_score": 0.1028338505658691,
+              "overall_score": 0.0
+            }
+          }
+        ]
+      },
+      "const_high": {
+        "summary": {
+          "mean": 0.2347078924079365,
+          "std": 0.017182281483804566,
+          "min": 0.20554607088474802,
+          "max": 0.24745806932664333
+        },
+        "successes": 0,
+        "num_runs": 4,
+        "profiles": [
+          "fragile",
+          "fragile",
+          "fragile",
+          "fragile"
+        ],
+        "runs": [
+          {
+            "score": 0.2388349095766703,
+            "success": false,
+            "patient_profile_id": "fragile",
+            "score_details": {
+              "force_score": 0.5694436185852841,
+              "beta_score": 0.9849619714222746,
+              "tremor_score": 0.48418026921707735,
+              "tracking_score": 0.8765018483698609,
+              "safety_score": 0.0,
+              "smoothness_score": 0.984375,
+              "terminal_stability_score": 0.23003312532833664,
+              "recovery_score": 0.05427225896068094,
+              "efficiency_score": 0.021726903887842524,
+              "overall_score": 0.2388349095766703
+            }
+          },
+          {
+            "score": 0.24745806932664333,
+            "success": false,
+            "patient_profile_id": "fragile",
+            "score_details": {
+              "force_score": 0.5744094998157574,
+              "beta_score": 0.9849619714222746,
+              "tremor_score": 0.48418026921707735,
+              "tracking_score": 0.9178897436804843,
+              "safety_score": 0.0,
+              "smoothness_score": 0.984375,
+              "terminal_stability_score": 0.2355581683238523,
+              "recovery_score": 0.049910645188110336,
+              "efficiency_score": 0.021791460343838682,
+              "overall_score": 0.24745806932664333
+            }
+          },
+          {
+            "score": 0.20554607088474802,
+            "success": false,
+            "patient_profile_id": "fragile",
+            "score_details": {
+              "force_score": 0.5547453661987857,
+              "beta_score": 0.9849619714222746,
+              "tremor_score": 0.48418026921707735,
+              "tracking_score": 0.7521108911699165,
+              "safety_score": 0.0,
+              "smoothness_score": 0.984375,
+              "terminal_stability_score": 0.06516858328210987,
+              "recovery_score": 0.0,
+              "efficiency_score": 0.021535826606818048,
+              "overall_score": 0.20554607088474802
+            }
+          },
+          {
+            "score": 0.24699251984368426,
+            "success": false,
+            "patient_profile_id": "fragile",
+            "score_details": {
+              "force_score": 0.5740050445891604,
+              "beta_score": 0.9849619714222746,
+              "tremor_score": 0.48418026921707735,
+              "tracking_score": 0.9142713630288188,
+              "safety_score": 0.0,
+              "smoothness_score": 0.984375,
+              "terminal_stability_score": 0.24073464574436307,
+              "recovery_score": 0.04387357345912085,
+              "efficiency_score": 0.021786202425892912,
+              "overall_score": 0.24699251984368426
+            }
+          }
+        ]
+      },
+      "safety_aware": {
+        "summary": {
+          "mean": 0.3129409505921618,
+          "std": 0.02120037046734342,
+          "min": 0.2769090850702459,
+          "max": 0.32850899957296986
+        },
+        "successes": 0,
+        "num_runs": 4,
+        "profiles": [
+          "fragile",
+          "fragile",
+          "fragile",
+          "fragile"
+        ],
+        "runs": [
+          {
+            "score": 0.31828514692162824,
+            "success": false,
+            "patient_profile_id": "fragile",
+            "score_details": {
+              "force_score": 0.19785280646073378,
+              "beta_score": 0.2931891623557103,
+              "tremor_score": 0.11026588609979535,
+              "tracking_score": 0.8236932794878766,
+              "safety_score": 0.599602475729075,
+              "smoothness_score": 0.9927789083157069,
+              "terminal_stability_score": 0.1737081251666341,
+              "recovery_score": 0.051814545636679143,
+              "efficiency_score": 0.15841025287825386,
+              "overall_score": 0.31828514692162824
+            }
+          },
+          {
+            "score": 0.32850899957296986,
+            "success": false,
+            "patient_profile_id": "fragile",
+            "score_details": {
+              "force_score": 0.19998812641834612,
+              "beta_score": 0.2931891623557103,
+              "tremor_score": 0.11026588609979535,
+              "tracking_score": 0.8784259919608011,
+              "safety_score": 0.599602475729075,
+              "smoothness_score": 0.9927789083157069,
+              "terminal_stability_score": 0.17278434863064387,
+              "recovery_score": 0.05155501850292982,
+              "efficiency_score": 0.1590861656911461,
+              "overall_score": 0.32850899957296986
+            }
+          },
+          {
+            "score": 0.2769090850702459,
+            "success": false,
+            "patient_profile_id": "fragile",
+            "score_details": {
+              "force_score": 0.1887106640420543,
+              "beta_score": 0.2931891623557103,
+              "tremor_score": 0.11026588609979535,
+              "tracking_score": 0.652024515253696,
+              "safety_score": 0.599602475729075,
+              "smoothness_score": 0.9927789083157069,
+              "terminal_stability_score": 1.1193246187851282e-14,
+              "recovery_score": 0.0,
+              "efficiency_score": 0.15551640496752636,
+              "overall_score": 0.2769090850702459
+            }
+          },
+          {
+            "score": 0.32806057080380324,
+            "success": false,
+            "patient_profile_id": "fragile",
+            "score_details": {
+              "force_score": 0.19949663865588335,
+              "beta_score": 0.2931891623557103,
+              "tremor_score": 0.11026588609979535,
+              "tracking_score": 0.87438031497943,
+              "safety_score": 0.599602475729075,
+              "smoothness_score": 0.9927789083157069,
+              "terminal_stability_score": 0.18030514154691513,
+              "recovery_score": 0.03969936759886222,
+              "efficiency_score": 0.15893059046934194,
+              "overall_score": 0.32806057080380324
+            }
+          }
+        ]
+      },
+      "reference": {
+        "summary": {
+          "mean": 0.0,
+          "std": 0.0,
+          "min": 0.0,
+          "max": 0.0
+        },
+        "successes": 0,
+        "num_runs": 4,
+        "profiles": [
+          "fragile",
+          "fragile",
+          "fragile",
+          "fragile"
+        ],
+        "runs": [
+          {
+            "score": 0.0,
+            "success": false,
+            "patient_profile_id": "fragile",
+            "score_details": {
+              "force_score": 0.15535153913730268,
+              "beta_score": 0.29147473928027384,
+              "tremor_score": 0.11212303400222255,
+              "tracking_score": 0.819106013704755,
+              "safety_score": 0.0,
+              "smoothness_score": 0.9757027513865051,
+              "terminal_stability_score": 0.17237102312294378,
+              "recovery_score": 0.05023271720250316,
+              "efficiency_score": 0.1160711701784407,
+              "overall_score": 0.0
+            }
+          },
+          {
+            "score": 0.0,
+            "success": false,
+            "patient_profile_id": "fragile",
+            "score_details": {
+              "force_score": 0.15663399984916207,
+              "beta_score": 0.29147473928027384,
+              "tremor_score": 0.11212303400222255,
+              "tracking_score": 0.8790963746871993,
+              "safety_score": 0.0,
+              "smoothness_score": 0.9757027513865051,
+              "terminal_stability_score": 0.17288743879895418,
+              "recovery_score": 0.05158920618462465,
+              "efficiency_score": 0.11639614945597253,
+              "overall_score": 0.0
+            }
+          },
+          {
+            "score": 0.0,
+            "success": false,
+            "patient_profile_id": "fragile",
+            "score_details": {
+              "force_score": 0.14761535782110546,
+              "beta_score": 0.29147473928027384,
+              "tremor_score": 0.11212303400222255,
+              "tracking_score": 0.6437534918185632,
+              "safety_score": 0.0,
+              "smoothness_score": 0.9757027513865051,
+              "terminal_stability_score": 5.79205846497481e-17,
+              "recovery_score": 0.0,
+              "efficiency_score": 0.11411079931347451,
+              "overall_score": 0.0
+            }
+          },
+          {
+            "score": 0.0,
+            "success": false,
+            "patient_profile_id": "fragile",
+            "score_details": {
+              "force_score": 0.15696482591089683,
+              "beta_score": 0.29147473928027384,
+              "tremor_score": 0.11212303400222255,
+              "tracking_score": 0.8740453984491581,
+              "safety_score": 0.0,
+              "smoothness_score": 0.9757027513865051,
+              "terminal_stability_score": 0.18016217906778423,
+              "recovery_score": 0.03932209625629407,
+              "efficiency_score": 0.11647998174302589,
+              "overall_score": 0.0
+            }
+          }
+        ]
+      }
+    },
+    "refractory_patient": {
+      "no_dbs": {
+        "summary": {
+          "mean": 0.09021494935546992,
+          "std": 0.04887133588877442,
+          "min": 0.032749909922121234,
+          "max": 0.16701896669819433
+        },
+        "successes": 0,
+        "num_runs": 4,
+        "profiles": [
+          "refractory",
+          "refractory",
+          "refractory",
+          "refractory"
+        ],
+        "runs": [
+          {
+            "score": 0.07144754811646792,
+            "success": false,
+            "patient_profile_id": "refractory",
+            "score_details": {
+              "force_score": 0.29384858607115355,
+              "beta_score": 0.3296509049020421,
+              "tremor_score": 0.16954147569871258,
+              "tracking_score": 0.770253317236361,
+              "safety_score": 1.0,
+              "smoothness_score": 1.0,
+              "terminal_stability_score": 0.13274168817641713,
+              "recovery_score": 0.09975819626678589,
+              "efficiency_score": 0.2672971486086878,
+              "overall_score": 0.07144754811646792
+            }
+          },
+          {
+            "score": 0.0896433726850962,
+            "success": false,
+            "patient_profile_id": "refractory",
+            "score_details": {
+              "force_score": 0.30471207463534866,
+              "beta_score": 0.3296509049020421,
+              "tremor_score": 0.16954147569871258,
+              "tracking_score": 0.8902814591375483,
+              "safety_score": 1.0,
+              "smoothness_score": 1.0,
+              "terminal_stability_score": 0.17756149939760962,
+              "recovery_score": 0.04806482667748141,
+              "efficiency_score": 0.2716425440343659,
+              "overall_score": 0.0896433726850962
+            }
+          },
+          {
+            "score": 0.032749909922121234,
+            "success": false,
+            "patient_profile_id": "refractory",
+            "score_details": {
+              "force_score": 0.27837088955228484,
+              "beta_score": 0.3296509049020421,
+              "tremor_score": 0.16954147569871258,
+              "tracking_score": 0.5703531927041172,
+              "safety_score": 1.0,
+              "smoothness_score": 1.0,
+              "terminal_stability_score": 0.061639744738127056,
+              "recovery_score": 0.07064080270427137,
+              "efficiency_score": 0.26110607000114033,
+              "overall_score": 0.032749909922121234
+            }
+          },
+          {
+            "score": 0.16701896669819433,
+            "success": false,
+            "patient_profile_id": "refractory",
+            "score_details": {
+              "force_score": 0.3040371219885029,
+              "beta_score": 0.3296509049020421,
+              "tremor_score": 0.16954147569871258,
+              "tracking_score": 0.8679016870447378,
+              "safety_score": 1.0,
+              "smoothness_score": 1.0,
+              "terminal_stability_score": 0.19685554605060654,
+              "recovery_score": 0.03939818196107986,
+              "efficiency_score": 0.27137256297562756,
+              "overall_score": 0.16701896669819433
+            }
+          }
+        ]
+      },
+      "const_low": {
+        "summary": {
+          "mean": 0.2580276181948226,
+          "std": 0.049317857801942346,
+          "min": 0.19997302163927433,
+          "max": 0.33538289504375085
+        },
+        "successes": 1,
+        "num_runs": 4,
+        "profiles": [
+          "refractory",
+          "refractory",
+          "refractory",
+          "refractory"
+        ],
+        "runs": [
+          {
+            "score": 0.23866720015979986,
+            "success": false,
+            "patient_profile_id": "refractory",
+            "score_details": {
+              "force_score": 0.2661146617742024,
+              "beta_score": 0.3170468471086064,
+              "tremor_score": 0.1690962956551747,
+              "tracking_score": 0.7631629204656252,
+              "safety_score": 1.0,
+              "smoothness_score": 0.9985454545454545,
+              "terminal_stability_score": 0.128728648738205,
+              "recovery_score": 0.09761463743000504,
+              "efficiency_score": 0.21520999794598933,
+              "overall_score": 0.23866720015979986
+            }
+          },
+          {
+            "score": 0.2580873559364654,
+            "success": false,
+            "patient_profile_id": "refractory",
+            "score_details": {
+              "force_score": 0.27643743013706,
+              "beta_score": 0.3170468471086064,
+              "tremor_score": 0.1690962956551747,
+              "tracking_score": 0.8901083383433059,
+              "safety_score": 1.0,
+              "smoothness_score": 0.9985454545454545,
+              "terminal_stability_score": 0.17725917539390107,
+              "recovery_score": 0.04811884659987925,
+              "efficiency_score": 0.21873225163586135,
+              "overall_score": 0.2580873559364654
+            }
+          },
+          {
+            "score": 0.19997302163927433,
+            "success": false,
+            "patient_profile_id": "refractory",
+            "score_details": {
+              "force_score": 0.2520042586493965,
+              "beta_score": 0.3170468471086064,
+              "tremor_score": 0.1690962956551747,
+              "tracking_score": 0.5624496216936941,
+              "safety_score": 1.0,
+              "smoothness_score": 0.9985454545454545,
+              "terminal_stability_score": 0.055262925917119204,
+              "recovery_score": 0.06723489400029442,
+              "efficiency_score": 0.21039535736461618,
+              "overall_score": 0.19997302163927433
+            }
+          },
+          {
+            "score": 0.33538289504375085,
+            "success": true,
+            "patient_profile_id": "refractory",
+            "score_details": {
+              "force_score": 0.27587659952323235,
+              "beta_score": 0.3170468471086064,
+              "tremor_score": 0.1690962956551747,
+              "tracking_score": 0.8667801811275437,
+              "safety_score": 1.0,
+              "smoothness_score": 0.9985454545454545,
+              "terminal_stability_score": 0.19708884615124464,
+              "recovery_score": 0.03928747029119911,
+              "efficiency_score": 0.21854088943247654,
+              "overall_score": 0.33538289504375085
+            }
+          }
+        ]
+      },
+      "const_mid": {
+        "summary": {
+          "mean": 0.007164077895892851,
+          "std": 0.012408546905067555,
+          "min": 0.0,
+          "max": 0.028656311583571403
+        },
+        "successes": 0,
+        "num_runs": 4,
+        "profiles": [
+          "refractory",
+          "refractory",
+          "refractory",
+          "refractory"
+        ],
+        "runs": [
+          {
+            "score": 0.0,
+            "success": false,
+            "patient_profile_id": "refractory",
+            "score_details": {
+              "force_score": 0.2232953792064664,
+              "beta_score": 0.3616137955409859,
+              "tremor_score": 0.1937733029595926,
+              "tracking_score": 0.7530003787753375,
+              "safety_score": 0.0,
+              "smoothness_score": 0.9964545454545455,
+              "terminal_stability_score": 0.12173800111307395,
+              "recovery_score": 0.0926673151584006,
+              "efficiency_score": 0.16558172437331628,
+              "overall_score": 0.0
+            }
+          },
+          {
+            "score": 0.0,
+            "success": false,
+            "patient_profile_id": "refractory",
+            "score_details": {
+              "force_score": 0.23136762049153003,
+              "beta_score": 0.3616137955409859,
+              "tremor_score": 0.1937733029595926,
+              "tracking_score": 0.8922940011870697,
+              "safety_score": 0.0,
+              "smoothness_score": 0.9964545454545455,
+              "terminal_stability_score": 0.1785645781316024,
+              "recovery_score": 0.04856386393131268,
+              "efficiency_score": 0.16767072257254184,
+              "overall_score": 0.0
+            }
+          },
+          {
+            "score": 0.0,
+            "success": false,
+            "patient_profile_id": "refractory",
+            "score_details": {
+              "force_score": 0.21128273385711616,
+              "beta_score": 0.3616137955409859,
+              "tremor_score": 0.1937733029595926,
+              "tracking_score": 0.5536127243986328,
+              "safety_score": 0.0,
+              "smoothness_score": 0.9964545454545455,
+              "terminal_stability_score": 0.0447514714169078,
+              "recovery_score": 0.059972383772158244,
+              "efficiency_score": 0.16247299736472687,
+              "overall_score": 0.0
+            }
+          },
+          {
+            "score": 0.028656311583571403,
+            "success": false,
+            "patient_profile_id": "refractory",
+            "score_details": {
+              "force_score": 0.22999662305386318,
+              "beta_score": 0.3616137955409859,
+              "tremor_score": 0.1937733029595926,
+              "tracking_score": 0.8668017990357253,
+              "safety_score": 0.0,
+              "smoothness_score": 0.9964545454545455,
+              "terminal_stability_score": 0.1993170197727895,
+              "recovery_score": 0.0402032051029943,
+              "efficiency_score": 0.16731592505382442,
+              "overall_score": 0.028656311583571403
+            }
+          }
+        ]
+      },
+      "const_high": {
+        "summary": {
+          "mean": 0.22601829538441762,
+          "std": 0.04830793258839029,
+          "min": 0.14246301666409028,
+          "max": 0.2565709794142452
+        },
+        "successes": 0,
+        "num_runs": 4,
+        "profiles": [
+          "refractory",
+          "refractory",
+          "refractory",
+          "refractory"
+        ],
+        "runs": [
+          {
+            "score": 0.24977762460101624,
+            "success": false,
+            "patient_profile_id": "refractory",
+            "score_details": {
+              "force_score": 0.5039046885455017,
+              "beta_score": 0.9230022228337278,
+              "tremor_score": 0.45005398710321165,
+              "tracking_score": 0.8628562681054239,
+              "safety_score": 0.0,
+              "smoothness_score": 0.99,
+              "terminal_stability_score": 0.1849753025386804,
+              "recovery_score": 0.09974969589093957,
+              "efficiency_score": 1.0182418396308705e-15,
+              "overall_score": 0.24977762460101624
+            }
+          },
+          {
+            "score": 0.2565709794142452,
+            "success": false,
+            "patient_profile_id": "refractory",
+            "score_details": {
+              "force_score": 0.5121327545771094,
+              "beta_score": 0.9230022228337278,
+              "tremor_score": 0.45005398710321165,
+              "tracking_score": 0.9204813394861675,
+              "safety_score": 0.0,
+              "smoothness_score": 0.99,
+              "terminal_stability_score": 0.202566738622889,
+              "recovery_score": 0.0499171009952018,
+              "efficiency_score": 1.0237045626680138e-15,
+              "overall_score": 0.2565709794142452
+            }
+          },
+          {
+            "score": 0.14246301666409028,
+            "success": false,
+            "patient_profile_id": "refractory",
+            "score_details": {
+              "force_score": 0.48653255303788984,
+              "beta_score": 0.9230022228337278,
+              "tremor_score": 0.45005398710321165,
+              "tracking_score": 0.7199945835080093,
+              "safety_score": 0.0,
+              "smoothness_score": 0.99,
+              "terminal_stability_score": 0.14216815592170515,
+              "recovery_score": 0.08486860290682147,
+              "efficiency_score": 1.00670824662405e-15,
+              "overall_score": 0.14246301666409028
+            }
+          },
+          {
+            "score": 0.25526156085831875,
+            "success": false,
+            "patient_profile_id": "refractory",
+            "score_details": {
+              "force_score": 0.5110402418749931,
+              "beta_score": 0.9230022228337278,
+              "tremor_score": 0.45005398710321165,
+              "tracking_score": 0.9070838339990328,
+              "safety_score": 0.0,
+              "smoothness_score": 0.99,
+              "terminal_stability_score": 0.21547762682737512,
+              "recovery_score": 0.04815613004944269,
+              "efficiency_score": 1.022979228879576e-15,
+              "overall_score": 0.25526156085831875
+            }
+          }
+        ]
+      },
+      "safety_aware": {
+        "summary": {
+          "mean": 0.2642612400986801,
+          "std": 0.04164381408889618,
+          "min": 0.22038178652394286,
+          "max": 0.33281044897773815
+        },
+        "successes": 1,
+        "num_runs": 4,
+        "profiles": [
+          "refractory",
+          "refractory",
+          "refractory",
+          "refractory"
+        ],
+        "runs": [
+          {
+            "score": 0.249910164275158,
+            "success": false,
+            "patient_profile_id": "refractory",
+            "score_details": {
+              "force_score": 0.2604048025115631,
+              "beta_score": 0.31515669437921545,
+              "tremor_score": 0.1688878311501405,
+              "tracking_score": 0.8438364942220188,
+              "safety_score": 1.0,
+              "smoothness_score": 0.9955927765099306,
+              "terminal_stability_score": 0.17109041676428843,
+              "recovery_score": 0.09348947749153919,
+              "efficiency_score": 0.20185989145320063,
+              "overall_score": 0.249910164275158
+            }
+          },
+          {
+            "score": 0.25394256061788123,
+            "success": false,
+            "patient_profile_id": "refractory",
+            "score_details": {
+              "force_score": 0.2646869073863694,
+              "beta_score": 0.31515669437921545,
+              "tremor_score": 0.1688878311501405,
+              "tracking_score": 0.8921676855701202,
+              "safety_score": 1.0,
+              "smoothness_score": 0.9955927765099306,
+              "terminal_stability_score": 0.17957873023652554,
+              "recovery_score": 0.04051973538806947,
+              "efficiency_score": 0.20324637247064942,
+              "overall_score": 0.25394256061788123
+            }
+          },
+          {
+            "score": 0.22038178652394286,
+            "success": false,
+            "patient_profile_id": "refractory",
+            "score_details": {
+              "force_score": 0.2510100227767958,
+              "beta_score": 0.31515669437921545,
+              "tremor_score": 0.1688878311501405,
+              "tracking_score": 0.6838139874131456,
+              "safety_score": 1.0,
+              "smoothness_score": 0.9955927765099306,
+              "terminal_stability_score": 0.1249859840139465,
+              "recovery_score": 0.06970613567355483,
+              "efficiency_score": 0.19881800337567976,
+              "overall_score": 0.22038178652394286
+            }
+          },
+          {
+            "score": 0.33281044897773815,
+            "success": true,
+            "patient_profile_id": "refractory",
+            "score_details": {
+              "force_score": 0.2643544464145644,
+              "beta_score": 0.31515669437921545,
+              "tremor_score": 0.1688878311501405,
+              "tracking_score": 0.881032487575073,
+              "safety_score": 1.0,
+              "smoothness_score": 0.9955927765099306,
+              "terminal_stability_score": 0.1939813595727663,
+              "recovery_score": 0.03413523020962722,
+              "efficiency_score": 0.20313872661891838,
+              "overall_score": 0.33281044897773815
+            }
+          }
+        ]
+      },
+      "reference": {
+        "summary": {
+          "mean": 0.15353450598681304,
+          "std": 0.04284980084624846,
+          "min": 0.10691774828404799,
+          "max": 0.22340832842464262
+        },
+        "successes": 0,
+        "num_runs": 4,
+        "profiles": [
+          "refractory",
+          "refractory",
+          "refractory",
+          "refractory"
+        ],
+        "runs": [
+          {
+            "score": 0.1388643425259783,
+            "success": false,
+            "patient_profile_id": "refractory",
+            "score_details": {
+              "force_score": 0.2367876119357143,
+              "beta_score": 0.3193437924998854,
+              "tremor_score": 0.17275859420341458,
+              "tracking_score": 0.8336724435057978,
+              "safety_score": 0.4323696268539807,
+              "smoothness_score": 0.9836889229073976,
+              "terminal_stability_score": 0.16405121677717757,
+              "recovery_score": 0.09454735242334228,
+              "efficiency_score": 0.17191543234981171,
+              "overall_score": 0.1388643425259783
+            }
+          },
+          {
+            "score": 0.14494760471258328,
+            "success": false,
+            "patient_profile_id": "refractory",
+            "score_details": {
+              "force_score": 0.2413150300596317,
+              "beta_score": 0.3193437924998854,
+              "tremor_score": 0.17275859420341458,
+              "tracking_score": 0.8927203445073943,
+              "safety_score": 0.4323696268539807,
+              "smoothness_score": 0.9836889229073976,
+              "terminal_stability_score": 0.1796951309627376,
+              "recovery_score": 0.04177335554148959,
+              "efficiency_score": 0.17320009776616493,
+              "overall_score": 0.14494760471258328
+            }
+          },
+          {
+            "score": 0.10691774828404799,
+            "success": false,
+            "patient_profile_id": "refractory",
+            "score_details": {
+              "force_score": 0.22784754015440756,
+              "beta_score": 0.3193437924998854,
+              "tremor_score": 0.17275859420341458,
+              "tracking_score": 0.6609669466737994,
+              "safety_score": 0.4323696268539807,
+              "smoothness_score": 0.9836889229073976,
+              "terminal_stability_score": 0.11133786226038062,
+              "recovery_score": 0.06685984825105634,
+              "efficiency_score": 0.16937866620124523,
+              "overall_score": 0.10691774828404799
+            }
+          },
+          {
+            "score": 0.22340832842464262,
+            "success": false,
+            "patient_profile_id": "refractory",
+            "score_details": {
+              "force_score": 0.24055936047859744,
+              "beta_score": 0.3193437924998854,
+              "tremor_score": 0.17275859420341458,
+              "tracking_score": 0.8793486020577768,
+              "safety_score": 0.4323696268539807,
+              "smoothness_score": 0.9836889229073976,
+              "terminal_stability_score": 0.19520001355015468,
+              "recovery_score": 0.03433446427255399,
+              "efficiency_score": 0.1729856747660412,
+              "overall_score": 0.22340832842464262
+            }
+          }
+        ]
+      }
+    },
+    "personalization_generalization": {
+      "no_dbs": {
+        "summary": {
+          "mean": 0.03071762053769289,
+          "std": 0.03083508822541217,
+          "min": 0.0,
+          "max": 0.06523799123053936
+        },
+        "successes": 0,
+        "num_runs": 4,
+        "profiles": [
+          "refractory",
+          "responsive",
+          "balanced",
+          "responsive"
+        ],
+        "runs": [
+          {
+            "score": 0.0,
+            "success": false,
+            "patient_profile_id": "refractory",
+            "score_details": {
+              "force_score": 0.249261922699601,
+              "beta_score": 0.32624858949377833,
+              "tremor_score": 0.10770290053181451,
+              "tracking_score": 0.7400077640662536,
+              "safety_score": 1.0,
+              "smoothness_score": 1.0,
+              "terminal_stability_score": 0.06958469495535674,
+              "recovery_score": 0.01660609751759462,
+              "efficiency_score": 0.22989021608751825,
+              "overall_score": 0.0
+            }
+          },
+          {
+            "score": 0.06523799123053936,
+            "success": false,
+            "patient_profile_id": "responsive",
+            "score_details": {
+              "force_score": 0.3657683428322274,
+              "beta_score": 0.3699343458721498,
+              "tremor_score": 0.16046586772374266,
+              "tracking_score": 0.901253525001438,
+              "safety_score": 1.0,
+              "smoothness_score": 1.0,
+              "terminal_stability_score": 0.19649229422118905,
+              "recovery_score": 0.04516218239851649,
+              "efficiency_score": 0.30542740121165873,
+              "overall_score": 0.06523799123053936
+            }
+          },
+          {
+            "score": 0.0,
+            "success": false,
+            "patient_profile_id": "balanced",
+            "score_details": {
+              "force_score": 0.30101645719933967,
+              "beta_score": 0.35766578718010245,
+              "tremor_score": 0.1480049834815306,
+              "tracking_score": 0.5687399669426932,
+              "safety_score": 1.0,
+              "smoothness_score": 1.0,
+              "terminal_stability_score": 1.288648050645894e-09,
+              "recovery_score": 0.0,
+              "efficiency_score": 0.27210781407822576,
+              "overall_score": 0.0
+            }
+          },
+          {
+            "score": 0.057632490920232204,
+            "success": false,
+            "patient_profile_id": "responsive",
+            "score_details": {
+              "force_score": 0.3644236808202356,
+              "beta_score": 0.3699343458721498,
+              "tremor_score": 0.16046586772374266,
+              "tracking_score": 0.8809931131246096,
+              "safety_score": 1.0,
+              "smoothness_score": 1.0,
+              "terminal_stability_score": 0.14593084156072322,
+              "recovery_score": 0.032434569143932,
+              "efficiency_score": 0.30488953640686195,
+              "overall_score": 0.057632490920232204
+            }
+          }
+        ]
+      },
+      "const_low": {
+        "summary": {
+          "mean": 0.2103929500559797,
+          "std": 0.04056943634887433,
+          "min": 0.16288014529003786,
+          "max": 0.2544347885328664
+        },
+        "successes": 0,
+        "num_runs": 4,
+        "profiles": [
+          "refractory",
+          "responsive",
+          "balanced",
+          "responsive"
+        ],
+        "runs": [
+          {
+            "score": 0.1776295730307792,
+            "success": false,
+            "patient_profile_id": "refractory",
+            "score_details": {
+              "force_score": 0.21929063190483936,
+              "beta_score": 0.30986595582653415,
+              "tremor_score": 0.10725011564645481,
+              "tracking_score": 0.7320361866327775,
+              "safety_score": 1.0,
+              "smoothness_score": 0.9977704678362573,
+              "terminal_stability_score": 0.06444932227694108,
+              "recovery_score": 0.014566766063919656,
+              "efficiency_score": 0.17858951971575932,
+              "overall_score": 0.1776295730307792
+            }
+          },
+          {
+            "score": 0.2544347885328664,
+            "success": false,
+            "patient_profile_id": "responsive",
+            "score_details": {
+              "force_score": 0.3377621337966363,
+              "beta_score": 0.3612159473190424,
+              "tremor_score": 0.16000015091610023,
+              "tracking_score": 0.9010519460366153,
+              "safety_score": 1.0,
+              "smoothness_score": 0.997843567251462,
+              "terminal_stability_score": 0.19620549664158982,
+              "recovery_score": 0.04514088291710111,
+              "efficiency_score": 0.2445532910343571,
+              "overall_score": 0.2544347885328664
+            }
+          },
+          {
+            "score": 0.16288014529003786,
+            "success": false,
+            "patient_profile_id": "balanced",
+            "score_details": {
+              "force_score": 0.2723887762345919,
+              "beta_score": 0.34830705046923993,
+              "tremor_score": 0.14746440066157446,
+              "tracking_score": 0.5615687977827847,
+              "safety_score": 1.0,
+              "smoothness_score": 0.9977704678362573,
+              "terminal_stability_score": 8.749317902452803e-12,
+              "recovery_score": 0.0,
+              "efficiency_score": 0.21620838920117713,
+              "overall_score": 0.16288014529003786
+            }
+          },
+          {
+            "score": 0.24662729337023537,
+            "success": false,
+            "patient_profile_id": "responsive",
+            "score_details": {
+              "force_score": 0.336500681954484,
+              "beta_score": 0.3612159473190424,
+              "tremor_score": 0.16000015091610023,
+              "tracking_score": 0.8799151206876745,
+              "safety_score": 1.0,
+              "smoothness_score": 0.997843567251462,
+              "terminal_stability_score": 0.1449753419669036,
+              "recovery_score": 0.03202500892738086,
+              "efficiency_score": 0.24412993009154357,
+              "overall_score": 0.24662729337023537
+            }
+          }
+        ]
+      },
+      "const_mid": {
+        "summary": {
+          "mean": 0.09395420651769636,
+          "std": 0.0939935673143724,
+          "min": 0.0,
+          "max": 0.19175491121205127
+        },
+        "successes": 0,
+        "num_runs": 4,
+        "profiles": [
+          "refractory",
+          "responsive",
+          "balanced",
+          "responsive"
+        ],
+        "runs": [
+          {
+            "score": 0.0,
+            "success": false,
+            "patient_profile_id": "refractory",
+            "score_details": {
+              "force_score": 0.1764110302927656,
+              "beta_score": 0.37092945225974083,
+              "tremor_score": 0.12436050813128344,
+              "tracking_score": 0.7222756873517375,
+              "safety_score": 0.0,
+              "smoothness_score": 0.9945175438596491,
+              "terminal_stability_score": 0.054959796311928884,
+              "recovery_score": 0.006819061721067221,
+              "efficiency_score": 0.13360545891484,
+              "overall_score": 0.0
+            }
+          },
+          {
+            "score": 0.19175491121205127,
+            "success": false,
+            "patient_profile_id": "responsive",
+            "score_details": {
+              "force_score": 0.31842849555389496,
+              "beta_score": 0.44918677238284244,
+              "tremor_score": 0.21001379205050702,
+              "tracking_score": 0.9071039332687216,
+              "safety_score": 0.2804824465332426,
+              "smoothness_score": 0.9947124756335283,
+              "terminal_stability_score": 0.19776958150224733,
+              "recovery_score": 0.04445960793867071,
+              "efficiency_score": 0.19821617495468105,
+              "overall_score": 0.19175491121205127
+            }
+          },
+          {
+            "score": 0.0,
+            "success": false,
+            "patient_profile_id": "balanced",
+            "score_details": {
+              "force_score": 0.23930618157272626,
+              "beta_score": 0.42621463943774507,
+              "tremor_score": 0.18813830656164193,
+              "tracking_score": 0.5632724528825812,
+              "safety_score": 0.0,
+              "smoothness_score": 0.9945175438596491,
+              "terminal_stability_score": 2.5903923495907834e-15,
+              "recovery_score": 0.0,
+              "efficiency_score": 0.17071904185797393,
+              "overall_score": 0.0
+            }
+          },
+          {
+            "score": 0.18406191485873416,
+            "success": false,
+            "patient_profile_id": "responsive",
+            "score_details": {
+              "force_score": 0.31713949988216705,
+              "beta_score": 0.44918677238284244,
+              "tremor_score": 0.21001379205050702,
+              "tracking_score": 0.8859356853112588,
+              "safety_score": 0.2804824465332426,
+              "smoothness_score": 0.9947124756335283,
+              "terminal_stability_score": 0.147891524068417,
+              "recovery_score": 0.031885797874303734,
+              "efficiency_score": 0.1979018409224527,
+              "overall_score": 0.18406191485873416
+            }
+          }
+        ]
+      },
+      "const_high": {
+        "summary": {
+          "mean": 0.24273574300196848,
+          "std": 0.06756701254289738,
+          "min": 0.13853288363282212,
+          "max": 0.3041319760460912
+        },
+        "successes": 2,
+        "num_runs": 4,
+        "profiles": [
+          "refractory",
+          "responsive",
+          "balanced",
+          "responsive"
+        ],
+        "runs": [
+          {
+            "score": 0.13853288363282212,
+            "success": false,
+            "patient_profile_id": "refractory",
+            "score_details": {
+              "force_score": 0.49318797994442287,
+              "beta_score": 0.9715735492982043,
+              "tremor_score": 0.4307745941575138,
+              "tracking_score": 0.8454112343404734,
+              "safety_score": 0.0,
+              "smoothness_score": 0.9861111111111112,
+              "terminal_stability_score": 0.1324319020687142,
+              "recovery_score": 0.023335003010030386,
+              "efficiency_score": 0.0,
+              "overall_score": 0.13853288363282212
+            }
+          },
+          {
+            "score": 0.3041319760460912,
+            "success": true,
+            "patient_profile_id": "responsive",
+            "score_details": {
+              "force_score": 0.814367701196104,
+              "beta_score": 0.9990855668206651,
+              "tremor_score": 0.7044204747483533,
+              "tracking_score": 0.9479285397413544,
+              "safety_score": 0.0,
+              "smoothness_score": 0.9861111111111112,
+              "terminal_stability_score": 0.3690038119775878,
+              "recovery_score": 0.05074128131743677,
+              "efficiency_score": 0.0,
+              "overall_score": 0.3041319760460912
+            }
+          },
+          {
+            "score": 0.227279404955409,
+            "success": false,
+            "patient_profile_id": "balanced",
+            "score_details": {
+              "force_score": 0.6973486723942034,
+              "beta_score": 0.9990220597469464,
+              "tremor_score": 0.5934562160331737,
+              "tracking_score": 0.7878630130499293,
+              "safety_score": 0.0,
+              "smoothness_score": 0.9861111111111112,
+              "terminal_stability_score": 0.17405903220212238,
+              "recovery_score": 0.0073043868575327076,
+              "efficiency_score": 0.0,
+              "overall_score": 0.227279404955409
+            }
+          },
+          {
+            "score": 0.3009987073735516,
+            "success": true,
+            "patient_profile_id": "responsive",
+            "score_details": {
+              "force_score": 0.8138272624067214,
+              "beta_score": 0.9990855668206651,
+              "tremor_score": 0.7044204747483533,
+              "tracking_score": 0.9430188965837636,
+              "safety_score": 0.0,
+              "smoothness_score": 0.9861111111111112,
+              "terminal_stability_score": 0.33616003833892083,
+              "recovery_score": 0.04507388976020327,
+              "efficiency_score": 0.0,
+              "overall_score": 0.3009987073735516
+            }
+          }
+        ]
+      },
+      "safety_aware": {
+        "summary": {
+          "mean": 0.10387045403200705,
+          "std": 0.103874532345858,
+          "min": 0.0,
+          "max": 0.20904263711063722
+        },
+        "successes": 0,
+        "num_runs": 4,
+        "profiles": [
+          "refractory",
+          "responsive",
+          "balanced",
+          "responsive"
+        ],
+        "runs": [
+          {
+            "score": 0.0,
+            "success": false,
+            "patient_profile_id": "refractory",
+            "score_details": {
+              "force_score": 0.17841075623889163,
+              "beta_score": 0.32306285345570984,
+              "tremor_score": 0.11648596217383678,
+              "tracking_score": 0.8403513103708453,
+              "safety_score": 0.0,
+              "smoothness_score": 0.9846392513267918,
+              "terminal_stability_score": 0.12616113072787277,
+              "recovery_score": 0.02252469496458248,
+              "efficiency_score": 0.12964001758731594,
+              "overall_score": 0.0
+            }
+          },
+          {
+            "score": 0.20904263711063722,
+            "success": false,
+            "patient_profile_id": "responsive",
+            "score_details": {
+              "force_score": 0.304964510621668,
+              "beta_score": 0.4112583610577434,
+              "tremor_score": 0.18884845821821908,
+              "tracking_score": 0.9038391996089117,
+              "safety_score": 0.42903216724899373,
+              "smoothness_score": 0.9861288669728661,
+              "terminal_stability_score": 0.20112372224034442,
+              "recovery_score": 0.04495596120914397,
+              "efficiency_score": 0.1890289749219182,
+              "overall_score": 0.20904263711063722
+            }
+          },
+          {
+            "score": 0.0,
+            "success": false,
+            "patient_profile_id": "balanced",
+            "score_details": {
+              "force_score": 0.2450026656325462,
+              "beta_score": 0.38292096262464004,
+              "tremor_score": 0.1687994160623084,
+              "tracking_score": 0.7411773592167372,
+              "safety_score": 0.15857791238285546,
+              "smoothness_score": 0.9853614978581431,
+              "terminal_stability_score": 0.0845747735385613,
+              "recovery_score": 0.0,
+              "efficiency_score": 0.16699083877426776,
+              "overall_score": 0.0
+            }
+          },
+          {
+            "score": 0.20643917901739098,
+            "success": false,
+            "patient_profile_id": "responsive",
+            "score_details": {
+              "force_score": 0.30468636903891977,
+              "beta_score": 0.4112583610577434,
+              "tremor_score": 0.18884845821821908,
+              "tracking_score": 0.903263861890581,
+              "safety_score": 0.42903216724899373,
+              "smoothness_score": 0.9861288669728661,
+              "terminal_stability_score": 0.16166102367625915,
+              "recovery_score": 0.03972122602558997,
+              "efficiency_score": 0.188959340867819,
+              "overall_score": 0.20643917901739098
+            }
+          }
+        ]
+      },
+      "reference": {
+        "summary": {
+          "mean": 0.13653506498524495,
+          "std": 0.0673975993630952,
+          "min": 0.047583023234596455,
+          "max": 0.2039698807699764
+        },
+        "successes": 0,
+        "num_runs": 4,
+        "profiles": [
+          "refractory",
+          "responsive",
+          "balanced",
+          "responsive"
+        ],
+        "runs": [
+          {
+            "score": 0.047583023234596455,
+            "success": false,
+            "patient_profile_id": "refractory",
+            "score_details": {
+              "force_score": 0.19520408827611027,
+              "beta_score": 0.31137344277346596,
+              "tremor_score": 0.1103700898461685,
+              "tracking_score": 0.8091404966902542,
+              "safety_score": 0.2286038430796763,
+              "smoothness_score": 0.9829917126929367,
+              "terminal_stability_score": 0.10364416559094189,
+              "recovery_score": 0.018691695035256084,
+              "efficiency_score": 0.14142363303067632,
+              "overall_score": 0.047583023234596455
+            }
+          },
+          {
+            "score": 0.2039698807699764,
+            "success": false,
+            "patient_profile_id": "responsive",
+            "score_details": {
+              "force_score": 0.31223643286354363,
+              "beta_score": 0.3776679584420758,
+              "tremor_score": 0.16940296262869253,
+              "tracking_score": 0.9025205325920972,
+              "safety_score": 0.7520680903006146,
+              "smoothness_score": 0.9845530832902306,
+              "terminal_stability_score": 0.19905754139243204,
+              "recovery_score": 0.0451817165277974,
+              "efficiency_score": 0.1999777956788587,
+              "overall_score": 0.2039698807699764
+            }
+          },
+          {
+            "score": 0.09495664527877212,
+            "success": false,
+            "patient_profile_id": "balanced",
+            "score_details": {
+              "force_score": 0.25470746514322534,
+              "beta_score": 0.3543099838739689,
+              "tremor_score": 0.15352454460822373,
+              "tracking_score": 0.6709632525655982,
+              "safety_score": 0.5323298627804662,
+              "smoothness_score": 0.9836956155496622,
+              "terminal_stability_score": 0.04573107756271631,
+              "recovery_score": 0.0,
+              "efficiency_score": 0.1764302278459168,
+              "overall_score": 0.09495664527877212
+            }
+          },
+          {
+            "score": 0.19963071065763482,
+            "success": false,
+            "patient_profile_id": "responsive",
+            "score_details": {
+              "force_score": 0.3117668262996123,
+              "beta_score": 0.3776679584420758,
+              "tremor_score": 0.16940296262869253,
+              "tracking_score": 0.8955865759952117,
+              "safety_score": 0.7520680903006146,
+              "smoothness_score": 0.9845530832902306,
+              "terminal_stability_score": 0.15505745663532253,
+              "recovery_score": 0.03633586498739966,
+              "efficiency_score": 0.19984782234256646,
+              "overall_score": 0.19963071065763482
+            }
+          }
+        ]
+      }
+    }
+  },
+  "heldout": {
+    "beta_suppression": {
+      "no_dbs": {
+        "score": 0.3195254540676792,
+        "success": false,
+        "patient_profile_id": "fragile",
+        "score_details": {
+          "force_score": 0.49229907125383726,
+          "beta_score": 0.4362956299881001,
+          "tremor_score": 0.28118209878752365,
+          "tracking_score": 0.9053999044347483,
+          "safety_score": 1.0,
+          "smoothness_score": 1.0,
+          "terminal_stability_score": 0.4205263142314942,
+          "recovery_score": 0.05580783387604887,
+          "efficiency_score": 0.41216294713422186,
+          "overall_score": 0.3195254540676792
+        }
+      },
+      "const_low": {
+        "score": 0.4061259304080841,
+        "success": false,
+        "patient_profile_id": "fragile",
+        "score_details": {
+          "force_score": 0.40788978806451726,
+          "beta_score": 0.3732658400967212,
+          "tremor_score": 0.2794812872134044,
+          "tracking_score": 0.9042479509242782,
+          "safety_score": 0.7653264029002613,
+          "smoothness_score": 0.9891995614035087,
+          "terminal_stability_score": 0.35726872808704524,
+          "recovery_score": 0.05510663272206889,
+          "efficiency_score": 0.26923504006413346,
+          "overall_score": 0.4061259304080841
+        }
+      },
+      "const_mid": {
+        "score": 0.27772720476775725,
+        "success": false,
+        "patient_profile_id": "fragile",
+        "score_details": {
+          "force_score": 0.3352036015684891,
+          "beta_score": 0.532482240711551,
+          "tremor_score": 0.3274982654407014,
+          "tracking_score": 0.9088167776467387,
+          "safety_score": 0.0,
+          "smoothness_score": 0.97328216374269,
+          "terminal_stability_score": 0.3365629843916906,
+          "recovery_score": 0.05534274235332021,
+          "efficiency_score": 0.15356294038528617,
+          "overall_score": 0.27772720476775725
+        }
+      },
+      "const_high": {
+        "score": 0.3322121179994709,
+        "success": false,
+        "patient_profile_id": "fragile",
+        "score_details": {
+          "force_score": 0.5774074323313316,
+          "beta_score": 0.8696993227157637,
+          "tremor_score": 0.5437514911747106,
+          "tracking_score": 0.9338402069235605,
+          "safety_score": 0.0,
+          "smoothness_score": 0.9583333333333334,
+          "terminal_stability_score": 0.48094991934483394,
+          "recovery_score": 0.12003171464133858,
+          "efficiency_score": 0.021287442055739056,
+          "overall_score": 0.3322121179994709
+        }
+      },
+      "safety_aware": {
+        "score": 0.5347621940752065,
+        "success": false,
+        "patient_profile_id": "fragile",
+        "score_details": {
+          "force_score": 0.4752029786260964,
+          "beta_score": 0.4348828683973058,
+          "tremor_score": 0.28082712115863473,
+          "tracking_score": 0.911827260786182,
+          "safety_score": 1.0,
+          "smoothness_score": 0.996390716374269,
+          "terminal_stability_score": 0.4160069225621599,
+          "recovery_score": 0.059009273565123255,
+          "efficiency_score": 0.36954336108459596,
+          "overall_score": 0.5347621940752065
+        }
+      },
+      "reference": {
+        "score": 0.16281884698405544,
+        "success": false,
+        "patient_profile_id": "fragile",
+        "score_details": {
+          "force_score": 0.33781347728207467,
+          "beta_score": 0.3699765540482271,
+          "tremor_score": 0.2802179211572305,
+          "tracking_score": 0.9073270316053468,
+          "safety_score": 0.0,
+          "smoothness_score": 0.9540476877747153,
+          "terminal_stability_score": 0.30505514058835026,
+          "recovery_score": 0.05630393039090781,
+          "efficiency_score": 0.21509740829553117,
+          "overall_score": 0.16281884698405544
+        }
+      }
+    },
+    "tremor_correction": {
+      "no_dbs": {
+        "score": 0.03508249420569709,
+        "success": false,
+        "patient_profile_id": "fragile",
+        "score_details": {
+          "force_score": 0.24902602604428542,
+          "beta_score": 0.30897563086149726,
+          "tremor_score": 0.10865200278458323,
+          "tracking_score": 0.6774674008764815,
+          "safety_score": 1.0,
+          "smoothness_score": 1.0,
+          "terminal_stability_score": 0.03700686708234549,
+          "recovery_score": 0.03305037830192098,
+          "efficiency_score": 0.22489870051153826,
+          "overall_score": 0.03508249420569709
+        }
+      },
+      "const_low": {
+        "score": 0.20009019590620303,
+        "success": false,
+        "patient_profile_id": "fragile",
+        "score_details": {
+          "force_score": 0.20418677114476558,
+          "beta_score": 0.3037819455738904,
+          "tremor_score": 0.10784042578584763,
+          "tracking_score": 0.6657716864196579,
+          "safety_score": 1.0,
+          "smoothness_score": 0.9963998538011696,
+          "terminal_stability_score": 0.028747796661162797,
+          "recovery_score": 0.02945543045008664,
+          "efficiency_score": 0.17096784988818964,
+          "overall_score": 0.20009019590620303
+        }
+      },
+      "const_mid": {
+        "score": 0.0,
+        "success": false,
+        "patient_profile_id": "fragile",
+        "score_details": {
+          "force_score": 0.1542432067115484,
+          "beta_score": 0.35159853878846303,
+          "tremor_score": 0.13164330092914245,
+          "tracking_score": 0.6614385912260821,
+          "safety_score": 0.0,
+          "smoothness_score": 0.9910940545808967,
+          "terminal_stability_score": 0.023483677649716768,
+          "recovery_score": 0.02389374180521836,
+          "efficiency_score": 0.12285373501216339,
+          "overall_score": 0.0
+        }
+      },
+      "const_high": {
+        "score": 0.13494111560635708,
+        "success": false,
+        "patient_profile_id": "fragile",
+        "score_details": {
+          "force_score": 0.6277579819716606,
+          "beta_score": 0.9779854743511744,
+          "tremor_score": 0.5285641880497609,
+          "tracking_score": 0.8392684674883788,
+          "safety_score": 0.0,
+          "smoothness_score": 0.9791666666666666,
+          "terminal_stability_score": 0.2148599269608915,
+          "recovery_score": 0.03804669824083923,
+          "efficiency_score": 0.022849712974041095,
+          "overall_score": 0.13494111560635708
+        }
+      },
+      "safety_aware": {
+        "score": 0.24749176239310042,
+        "success": false,
+        "patient_profile_id": "fragile",
+        "score_details": {
+          "force_score": 0.6425304485918006,
+          "beta_score": 0.9784537409428977,
+          "tremor_score": 0.5284716614532032,
+          "tracking_score": 0.9102356715180124,
+          "safety_score": 0.0,
+          "smoothness_score": 0.98322977582846,
+          "terminal_stability_score": 0.26855343419161004,
+          "recovery_score": 0.038805124370553445,
+          "efficiency_score": 0.17530275614956659,
+          "overall_score": 0.24749176239310042
+        }
+      },
+      "reference": {
+        "score": 0.0,
+        "success": false,
+        "patient_profile_id": "fragile",
+        "score_details": {
+          "force_score": 0.16716580802783967,
+          "beta_score": 0.3035695626229288,
+          "tremor_score": 0.11198495302345228,
+          "tracking_score": 0.7560135930935032,
+          "safety_score": 0.0,
+          "smoothness_score": 0.9775114423686345,
+          "terminal_stability_score": 0.06844808622242615,
+          "recovery_score": 0.022525798648378392,
+          "efficiency_score": 0.1323377514678793,
+          "overall_score": 0.0
+        }
+      }
+    },
+    "full_episode": {
+      "no_dbs": {
+        "score": 0.3692906355011354,
+        "success": false,
+        "patient_profile_id": "refractory",
+        "score_details": {
+          "force_score": 0.2840718462211348,
+          "beta_score": 0.3296509049020421,
+          "tremor_score": 0.1735414756987126,
+          "tracking_score": 0.5321483579110786,
+          "safety_score": 1.0,
+          "smoothness_score": 1.0,
+          "terminal_stability_score": 0.022672671268995137,
+          "recovery_score": 0.09032474469734803,
+          "efficiency_score": 0.26458645266868036,
+          "overall_score": 0.3692906355011354
+        }
+      },
+      "const_low": {
+        "score": 0.3589013953491973,
+        "success": false,
+        "patient_profile_id": "refractory",
+        "score_details": {
+          "force_score": 0.2606859368222559,
+          "beta_score": 0.31765598463106204,
+          "tremor_score": 0.17317080002482338,
+          "tracking_score": 0.5250822569942386,
+          "safety_score": 1.0,
+          "smoothness_score": 0.9986964285714286,
+          "terminal_stability_score": 0.016072909895801374,
+          "recovery_score": 0.087027997708995,
+          "efficiency_score": 0.21851009379667397,
+          "overall_score": 0.3589013953491973
+        }
+      },
+      "const_mid": {
+        "score": 0.08141729541231249,
+        "success": false,
+        "patient_profile_id": "refractory",
+        "score_details": {
+          "force_score": 0.22953808991298819,
+          "beta_score": 0.37324526048910395,
+          "tremor_score": 0.19413835112232597,
+          "tracking_score": 0.5195506149003957,
+          "safety_score": 0.24055246674481845,
+          "smoothness_score": 0.9968095238095238,
+          "terminal_stability_score": 0.006023463060588569,
+          "recovery_score": 0.07998655050928166,
+          "efficiency_score": 0.17905405162322682,
+          "overall_score": 0.08141729541231249
+        }
+      },
+      "const_high": {
+        "score": 0.0768584757410527,
+        "success": false,
+        "patient_profile_id": "refractory",
+        "score_details": {
+          "force_score": 0.5022877383337817,
+          "beta_score": 0.9230371783286628,
+          "tremor_score": 0.45005398960735965,
+          "tracking_score": 0.6886110883686882,
+          "safety_score": 0.0,
+          "smoothness_score": 0.99,
+          "terminal_stability_score": 0.12028409185197107,
+          "recovery_score": 0.10077236174776844,
+          "efficiency_score": 0.0,
+          "overall_score": 0.0768584757410527
+        }
+      },
+      "safety_aware": {
+        "score": 0.33552059756232194,
+        "success": false,
+        "patient_profile_id": "refractory",
+        "score_details": {
+          "force_score": 0.23775094729370397,
+          "beta_score": 0.34344919676375796,
+          "tremor_score": 0.1934945942744591,
+          "tracking_score": 0.7393820086842474,
+          "safety_score": 0.7220246347393215,
+          "smoothness_score": 0.9887391049134027,
+          "terminal_stability_score": 0.1473749742528187,
+          "recovery_score": 0.05410103593016663,
+          "efficiency_score": 0.1811415968968873,
+          "overall_score": 0.33552059756232194
+        }
+      },
+      "reference": {
+        "score": 0.331942124502562,
+        "success": false,
+        "patient_profile_id": "refractory",
+        "score_details": {
+          "force_score": 0.24330932700209643,
+          "beta_score": 0.3222552675715631,
+          "tremor_score": 0.1774348027199718,
+          "tracking_score": 0.6389900124846927,
+          "safety_score": 0.8812297160684341,
+          "smoothness_score": 0.9852793674728775,
+          "terminal_stability_score": 0.09003345206817526,
+          "recovery_score": 0.08821073964861886,
+          "efficiency_score": 0.1820556839410551,
+          "overall_score": 0.331942124502562
+        }
+      }
+    },
+    "fragile_patient": {
+      "no_dbs": {
+        "score": 0.17293991700330424,
+        "success": false,
+        "patient_profile_id": "fragile",
+        "score_details": {
+          "force_score": 0.24545139798685783,
+          "beta_score": 0.3020092518926871,
+          "tremor_score": 0.11152747047876387,
+          "tracking_score": 0.5786933930177343,
+          "safety_score": 1.0,
+          "smoothness_score": 1.0,
+          "terminal_stability_score": 0.04256207180047141,
+          "recovery_score": 0.011939683217582375,
+          "efficiency_score": 0.22224157590617838,
+          "overall_score": 0.17293991700330424
+        }
+      },
+      "const_low": {
+        "score": 0.2596722083147739,
+        "success": false,
+        "patient_profile_id": "fragile",
+        "score_details": {
+          "force_score": 0.18477643871748645,
+          "beta_score": 0.29351102524896194,
+          "tremor_score": 0.11035768648952508,
+          "tracking_score": 0.5597143671833511,
+          "safety_score": 0.5951352466299444,
+          "smoothness_score": 0.9965953947368421,
+          "terminal_stability_score": 0.022622410883264683,
+          "recovery_score": 0.0038949203406230537,
+          "efficiency_score": 0.1542455758803246,
+          "overall_score": 0.2596722083147739
+        }
+      },
+      "const_mid": {
+        "score": 0.0,
+        "success": false,
+        "patient_profile_id": "fragile",
+        "score_details": {
+          "force_score": 0.1352941730119388,
+          "beta_score": 0.3667028840225821,
+          "tremor_score": 0.13201128785863128,
+          "tracking_score": 0.556372692608444,
+          "safety_score": 0.0,
+          "smoothness_score": 0.9915460526315789,
+          "terminal_stability_score": 0.02019290671273147,
+          "recovery_score": 0.0012785026596965898,
+          "efficiency_score": 0.09953759557577976,
+          "overall_score": 0.0
+        }
+      },
+      "const_high": {
+        "score": 0.20929650708918784,
+        "success": false,
+        "patient_profile_id": "fragile",
+        "score_details": {
+          "force_score": 0.5541413937659968,
+          "beta_score": 0.9849619714222746,
+          "tremor_score": 0.48418026921707735,
+          "tracking_score": 0.7500622114442335,
+          "safety_score": 0.0,
+          "smoothness_score": 0.984375,
+          "terminal_stability_score": 0.14973470678303255,
+          "recovery_score": 0.022446806878315295,
+          "efficiency_score": 0.021527974965191793,
+          "overall_score": 0.20929650708918784
+        }
+      },
+      "safety_aware": {
+        "score": 0.282672188896561,
+        "success": false,
+        "patient_profile_id": "fragile",
+        "score_details": {
+          "force_score": 0.18773239095228614,
+          "beta_score": 0.2931891623557103,
+          "tremor_score": 0.11026588609979535,
+          "tracking_score": 0.6594377983939927,
+          "safety_score": 0.599602475729075,
+          "smoothness_score": 0.9927789083157069,
+          "terminal_stability_score": 0.09240570228220173,
+          "recovery_score": 0.01201455079202346,
+          "efficiency_score": 0.15520674302973353,
+          "overall_score": 0.282672188896561
+        }
+      },
+      "reference": {
+        "score": 0.0,
+        "success": false,
+        "patient_profile_id": "fragile",
+        "score_details": {
+          "force_score": 0.14851602713099027,
+          "beta_score": 0.29147473928027384,
+          "tremor_score": 0.11212303400222255,
+          "tracking_score": 0.6509504799249223,
+          "safety_score": 0.0,
+          "smoothness_score": 0.9757027513865051,
+          "terminal_stability_score": 0.08845368754383272,
+          "recovery_score": 0.008944478683675594,
+          "efficiency_score": 0.11433903153837992,
+          "overall_score": 0.0
+        }
+      }
+    },
+    "refractory_patient": {
+      "no_dbs": {
+        "score": 0.04786852184671092,
+        "success": false,
+        "patient_profile_id": "refractory",
+        "score_details": {
+          "force_score": 0.28631706617326746,
+          "beta_score": 0.3296509049020421,
+          "tremor_score": 0.16954147569871258,
+          "tracking_score": 0.6435671076254683,
+          "safety_score": 1.0,
+          "smoothness_score": 1.0,
+          "terminal_stability_score": 0.09067493250446804,
+          "recovery_score": 0.08424132564602799,
+          "efficiency_score": 0.2642845406495334,
+          "overall_score": 0.04786852184671092
+        }
+      },
+      "const_low": {
+        "score": 0.21483274306714145,
+        "success": false,
+        "patient_profile_id": "refractory",
+        "score_details": {
+          "force_score": 0.2592829644784697,
+          "beta_score": 0.3170468471086064,
+          "tremor_score": 0.1690962956551747,
+          "tracking_score": 0.6347898204216329,
+          "safety_score": 1.0,
+          "smoothness_score": 0.9985454545454545,
+          "terminal_stability_score": 0.08477052328524742,
+          "recovery_score": 0.08108534994269206,
+          "efficiency_score": 0.21287894002023328,
+          "overall_score": 0.21483274306714145
+        }
+      },
+      "const_mid": {
+        "score": 0.0,
+        "success": false,
+        "patient_profile_id": "refractory",
+        "score_details": {
+          "force_score": 0.21605070265296136,
+          "beta_score": 0.3616137955409859,
+          "tremor_score": 0.1937733029595926,
+          "tracking_score": 0.623391945575016,
+          "safety_score": 0.0,
+          "smoothness_score": 0.9964545454545455,
+          "terminal_stability_score": 0.0743805015335059,
+          "recovery_score": 0.07421121612363751,
+          "efficiency_score": 0.16370688989553042,
+          "overall_score": 0.0
+        }
+      },
+      "const_high": {
+        "score": 0.15377439928333764,
+        "success": false,
+        "patient_profile_id": "refractory",
+        "score_details": {
+          "force_score": 0.49470527011224197,
+          "beta_score": 0.9230022228337278,
+          "tremor_score": 0.45005398710321165,
+          "tracking_score": 0.7754503816492433,
+          "safety_score": 0.0,
+          "smoothness_score": 0.99,
+          "terminal_stability_score": 0.16075378226315676,
+          "recovery_score": 0.09456220243419117,
+          "efficiency_score": 1.0121342227485263e-15,
+          "overall_score": 0.15377439928333764
+        }
+      },
+      "safety_aware": {
+        "score": 0.23499782878546077,
+        "success": false,
+        "patient_profile_id": "refractory",
+        "score_details": {
+          "force_score": 0.2572678704633234,
+          "beta_score": 0.31515669437921545,
+          "tremor_score": 0.1688878311501405,
+          "tracking_score": 0.7585876331785733,
+          "safety_score": 1.0,
+          "smoothness_score": 0.9955927765099306,
+          "terminal_stability_score": 0.14961519447918153,
+          "recovery_score": 0.08338932145005279,
+          "efficiency_score": 0.2008442001366474,
+          "overall_score": 0.23499782878546077
+        }
+      },
+      "reference": {
+        "score": 0.12148201403089492,
+        "success": false,
+        "patient_profile_id": "refractory",
+        "score_details": {
+          "force_score": 0.23289483660787352,
+          "beta_score": 0.3193437924998854,
+          "tremor_score": 0.17275859420341458,
+          "tracking_score": 0.7370340379338137,
+          "safety_score": 0.4323696268539807,
+          "smoothness_score": 0.9836889229073976,
+          "terminal_stability_score": 0.1366551334273488,
+          "recovery_score": 0.08049650346423926,
+          "efficiency_score": 0.17081084830203153,
+          "overall_score": 0.12148201403089492
+        }
+      }
+    },
+    "personalization_generalization": {
+      "no_dbs": {
+        "score": 0.0008261583064349542,
+        "success": false,
+        "patient_profile_id": "refractory",
+        "score_details": {
+          "force_score": 0.24805194184500767,
+          "beta_score": 0.32624858949377833,
+          "tremor_score": 0.10770290053181451,
+          "tracking_score": 0.7561292699945472,
+          "safety_score": 1.0,
+          "smoothness_score": 1.0,
+          "terminal_stability_score": 0.17222824671020712,
+          "recovery_score": 0.04539327463144677,
+          "efficiency_score": 0.22940622374568093,
+          "overall_score": 0.0008261583064349542
+        }
+      },
+      "const_low": {
+        "score": 0.18853218642802672,
+        "success": false,
+        "patient_profile_id": "refractory",
+        "score_details": {
+          "force_score": 0.21885762288933566,
+          "beta_score": 0.30986595582653415,
+          "tremor_score": 0.10725011564645481,
+          "tracking_score": 0.7497829381539507,
+          "safety_score": 1.0,
+          "smoothness_score": 0.9977704678362573,
+          "terminal_stability_score": 0.1681501566368147,
+          "recovery_score": 0.043597032069109753,
+          "efficiency_score": 0.17844419581283677,
+          "overall_score": 0.18853218642802672
+        }
+      },
+      "const_mid": {
+        "score": 0.0,
+        "success": false,
+        "patient_profile_id": "refractory",
+        "score_details": {
+          "force_score": 0.1754885051739885,
+          "beta_score": 0.37092945225974083,
+          "tremor_score": 0.12436050813128344,
+          "tracking_score": 0.743459857106285,
+          "safety_score": 0.0,
+          "smoothness_score": 0.9945175438596491,
+          "terminal_stability_score": 0.16061435660236306,
+          "recovery_score": 0.03801067573548217,
+          "efficiency_score": 0.133380492263068,
+          "overall_score": 0.0
+        }
+      },
+      "const_high": {
+        "score": 0.146689781724686,
+        "success": false,
+        "patient_profile_id": "refractory",
+        "score_details": {
+          "force_score": 0.49402911678016115,
+          "beta_score": 0.9715735492982043,
+          "tremor_score": 0.4307745941575138,
+          "tracking_score": 0.8534678754436563,
+          "safety_score": 0.0,
+          "smoothness_score": 0.9861111111111112,
+          "terminal_stability_score": 0.2196196150434291,
+          "recovery_score": 0.047734029833610137,
+          "efficiency_score": 0.0,
+          "overall_score": 0.146689781724686
+        }
+      },
+      "safety_aware": {
+        "score": 0.0,
+        "success": false,
+        "patient_profile_id": "refractory",
+        "score_details": {
+          "force_score": 0.17617418824095765,
+          "beta_score": 0.32306285345570984,
+          "tremor_score": 0.11648596217383678,
+          "tracking_score": 0.8287041783394302,
+          "safety_score": 0.0,
+          "smoothness_score": 0.9846392513267918,
+          "terminal_stability_score": 0.19742556922158114,
+          "recovery_score": 0.06401305952882635,
+          "efficiency_score": 0.12906933369881599,
+          "overall_score": 0.0
+        }
+      },
+      "reference": {
+        "score": 0.054856991124734356,
+        "success": false,
+        "patient_profile_id": "refractory",
+        "score_details": {
+          "force_score": 0.1931466263068092,
+          "beta_score": 0.31137344277346596,
+          "tremor_score": 0.1103700898461685,
+          "tracking_score": 0.806498343937128,
+          "safety_score": 0.2286038430796763,
+          "smoothness_score": 0.9829917126929367,
+          "terminal_stability_score": 0.19586822124798492,
+          "recovery_score": 0.05818284840618154,
+          "efficiency_score": 0.14085478245491803,
+          "overall_score": 0.054856991124734356
+        }
+      }
+    }
+  },
+  "public_seeds": [
+    0,
+    1,
+    2,
+    3
+  ],
+  "heldout_config": {
+    "beta_suppression": {
+      "seed": 101,
+      "patient_profile_id": "fragile"
+    },
+    "tremor_correction": {
+      "seed": 102,
+      "patient_profile_id": "fragile"
+    },
+    "full_episode": {
+      "seed": 103,
+      "patient_profile_id": "refractory"
+    },
+    "fragile_patient": {
+      "seed": 104,
+      "patient_profile_id": "fragile"
+    },
+    "refractory_patient": {
+      "seed": 105,
+      "patient_profile_id": "refractory"
+    },
+    "personalization_generalization": {
+      "seed": 106,
+      "patient_profile_id": "refractory"
+    }
+  }
+}

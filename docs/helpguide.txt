@@ -250,33 +250,25 @@ Training before the environment is stable
 Relying only on average reward and not inspecting outputs
 Forgetting timeouts and sandbox limits
 Saving LoRA/QLoRA models incorrectly
-
 22) Learning Resources
-
 (Recommended) RL Environment Lecture Chapters:
 https://openenv-india-apr-2026.lovable.app/
-
-
 Module 1: Why OpenEnv? (~7 min)
 ▸ Workshop 8:02–15:05 — https://www.youtube.com/watch?v=1jU05MlENOI&t=482s
 ▸ Sanyam: RL loop, fragmented env APIs, OpenEnv as universal interface, Gymnasium spec + Docker
 ▸ Alt: Mega Lecture 40:01–46:00 — https://www.youtube.com/watch?v=Jew4lhAiqnw&t=2401s
-
 Module 2: Using Existing Envs (~7.5 min)
 ▸ Workshop 35:33–43:05 — https://www.youtube.com/watch?v=1jU05MlENOI&t=2133s
 ▸ Ben: Hub org, env collections, 3 Space interfaces (server/repo/registry), from_hub
 ▸ Alt: Mega Lecture 1:24:11–1:30:00 — https://www.youtube.com/watch?v=Jew4lhAiqnw&t=5051s
-
 Module 3: Deploying Envs (~9 min)
 ▸ Mega Lecture 1:30:00–1:39:07 — https://www.youtube.com/watch?v=Jew4lhAiqnw&t=5400s
 ▸ Ben: live openenv init, scaffold, running locally, openenv push, Docker run from Space
 ▸ Alt: Workshop 43:05–48:30 — https://www.youtube.com/watch?v=1jU05MlENOI&t=2585s
-
 Module 4: Building Your Own (~6.5 min)
 ▸ Workshop 43:45–50:20 — https://www.youtube.com/watch?v=1jU05MlENOI&t=2625s
 ▸ Ben: scaffold files, business logic (reset/step), models, client, publishing
 ▸ Alt: Mega Lecture 1:33:30–1:39:07 — https://www.youtube.com/watch?v=Jew4lhAiqnw&t=5610s
-
 Module 5: Training + TRL (~14 min)
 ▸ Mega Lecture 1:53:20–2:07:12 — https://www.youtube.com/watch?v=Jew4lhAiqnw&t=6800s
 ▸ Lewis: Wordle GRPO walkthrough — rollout function, reward shaping, GRPOTrainer, live training

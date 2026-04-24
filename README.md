@@ -33,7 +33,7 @@ Why this model matters:
 - It produces physically meaningful values rather than arbitrary simulator units.
 - It includes a published closed-loop controller, which gives us a strong reference policy.
 
-The source data in `fleming-model-based-brain/` includes:
+The packaged source data in `parkinsons_Motor/fleming-model-based-brain/` includes:
 
 - A 100-step DBS-active timeline covering `t=10.02s` to `t=12.00s`
 - Controller and observer CSVs for beta activity, tremor, side effects, stimulation, and force
@@ -60,7 +60,7 @@ The project has four layers:
    Raw simulation outputs from Fleming et al. provide the ground-truth trajectories and the DBS parameter sweep.
 
 2. **Calibration layer**
-   [`parkinsons_Motor/brain_calibrator.py`](./parkinsons_Motor/brain_calibrator.py) loads the raw files, aligns them to a common 100-step timeline, normalizes signals, computes derived features such as `force_preserved`, and exposes fast lookup/interpolation helpers.
+   [`parkinsons_Motor/core/calibration.py`](./parkinsons_Motor/core/calibration.py) exposes the calibrated brain-state interface used by the environment. It loads the raw files, aligns them to a common 100-step timeline, normalizes signals, computes derived features such as `force_preserved`, and exposes fast lookup/interpolation helpers.
 
 3. **OpenEnv environment layer**
    [`parkinsons_Motor/server/parkinsons_Motor_environment.py`](./parkinsons_Motor/server/parkinsons_Motor_environment.py) implements `reset()` and `step()`, applies the Parkinsonian distortion and DBS effects, tracks trajectory data, and computes episode-end grades.
@@ -73,7 +73,7 @@ The project has four layers:
 ```text
 Fleming biophysical outputs
         ->
-brain_calibrator.py
+core/calibration.py
         ->
 CalibratedBrainState
         ->
@@ -92,17 +92,25 @@ optional web demo / remote inference
 
 The environment uses three clinically distinct tasks built from the same calibrated episode family. They share the same action/observation schema, but differ in horizon length, safety budget, pass threshold, and what kind of control behavior is rewarded.
 
-| Task | Difficulty | Steps | Main goal |
-|---|---|---:|---|
-| `beta_suppression` | Easy | 24 | Early stabilization under a very tight safety budget |
-| `tremor_correction` | Medium | 48 | Active tremor rescue as force starts to degrade |
-| `full_episode` | Hard | 100 | Long-horizon control with cumulative side effects and recovery pressure |
+| Task ID | Friendly name | Difficulty | Steps | Main goal |
+|---|---|---:|---:|---|
+| `beta_suppression` | Calm Start | Easy | 24 | Early stabilization under a very tight safety budget |
+| `tremor_correction` | Rescue Phase | Medium | 48 | Active tremor rescue as force starts to degrade |
+| `full_episode` | Full Episode | Hard | 100 | Long-horizon control with cumulative side effects and recovery pressure |
+
+Plain-language meaning:
+
+- `beta_suppression` / `Calm Start`: the onboarding task
+- `tremor_correction` / `Rescue Phase`: the first real adaptive-control task
+- `full_episode` / `Full Episode`: the long-horizon benchmark
 
 Current calibrated public ladder:
 
 - `beta_suppression`: `no_dbs`, `const_low`, `const_mid`, and `const_high` all fail; `safety_aware` passes all public runs.
-- `tremor_correction`: `no_dbs` and all constant policies fail; the searched rescue baseline used by `safety_aware` passes all public runs.
+- `tremor_correction`: `no_dbs` and all constant policies fail; `safety_aware` is currently marginal, passing `2/4` public runs.
 - `full_episode`: passive and constant policies fail; `safety_aware` passes all public runs.
+
+That baseline shape is intentional. The simple hand-designed controller is meant to solve the easy onboarding task, stay competitive but imperfect on the medium rescue task, and remain strong on the long-horizon task where conservative pacing matters more than fast rescue timing.
 
 ### What the agent must learn across tasks
 
@@ -220,6 +228,7 @@ Important grounding choices:
 ```text
 .
 |- README.md
+|- BENCHMARK_GRADE.md
 |- PROBLEM.md
 |- ARCHITECTURE.md
 |- CALIBRATION.md
@@ -227,15 +236,25 @@ Important grounding choices:
 |- STATE_ACTION_SPACE.md
 |- TASKS.md
 |- CONTEXT.md
+|- outputs/
+|  |- README.md
+|  |- benchmark/
+|  |- search/
+|  |- runs/
+|  `- analysis/
+|- docs/
+|  |- BENCHMARK_GRADE.md
+|  `- JUDGE_PITCH.md
 |- run_local_inference.py
-|- fleming-model-based-brain/
 `- parkinsons_Motor/
-   |- brain_calibrator.py
    |- client.py
    |- inference.py
-   |- models.py
+   |- core/
+   |- evaluation/
+   |- fleming-model-based-brain/
    |- tasks/
    |- graders/
+   |- tests/
    |- server/
    `- static/myosuite_demo/
 ```
@@ -276,6 +295,14 @@ uv run --project parkinsons_Motor python run_local_inference.py
 ```
 
 That script connects to the local server, runs the agent loop, and prints OpenEnv-style step and score logs.
+
+If you want a lower-pressure version that runs tasks one by one with longer pauses between runs:
+
+```bash
+uv run --project parkinsons_Motor python run_taskwise_inference.py
+```
+
+That helper saves separate per-task logs and a final summary into `outputs/runs/`.
 
 ### 4. Use the environment directly in Python
 
@@ -327,7 +354,10 @@ The README is the main project document. These files are extensions if you want 
 - [STATE_ACTION_SPACE.md](./STATE_ACTION_SPACE.md): full observation/action semantics
 - [TASKS.md](./TASKS.md): task curriculum and grading thresholds
 - [CONTEXT.md](./CONTEXT.md): project narrative and hackathon context
+- [RESEARCH_AND_REFERENCES.md](./RESEARCH_AND_REFERENCES.md): source lineage, repo influences, and citation guidance
+- [docs/BENCHMARK_GRADE.md](./docs/BENCHMARK_GRADE.md): why the environment qualifies as benchmark-grade
 - [docs/JUDGE_PITCH.md](./docs/JUDGE_PITCH.md): judge-facing pitch summary
+- [outputs/README.md](./outputs/README.md): guide to generated benchmark artifacts
 - [parkinsons_Motor/README.md](./parkinsons_Motor/README.md): package/server quick reference
 
 ## Vision

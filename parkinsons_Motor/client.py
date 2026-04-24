@@ -57,19 +57,25 @@ class ParkinsonsMotorEnv(
             # disease state
             disease_severity=obs_data.get("disease_severity", 0.0),
             beta_suppression=obs_data.get("beta_suppression", 0.0),
+            beta_trend=obs_data.get("beta_trend", 0.0),
+            tremor_trend=obs_data.get("tremor_trend", 0.0),
+            side_effect_rate=obs_data.get("side_effect_rate", 0.0),
             # motor output
             force_amplitude=obs_data.get("force_amplitude", 0.0),
             force_preserved=obs_data.get("force_preserved", 0.0),
+            target_output=obs_data.get("target_output", 0.0),
             effective_motor_output=obs_data.get("effective_motor_output", 0.0),
             task_error=obs_data.get("task_error", 0.0),
+            tracking_accuracy=obs_data.get("tracking_accuracy", 0.0),
             # DBS state
             dbs_amplitude_ma=obs_data.get("dbs_amplitude_ma", 0.0),
             dbs_pulse_width_ms=obs_data.get("dbs_pulse_width_ms", 0.06),
             dbs_entrainment=obs_data.get("dbs_entrainment", 0.0),
+            recent_dbs_avg_ma=obs_data.get("recent_dbs_avg_ma", 0.0),
+            recent_dbs_avg_pw_ms=obs_data.get("recent_dbs_avg_pw_ms", 0.06),
             side_effect_load=obs_data.get("side_effect_load", 0.0),
-            # controller internals
-            scheduler_class=obs_data.get("scheduler_class", 1),
-            beta_ctrl_error=obs_data.get("beta_ctrl_error", 0.0),
+            action_smoothness_cost=obs_data.get("action_smoothness_cost", 0.0),
+            dbs_constraint_violation=obs_data.get("dbs_constraint_violation", 0.0),
             sim_time_s=obs_data.get("sim_time_s", 0.0),
             # task & grader
             task_id=obs_data.get("task_id", "full_episode"),

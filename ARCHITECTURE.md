@@ -62,22 +62,31 @@ The environment does not invent physics. It uses peer-reviewed biophysical simul
 - **What it provides:** 100-step timelines of beta oscillation, tremor amplitude, and raw muscle force.
 - **Why it matters:** Agents train on real physiological dynamics, including non-stationary tremor build-up.
 
-### 3.2 Brain Calibrator (`brain_calibrator.py`)
-Loads the raw `.csv` and `.txt` files into memory during environment initialization.
+### 3.2 Calibration Core (`core/calibration.py`)
+Loads the raw `.csv` and `.txt` files into memory during environment initialization through the calibration interface used by the environment.
 - Converts raw signals to normalized `[0, 1]` ranges.
 - Provides a fast bilinear interpolation function to map the agent's `(amplitude, pulse_width)` to a cortical `entrainment` fraction.
 
 ### 3.3 OpenEnv API (`server/parkinsons_Motor_environment.py`)
 Provides the standard `step()` and `reset()` interface.
 - **State Transition:** Applies the agent's DBS action to suppress the exact *next step's* pathological brain signals (1-step clinical lag).
-- **Sub-task Management:** Slices the 100-step timeline into 3 distinct tasks (Easy: 20 steps, Medium: 50 steps, Hard: 100 steps).
+- **Sub-task Management:** Uses the task registry under `tasks/` to expose three benchmark scenarios with different horizons, safety envelopes, and grading emphasis.
 
-### 3.4 Grader System (`graders/dbs_graders.py`)
+### 3.4 Grader System (`graders/`)
 At the end of an episode, returns a fixed `[0.0, 1.0]` score.
 - **No LLM-as-Judge.** The grader is 100% deterministic math.
-- Factors in `force_preserved`, `beta_suppression`, `side_effect_load`, and `amplitude_efficiency`.
+- Split into:
+  - `graders/components.py` for reusable score components
+  - `graders/rules.py` for hard-failure logic
+  - `graders/dbs_graders.py` for task-level deterministic score assembly
 
-### 3.5 3D Visualisation (`static/myosuite_demo/`)
+### 3.5 Evaluation and Test Harness (`evaluation/`, `tests/`)
+The benchmark-facing evaluation code is separated from the environment core.
+- `evaluation/eval_suite.py` generates the official public and held-out reports in `outputs/benchmark/`
+- `evaluation/tremor_policy_search.py` generates the rescue-policy sweep in `outputs/search/`
+- `tests/smoke_test.py` and `tests/test_remote.py` keep quick validation code out of the package root
+
+### 3.6 3D Visualisation (`static/myosuite_demo/`)
 A completely separate frontend to showcase the AI's impact visually.
 - Reads `tremor_arv` from the OpenEnv backend.
 - Applies proportional jitter to a 3D musculoskeletal arm.
@@ -105,3 +114,38 @@ MyoSuite calculates computationally heavy musculoskeletal physics. Training an R
 - `beta_arv`: The pathological driver the agent must suppress.
 - `side_effect_load`: The penalty boundary.
 - `grader_score`: The objective Hackathon validation proxy.
+
+---
+
+## 6. Codebase Layout
+
+```text
+parkinsons_Motor/
+|- core/
+|  |- calibration.py
+|  |- models.py
+|  `- patient_profiles.py
+|- tasks/
+|  |- base.py
+|  |- scenarios.py
+|  `- registry.py
+|- graders/
+|  |- components.py
+|  |- rules.py
+|  `- dbs_graders.py
+|- evaluation/
+|  |- eval_suite.py
+|  `- tremor_policy_search.py
+|- tests/
+|  |- smoke_test.py
+|  `- test_remote.py
+|- server/
+`- static/
+```
+
+This split keeps the repo presentable:
+- `core/` contains benchmark logic primitives
+- `tasks/` contains scenario definitions and lookup
+- `graders/` contains deterministic evaluation math
+- `evaluation/` contains benchmark/report generation code
+- `tests/` contains validation entrypoints

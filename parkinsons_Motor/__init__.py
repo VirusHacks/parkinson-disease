@@ -7,7 +7,7 @@
 """Parkinsons Motor Environment."""
 
 from .client import ParkinsonsMotorEnv
-from .models import ParkinsonsMotorAction, ParkinsonsMotorObservation
+from .core.models import ParkinsonsMotorAction, ParkinsonsMotorObservation
 
 __all__ = [
     "ParkinsonsMotorAction",

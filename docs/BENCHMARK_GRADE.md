@@ -4,11 +4,11 @@ This document explains why MotorAssistEnv is not just a themed simulator or a ha
 
 It is written as a companion to the main [README](../README.md), the calibration notes in [CALIBRATION.md](../CALIBRATION.md), and the saved benchmark artifacts in:
 
-- [outputs/benchmark_eval.md](../outputs/benchmark_eval.md)
-- [outputs/benchmark_eval.json](../outputs/benchmark_eval.json)
-- [outputs/tremor_policy_search.md](../outputs/tremor_policy_search.md)
-- [outputs/tremor_policy_search.json](../outputs/tremor_policy_search.json)
-- [outputs/phase6_10_summary.md](../outputs/phase6_10_summary.md)
+- [outputs/benchmark/benchmark_eval.md](../outputs/benchmark/benchmark_eval.md)
+- [outputs/benchmark/benchmark_eval.json](../outputs/benchmark/benchmark_eval.json)
+- [outputs/search/tremor_policy_search.md](../outputs/search/tremor_policy_search.md)
+- [outputs/search/tremor_policy_search.json](../outputs/search/tremor_policy_search.json)
+- [outputs/benchmark/phase6_10_summary.md](../outputs/benchmark/phase6_10_summary.md)
 
 ## What “benchmark-grade” means here
 
@@ -48,7 +48,7 @@ The environment is anchored to outputs from Fleming et al. (2023), a peer-review
 - the benchmark inherits a real controller-derived trajectory rather than arbitrary hand-authored curves
 - the DBS amplitude/pulse-width sweep is grounded in a real response surface
 
-The calibration layer in [parkinsons_Motor/brain_calibrator.py](../parkinsons_Motor/brain_calibrator.py) aligns the source traces, normalizes them, derives clinically meaningful fields, and exposes the entrainment lookup used by the online environment.
+The calibration layer in [parkinsons_Motor/core/calibration.py](../parkinsons_Motor/core/calibration.py) aligns the source traces, normalizes them, derives clinically meaningful fields, and exposes the entrainment lookup used by the online environment.
 
 So while this is still a benchmark and not a clinical simulator, it starts from real neuroscience outputs instead of synthetic game logic.
 
@@ -80,7 +80,7 @@ That is important because it means actions matter causally. The agent is not jus
 
 ## 4. The state space is benchmark-quality, not bloated or fake
 
-The observation model in [parkinsons_Motor/models.py](../parkinsons_Motor/models.py) is strong because every exposed field has a role:
+The observation model in [parkinsons_Motor/core/models.py](../parkinsons_Motor/core/models.py) is strong because every exposed field has a role:
 
 - neural state: `beta_arv`, `tremor_arv`, `semg_arv`
 - motor state: `force_preserved`, `force_amplitude`, `effective_motor_output`, `task_error`
@@ -147,7 +147,7 @@ The final grader in [parkinsons_Motor/graders/dbs_graders.py](../parkinsons_Moto
 - `terminal_stability_score`
 - `recovery_score`
 
-It also includes hard-failure logic for:
+It also includes hard-failure logic assembled from [parkinsons_Motor/graders/components.py](../parkinsons_Motor/graders/components.py) and [parkinsons_Motor/graders/rules.py](../parkinsons_Motor/graders/rules.py) for:
 
 - unsafe stimulation
 - poor rescue behavior on the medium task
@@ -159,7 +159,7 @@ That is benchmark-grade because the agent cannot win by optimizing only one numb
 
 ## 7. The tasks form a real curriculum rather than “same task, longer episode”
 
-The task set in [parkinsons_Motor/tasks/dbs_tasks.py](../parkinsons_Motor/tasks/dbs_tasks.py) now tests different capabilities:
+The task set in [parkinsons_Motor/tasks/scenarios.py](../parkinsons_Motor/tasks/scenarios.py) and [parkinsons_Motor/tasks/registry.py](../parkinsons_Motor/tasks/registry.py) now tests different capabilities:
 
 - `beta_suppression`: early stabilization under a tight safety budget
 - `tremor_correction`: active rescue during symptom escalation
@@ -178,7 +178,7 @@ That makes the curriculum much more meaningful for both training and evaluation.
 
 ## 8. Patient variation makes it more robust than a single canned scenario
 
-The patient-profile system in [parkinsons_Motor/patient_profiles.py](../parkinsons_Motor/patient_profiles.py) adds:
+The patient-profile system in [parkinsons_Motor/core/patient_profiles.py](../parkinsons_Motor/core/patient_profiles.py) adds:
 
 - `balanced`
 - `responsive`
@@ -199,7 +199,7 @@ That is benchmark-grade because the agent is not being evaluated on one frozen p
 
 ## 9. The evaluation suite is reproducible and evidence-based
 
-The benchmark harness in [parkinsons_Motor/eval_suite.py](../parkinsons_Motor/eval_suite.py) makes the project much stronger. It provides:
+The benchmark harness in [parkinsons_Motor/evaluation/eval_suite.py](../parkinsons_Motor/evaluation/eval_suite.py) makes the project much stronger. It provides:
 
 - fixed public seeds
 - fixed held-out configurations
@@ -207,13 +207,13 @@ The benchmark harness in [parkinsons_Motor/eval_suite.py](../parkinsons_Motor/ev
 - machine-readable JSON output
 - human-readable Markdown reports
 
-The search helper in [parkinsons_Motor/tremor_policy_search.py](../parkinsons_Motor/tremor_policy_search.py) strengthens this further by showing that the medium-task adaptive baseline was not chosen arbitrarily. It was calibrated from saved search results.
+The search helper in [parkinsons_Motor/evaluation/tremor_policy_search.py](../parkinsons_Motor/evaluation/tremor_policy_search.py) strengthens this further by showing that the medium-task adaptive baseline was not chosen arbitrarily. It was calibrated from saved search results.
 
 This matters a lot. A benchmark becomes serious when evaluation is automated, reproducible, and saved in artifacts others can inspect.
 
 ## 10. The baseline ladder now demonstrates real separation
 
-From [outputs/benchmark_eval.md](../outputs/benchmark_eval.md):
+From [outputs/benchmark/benchmark_eval.md](../outputs/benchmark/benchmark_eval.md):
 
 ### Public benchmark
 
@@ -223,7 +223,7 @@ From [outputs/benchmark_eval.md](../outputs/benchmark_eval.md):
 - `tremor_correction`
   - `no_dbs` fails `0/4`
   - all constant baselines fail `0/4`
-  - `safety_aware` passes `4/4`
+  - `safety_aware` is currently marginal at `2/4`
 - `full_episode`
   - all passive and constant baselines fail
   - `safety_aware` passes `4/4`
@@ -233,9 +233,17 @@ This is one of the strongest arguments that the environment is benchmark-grade. 
 - doing nothing is not enough
 - naive constant stimulation is not enough
 - brute-force stimulation is not enough
-- a tuned adaptive controller can win
+- a tuned adaptive controller can solve easy and hard cleanly while still leaving real headroom on medium rescue
 
 That is exactly what a good benchmark should show.
+
+The current base agent is intentionally simple. It is a hand-designed `safety_aware` controller, not a learned policy. Its performance profile is informative:
+
+- it reliably solves the easy public task
+- it is only partial on the medium rescue task, which means the rescue setting is still demanding
+- it reliably solves the long-horizon hard task because its policy style is conservative and stability-oriented
+
+That asymmetry does not mean the hard task is fake. It means this baseline is better at sustained safe control than fast reactive rescue, which is a useful benchmark signal.
 
 ## 11. Held-out scenarios prevent the benchmark from collapsing into public overfitting
 
@@ -283,7 +291,6 @@ MotorAssistEnv is still:
 But being honest about those limits makes the benchmark stronger, not weaker. It shows the project understands the difference between:
 
 - “research benchmark”
-and
 - “clinical decision system”
 
 That honesty is part of why the benchmark is credible.

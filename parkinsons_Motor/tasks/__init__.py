@@ -1,12 +1,24 @@
-"""
-Tasks for the Parkinson's Motor (DBS) Environment.
+"""Task package for the Parkinson's Motor environment."""
 
-Three tasks of increasing clinical difficulty:
-  - Task 1 (Easy):   beta_suppression  — suppress a static beta oscillation spike
-  - Task 2 (Medium): tremor_correction  — prevent force decay during active tremor
-  - Task 3 (Hard):   full_episode       — optimise full 100-step DBS trajectory
-"""
+from .base import DBSTask
+from .registry import TASK_REGISTRY, get_task
+from .scenarios import (
+    TASK_BETA_SUPPRESSION,
+    TASK_FRAGILE_PATIENT,
+    TASK_FULL_EPISODE,
+    TASK_PERSONALIZATION_GENERALIZATION,
+    TASK_REFRACTORY_PATIENT,
+    TASK_TREMOR_CORRECTION,
+)
 
-from .dbs_tasks import TASK_REGISTRY, DBSTask, get_task
-
-__all__ = ["TASK_REGISTRY", "DBSTask", "get_task"]
+__all__ = [
+    "DBSTask",
+    "TASK_BETA_SUPPRESSION",
+    "TASK_TREMOR_CORRECTION",
+    "TASK_FULL_EPISODE",
+    "TASK_FRAGILE_PATIENT",
+    "TASK_REFRACTORY_PATIENT",
+    "TASK_PERSONALIZATION_GENERALIZATION",
+    "TASK_REGISTRY",
+    "get_task",
+]
