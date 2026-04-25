@@ -1,0 +1,56 @@
+{
+  "model_name": "Qwen/Qwen2.5-72B-Instruct",
+  "server_url": "http://localhost:8000",
+  "tasks": [
+    "easy"
+  ],
+  "seeds": [
+    0
+  ],
+  "request_sleep_seconds": 0.0,
+  "task_sleep_seconds": 0.0,
+  "mean_score": 0.7928750105366751,
+  "per_task": [
+    {
+      "task_id": "easy",
+      "n_seeds": 1,
+      "score_mean": 0.7928750105366751,
+      "score_std": 0.0,
+      "score_min": 0.7928750105366751,
+      "score_max": 0.7928750105366751,
+      "success_rate": 1.0,
+      "successes": 1,
+      "success_threshold": 0.55,
+      "any_grader_invoked": false,
+      "component_means": {},
+      "rollouts": [
+        {
+          "task_id": "easy",
+          "seed": 0,
+          "score": 0.7928750105366751,
+          "success": true,
+          "steps_taken": 6,
+          "max_steps": 6,
+          "episode_steps_full": 36,
+          "grader_invoked": false,
+          "success_threshold": 0.55,
+          "side_effect_budget": 0.55,
+          "mean_amplitude_ma": 1.075,
+          "max_amplitude_ma": 1.2,
+          "mean_reward": 0.7928750105366751,
+          "rewards": [
+            0.666,
+            0.7848,
+            0.8205,
+            0.8323,
+            0.8334,
+            0.8203
+          ],
+          "event_schedule": [],
+          "score_details": {},
+          "error": null
+        }
+      ]
+    }
+  ]
+}

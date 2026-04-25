@@ -18,6 +18,8 @@ Observation:
   - task/constraint diagnostics relevant to learning
 """
 
+from typing import Any, Dict, List
+
 from openenv.core.env_server.types import Action, Observation
 from pydantic import Field
 
@@ -258,3 +260,26 @@ class ParkinsonsMotorObservation(Observation):
     task_id: str = Field(default="hard", description="Active task identifier.")
     grader_score: float = Field(default=-1.0, description="Final deterministic score in [0,1]. -1.0 until episode end.")
     episode_success: bool = Field(default=False, description="True if grader_score >= task success_threshold.")
+
+    # Diagnostic surfaces (the OpenEnv envelope strips obs.metadata, so anything
+    # we want clients to see at evaluation time has to be a typed field here).
+    grader_components: Dict[str, float] = Field(
+        default_factory=dict,
+        description=(
+            "Per-component grader scores (force, beta, tremor, tracking, safety, "
+            "smoothness, efficiency, terminal_stability, recovery, overall). "
+            "Empty until the episode ends and the deterministic grader runs."
+        ),
+    )
+    active_events: List[str] = Field(
+        default_factory=list,
+        description="Event ids active on the current step (e.g. ['dyskinesia_spike']).",
+    )
+    event_schedule_summary: List[Dict[str, Any]] = Field(
+        default_factory=list,
+        description=(
+            "Per-episode event firing plan, populated on reset. "
+            "Each entry: {event_id, start_step, end_step, intensity}. "
+            "Same value is echoed on every step so late-joining clients can recover it."
+        ),
+    )

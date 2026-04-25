@@ -13,14 +13,15 @@ from .base_grader import compute_component_details, finalize_details, weighted_o
 
 
 HARD_WEIGHTS = {
-    "force_score": 0.14,
-    "beta_score": 0.22,        # Suppressing pathological beta is the primary DBS goal
-    "tremor_score": 0.14,      # Tremor control is co-primary
-    "tracking_score": 0.16,
-    "safety_score": 0.18,      # Safety matters but can't be gamed by low-amp coasting
-    "smoothness_score": 0.04,
-    "efficiency_score": 0.04,  # Gated by therapeutic engagement; secondary in hard sessions
-    "terminal_stability_score": 0.08,  # 150-step episode must finish stable
+    "force_score": 0.12,
+    "beta_score": 0.18,                # Suppressing pathological beta is the primary DBS goal
+    "tremor_score": 0.12,              # Tremor control is co-primary
+    "tracking_score": 0.14,
+    "safety_score": 0.18,              # Safety matters but can't be gamed by low-amp coasting
+    "smoothness_score": 0.03,
+    "efficiency_score": 0.03,          # Gated by therapeutic engagement; secondary in hard sessions
+    "terminal_stability_score": 0.12,  # 150-step episode MUST finish stable (was 0.08)
+    "recovery_score": 0.08,            # Reward agents that recover from late crises (was missing)
 }
 
 

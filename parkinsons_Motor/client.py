@@ -77,10 +77,20 @@ class ParkinsonsMotorEnv(
             action_smoothness_cost=obs_data.get("action_smoothness_cost", 0.0),
             dbs_constraint_violation=obs_data.get("dbs_constraint_violation", 0.0),
             sim_time_s=obs_data.get("sim_time_s", 0.0),
+            # extended physiological signals
+            gamma_arv=obs_data.get("gamma_arv", 0.0),
+            medication_phase=obs_data.get("medication_phase", 0.5),
+            battery_drain_rate=obs_data.get("battery_drain_rate", 0.0),
+            stim_washout=obs_data.get("stim_washout", 0.0),
             # task & grader
             task_id=obs_data.get("task_id", "hard"),
             grader_score=obs_data.get("grader_score", -1.0),
             episode_success=obs_data.get("episode_success", False),
+            # diagnostic surfaces (the OpenEnv envelope strips obs.metadata,
+            # so these have to be typed observation fields).
+            grader_components=obs_data.get("grader_components") or {},
+            active_events=list(obs_data.get("active_events") or []),
+            event_schedule_summary=list(obs_data.get("event_schedule_summary") or []),
             # base fields
             done=payload.get("done", False),
             reward=payload.get("reward"),

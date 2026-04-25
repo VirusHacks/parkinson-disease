@@ -185,6 +185,9 @@ class ParkinsonsMotorEnvironment(Environment):
         self._event_scheduler: EventScheduler = EventScheduler(None, 1, self._rng)
         self._last_event_effects: EventEffects = EventEffects()
         self._active_event_ids: Tuple[str, ...] = ()
+        # Cached on reset so /step responses can echo the schedule without
+        # round-tripping the (stripped) metadata channel.
+        self._event_schedule_summary: List[Dict[str, Any]] = []
 
     # ------------------------------------------------------------------
     # helpers
@@ -572,6 +575,9 @@ class ParkinsonsMotorEnvironment(Environment):
             task_id=self._task.task_id,
             grader_score=grader_score if grader_score is not None else -1.0,
             episode_success=is_success(self._task, grader_score) if grader_score is not None else False,
+            grader_components=dict(metadata.get("score_details") or {}),
+            active_events=list(metadata.get("active_events") or self._active_event_ids or ()),
+            event_schedule_summary=list(self._event_schedule_summary),
             reward=reward,
             done=done,
             metadata=metadata,
@@ -614,6 +620,7 @@ class ParkinsonsMotorEnvironment(Environment):
         )
         self._last_event_effects = EventEffects()
         self._active_event_ids = ()
+        self._event_schedule_summary = list(self._event_scheduler.schedule_summary())
 
         base = self._brain_window(self._task.start_step)
         tracking_accuracy = _clamp(1.0 - abs(self._target_output) / 2.0)
@@ -764,6 +771,7 @@ class ParkinsonsMotorEnvironment(Environment):
             "active_events": list(self._active_event_ids),
             "cumulative_charge_mc": self._cumulative_charge,
             "score_details": score_details or {},
+            "event_schedule": list(self._event_schedule_summary),
         }
 
         obs = self._make_obs(
