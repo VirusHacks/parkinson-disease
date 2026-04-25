@@ -111,14 +111,17 @@ You are an expert closed-loop DBS controller managing Parkinsonian motor symptom
 Every step is a short clinical control decision: suppress pathological activity, preserve movement,
 avoid overstimulation, and keep enough safety budget for the remainder of the episode.
 
-Return JSON only:
-{"dbs_amplitude": X, "dbs_pulse_width": X, "dbs_frequency": X}
+You MAY think step by step inside <think>...</think> if helpful, but your response MUST end with
+exactly one valid JSON object on its own final line, in this exact shape:
 
-Rules:
+{"dbs_amplitude": <float>, "dbs_pulse_width": <float>, "dbs_frequency": <float>}
+
+Hard constraints (the deterministic grader will reject violations):
 - amplitude in mA [0.0, 5.0]; pulse_width in ms [0.06, 0.20]; frequency in Hz [60, 185].
 - Use pulse_width=0.13 and frequency=130 unless safety demands otherwise.
 - Smooth amplitude changes; avoid jumps > 0.3 mA per step.
-- No prose, no markdown, no motor_command — JSON only.
+- The JSON object MUST be the last non-empty line. No prose, markdown, or fences after it.
+- Do NOT include motor_command — that field is ignored.
 
 Clinical priorities (ranked):
 1. Prevent overstimulation: gamma_arv > 0.55 OR side_effect_load near budget => reduce.
@@ -218,10 +221,29 @@ def build_user_prompt(
     """).strip()
 
 
-def apply_chat_template(tokenizer: Any, system: str, user: str) -> str:
-    """Render a Qwen-style chat template ready to feed to .generate()."""
+def apply_chat_template(
+    tokenizer: Any,
+    system: str,
+    user: str,
+    *,
+    enable_thinking: bool = True,
+) -> str:
+    """Render a Qwen-style chat template ready to feed to .generate().
+
+    Qwen3 templates support an ``enable_thinking`` kwarg that controls whether
+    the assistant turn opens with ``<think>``; we pass it through and silently
+    fall back for tokenizers (Qwen2, Llama, ...) that don't accept it.
+    """
     msgs = [{"role": "system", "content": system}, {"role": "user", "content": user}]
-    return tokenizer.apply_chat_template(msgs, tokenize=False, add_generation_prompt=True)
+    try:
+        return tokenizer.apply_chat_template(
+            msgs,
+            tokenize=False,
+            add_generation_prompt=True,
+            enable_thinking=enable_thinking,
+        )
+    except TypeError:
+        return tokenizer.apply_chat_template(msgs, tokenize=False, add_generation_prompt=True)
 
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -234,19 +256,29 @@ _DEFAULT_FQ  = 130.0
 
 
 def parse_action(text: str) -> Optional[Dict[str, float]]:
-    """Extract the first JSON object from a completion. Returns None on failure."""
+    """Extract the **last** JSON object from a completion. Returns None on failure.
+
+    We deliberately scan back-to-front (and skip anything inside
+    ``<think>...</think>`` blocks) because Qwen3-style models often write
+    intermediate JSON examples while reasoning, then commit to the real action
+    on the final line. We want the commit, not the first scratchpad sample.
+    """
     if not text:
         return None
-    match = _JSON_RE.search(text)
-    if not match:
+    answer = re.sub(r"<think>.*?</think>", "", text, flags=re.DOTALL)
+    if not answer.strip():
+        answer = text  # all of it was inside <think> — fall back to full text
+    candidates = list(_JSON_RE.finditer(answer))
+    if not candidates:
         return None
-    try:
-        d = json.loads(match.group(0))
-    except json.JSONDecodeError:
-        return None
-    if not isinstance(d, dict):
-        return None
-    return d
+    for match in reversed(candidates):
+        try:
+            d = json.loads(match.group(0))
+        except json.JSONDecodeError:
+            continue
+        if isinstance(d, dict):
+            return d
+    return None
 
 
 def make_action(
@@ -337,7 +369,7 @@ def llm_generate(
     tokenizer: Any,
     prompt: str,
     *,
-    max_new_tokens: int = 96,
+    max_new_tokens: int = 256,
     temperature: float = 0.7,
     top_p: float = 0.9,
     max_prompt_length: int = 1024,
@@ -407,7 +439,7 @@ async def rollout_episode_async(
     *,
     max_turns: int = 30,
     temperature: float = 0.7,
-    max_new_tokens: int = 96,
+    max_new_tokens: int = 256,
     max_prompt_length: int = 1024,
     fallback_to_heuristic_on_invalid: bool = False,
 ) -> Trajectory:
@@ -652,8 +684,8 @@ def make_rollout_func(
     log_episode: Optional[Callable[[str, Optional[int], Dict[str, float]], Any]] = None,
     temperature: float = 0.7,
     reward_weights: Optional[Mapping[str, float]] = None,
-    fallback_to_heuristic_on_invalid: bool = False,
-    max_new_tokens: int = 96,
+    fallback_to_heuristic_on_invalid: bool = True,
+    max_new_tokens: int = 256,
     max_prompt_length: int = 1024,
 ) -> Callable[..., Dict[str, List[Any]]]:
     """Build the GRPO ``rollout_func`` callable.
@@ -703,7 +735,29 @@ def make_rollout_func(
             breakdown = compute_reward(traj, weights=reward_weights)
             if log_episode:
                 log_episode(task_id, seed, breakdown)
-            if not traj.prompts:  # env errored before any step succeeded
+            if not traj.prompts:
+                # Env failed before *any* successful step. We still need to return
+                # one row per incoming prompt so GRPO doesn't get a length mismatch
+                # (which silently zero-pads the group and kills the gradient).
+                logger.warning(
+                    "ROLLOUT FAILED  task=%s seed=%s env_error=%r — emitting "
+                    "placeholder row with reward_total=%.2f so GRPO group stays aligned.",
+                    task_id, seed, traj.env_error, ENVIRONMENT_ERROR_PENALTY,
+                )
+                # Tokenize a 1-token "[FAIL]" so prompt/completion lists are non-empty.
+                fail_ids = tokenizer("[FAIL]", return_tensors="pt").input_ids[0]
+                results["prompt_ids"].append(fail_ids.tolist())
+                results["completion_ids"].append(fail_ids.tolist())
+                results["logprobs"].append([0.0] * len(fail_ids))
+                results["reward_total"].append(float(ENVIRONMENT_ERROR_PENALTY))
+                results["reward_grader"].append(0.0)
+                results["reward_dense"].append(0.0)
+                results["reward_format"].append(0.0)
+                results["reward_invalid_penalty"].append(0.0)
+                results["reward_env_error"].append(float(ENVIRONMENT_ERROR_PENALTY))
+                results["grader_score"].append(0.0)
+                results["episode_success"].append(0)
+                results["n_steps"].append(0)
                 continue
             p_ids = torch.cat(traj.prompts)
             c_ids = torch.cat(traj.completions)
@@ -1132,6 +1186,97 @@ def eval_with_adapter_disabled(
     return evaluate_model_suite(model, tokenizer, env_url, tasks, seeds, **kwargs)
 
 
+def sanity_check_rollout(
+    model: Any,
+    tokenizer: Any,
+    env_url: str,
+    *,
+    task_id: str = "easy",
+    seed: int = 0,
+    max_turns: int = 4,
+    temperature: float = 0.7,
+    max_new_tokens: int = 512,
+    max_prompt_length: int = 1280,
+    raise_on_failure: bool = True,
+) -> Dict[str, Any]:
+    """Run ONE short rollout and verify the LLM→env loop is healthy.
+
+    Use this BEFORE training to catch the four most common GRPO collapses:
+      1. completions never produce parseable JSON (cap too small / wrong template)
+      2. env never returns a non-zero step reward (URL wrong / task broken)
+      3. all rollouts emit identical actions (no reward variance => GRPO can't learn)
+      4. env errors silently (ENVIRONMENT_ERROR_PENALTY appears in every step)
+
+    Prints raw completion + parsed action + per-step env reward + final grader,
+    and (by default) raises ``RuntimeError`` on a hard failure so the notebook
+    cell turns red instead of letting you waste an hour on a flat training run.
+
+    Returns a dict with the inspection data so you can assert on it in tests.
+    """
+    print(f"\n=== sanity_check_rollout  task={task_id}  seed={seed}  turns={max_turns} ===")
+    traj = rollout_episode(
+        model, tokenizer, env_url,
+        task_id=task_id, seed=seed,
+        max_turns=max_turns,
+        temperature=temperature,
+        max_new_tokens=max_new_tokens,
+        max_prompt_length=max_prompt_length,
+        fallback_to_heuristic_on_invalid=False,  # we WANT to see parse failures here
+    )
+
+    n_steps        = len(traj.rewards)
+    n_invalid      = traj.invalid_count
+    parseable_pct  = (sum(traj.parsed) / max(1, len(traj.parsed))) * 100
+    rewards_nonzero = sum(1 for r in traj.rewards if abs(r) > 1e-9)
+
+    print(f"  steps run               : {n_steps} / {max_turns}")
+    print(f"  parseable JSON          : {sum(traj.parsed)} / {len(traj.parsed)}  ({parseable_pct:.0f}%)")
+    print(f"  invalid_count           : {n_invalid}")
+    print(f"  steps with non-0 reward : {rewards_nonzero} / {n_steps}")
+    print(f"  dense reward (mean)     : {traj.dense_reward_mean:+.4f}")
+    print(f"  grader_score            : {traj.grader_score:.4f}")
+    print(f"  episode_success         : {traj.episode_success}")
+    print(f"  env_error               : {traj.env_error!r}")
+    if traj.history:
+        print(f"  first step trace        : {traj.history[0]}")
+        print(f"  last  step trace        : {traj.history[-1]}")
+
+    failures: List[str] = []
+    if traj.env_error:
+        failures.append(f"env raised: {traj.env_error}")
+    if n_steps == 0:
+        failures.append("zero env steps completed")
+    if parseable_pct < 50.0:
+        failures.append(
+            f"only {parseable_pct:.0f}% of completions parsed as JSON — "
+            "increase max_new_tokens, tighten SYSTEM_PROMPT, or check the chat template"
+        )
+    if n_steps > 0 and rewards_nonzero == 0:
+        failures.append(
+            "every env step returned reward=0 — the env may be broken, the seed may be invalid, "
+            "or the task_id may not be registered server-side"
+        )
+
+    if failures:
+        msg = "SANITY CHECK FAILED:\n  - " + "\n  - ".join(failures)
+        print("\n" + msg)
+        if raise_on_failure:
+            raise RuntimeError(msg)
+    else:
+        print("\nSANITY CHECK PASSED — LLM produces parseable JSON, env returns rewards, no errors.")
+
+    return {
+        "n_steps":         n_steps,
+        "parseable_pct":   parseable_pct,
+        "invalid_count":   n_invalid,
+        "rewards_nonzero": rewards_nonzero,
+        "grader_score":    traj.grader_score,
+        "env_error":       traj.env_error,
+        "history":         list(traj.history),
+        "failures":        failures,
+    }
+
+
 def evaluate_model_on_task(
     model: Any,
     tokenizer: Any,
@@ -1141,7 +1286,7 @@ def evaluate_model_on_task(
     *,
     max_turns: int = 30,
     temperature: float = 0.0,
-    max_new_tokens: int = 96,
+    max_new_tokens: int = 256,
     max_prompt_length: int = 1024,
 ) -> Dict[str, Any]:
     """Run multiple seeds against one task and return aggregated stats."""
@@ -1186,7 +1331,7 @@ def evaluate_model_suite(
     *,
     max_turns_per_task: Optional[Mapping[str, int]] = None,
     temperature: float = 0.0,
-    max_new_tokens: int = 96,
+    max_new_tokens: int = 256,
     max_prompt_length: int = 1024,
 ) -> List[Dict[str, Any]]:
     """Evaluate one model on a set of (task, seed) pairs and return per-task results."""
@@ -1237,4 +1382,5 @@ __all__ = [
     # eval
     "evaluate_model_on_task", "evaluate_model_suite",
     "eval_with_adapter_disabled",
+    "sanity_check_rollout",
 ]
