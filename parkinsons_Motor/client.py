@@ -78,7 +78,7 @@ class ParkinsonsMotorEnv(
             dbs_constraint_violation=obs_data.get("dbs_constraint_violation", 0.0),
             sim_time_s=obs_data.get("sim_time_s", 0.0),
             # task & grader
-            task_id=obs_data.get("task_id", "full_episode"),
+            task_id=obs_data.get("task_id", "hard"),
             grader_score=obs_data.get("grader_score", -1.0),
             episode_success=obs_data.get("episode_success", False),
             # base fields

@@ -7,7 +7,25 @@ LLM through all 3 tasks, and emits the required OpenEnv stdout format.
 Usage:
     uv run --project parkinsons_Motor python run_local_inference.py
 
-Reads OpenAI or Hugging Face router settings from .env or environment.
+Reads OpenAI or Hugging Face router settings from `.env` or the environment.
+When the config clearly points at the HF router, `auto` mode will prefer
+`HF_TOKEN` over `API_KEY`.
+
+Environment variables:
+  LLM_PROVIDER                          auto | openai | hf | huggingface
+  API_KEY / OPENAI_API_KEY              OpenAI-compatible API key
+  OPENAI_BASE_URL / API_BASE_URL        OpenAI-compatible base URL
+  OPENAI_MODEL / MODEL_NAME             OpenAI-compatible model name
+  HF_TOKEN                              Hugging Face router token
+  HF_API_BASE_URL / HF_ROUTE / API_BASE_URL
+                                        Hugging Face router base URL
+  HF_MODEL_NAME / HF_MODEL / MODEL_NAME Hugging Face model name
+  OPENAI_REQUEST_TIMEOUT_SECONDS        LLM request timeout (default: 120)
+  OPENAI_MAX_RETRIES                    LLM retry count (default: 4)
+  OPENAI_TEMPERATURE                    Sampling temperature (default: 0.2)
+  OPENAI_MAX_TOKENS                     Completion token cap (default: 300)
+  INFERENCE_REQUEST_SLEEP_SECONDS       Delay between successful steps (default: 0.5)
+  INFERENCE_TASK_SLEEP_SECONDS          Delay between tasks (default: 4.0)
 """
 
 from __future__ import annotations
@@ -29,6 +47,7 @@ if str(REPO_ROOT) not in sys.path:
     sys.path.insert(0, str(REPO_ROOT))
 
 from parkinsons_Motor import ParkinsonsMotorAction, ParkinsonsMotorEnv  # noqa: E402
+from parkinsons_Motor.tasks import get_task  # noqa: E402
 
 
 # ── env config ────────────────────────────────────────────────────────────────
@@ -53,6 +72,8 @@ _load_dotenv(".env")
 LOCAL_SERVER_URL = "http://localhost:8000"
 OPENAI_DEFAULT_BASE_URL = "https://api.openai.com/v1"
 OPENAI_DEFAULT_MODEL = "gpt-4o-mini"
+HF_DEFAULT_BASE_URL = "https://router.huggingface.co/v1"
+HF_DEFAULT_MODEL = "Qwen/Qwen2.5-Coder-7B-Instruct"
 HF_ROUTER_HOST = "huggingface.co"
 
 
@@ -67,6 +88,16 @@ def _looks_like_openai_model(name: Optional[str]) -> bool:
     return "/" not in normalized and normalized.startswith(("gpt", "o", "text-embedding"))
 
 
+def _looks_like_hf_model(name: Optional[str]) -> bool:
+    if not name:
+        return False
+    normalized = name.strip().lower()
+    return (
+        "/" in normalized
+        or normalized.startswith(("qwen", "meta-llama", "mistral", "deepseek", "google/"))
+    )
+
+
 def _resolve_llm_config() -> tuple[str, str, str, str]:
     provider = os.getenv("LLM_PROVIDER", "auto").strip().lower()
 
@@ -79,8 +110,29 @@ def _resolve_llm_config() -> tuple[str, str, str, str]:
     openai_base_url = os.getenv("OPENAI_BASE_URL")
     openai_model = os.getenv("OPENAI_MODEL")
 
-    hf_base_url = os.getenv("HF_API_BASE_URL")
-    hf_model = os.getenv("HF_MODEL_NAME")
+    hf_base_url = (
+        os.getenv("HF_API_BASE_URL")
+        or os.getenv("HF_ROUTE")
+        or os.getenv("HF_ROUTER_URL")
+        or os.getenv("HUGGINGFACE_API_BASE_URL")
+    )
+    hf_model = os.getenv("HF_MODEL_NAME") or os.getenv("HF_MODEL") or os.getenv("HUGGINGFACE_MODEL")
+
+    hf_base_candidate = hf_base_url or generic_base_url
+    hf_model_candidate = hf_model or generic_model
+    prefer_hf_auto = (
+        provider == "auto"
+        and hf_key
+        and (
+            _looks_like_hf_router(hf_base_candidate)
+            or _looks_like_hf_model(hf_model_candidate)
+        )
+    )
+
+    if provider in {"hf", "huggingface"} or prefer_hf_auto:
+        base_url = hf_base_candidate or HF_DEFAULT_BASE_URL
+        model_name = hf_model_candidate or HF_DEFAULT_MODEL
+        return "huggingface", hf_key, base_url, model_name
 
     if provider in {"auto", "openai"} and openai_key:
         base_url = openai_base_url or generic_base_url
@@ -96,8 +148,8 @@ def _resolve_llm_config() -> tuple[str, str, str, str]:
         return "openai", openai_key, base_url, model_name
 
     if provider in {"auto", "hf", "huggingface"} and hf_key:
-        base_url = hf_base_url or generic_base_url or "https://router.huggingface.co/v1"
-        model_name = hf_model or generic_model or "Qwen/Qwen2.5-72B-Instruct"
+        base_url = hf_base_candidate or HF_DEFAULT_BASE_URL
+        model_name = hf_model_candidate or HF_DEFAULT_MODEL
         return "huggingface", hf_key, base_url, model_name
 
     raise RuntimeError(
@@ -108,20 +160,70 @@ def _resolve_llm_config() -> tuple[str, str, str, str]:
 LLM_PROVIDER, API_KEY, API_BASE_URL, MODEL_NAME = _resolve_llm_config()
 BENCHMARK    = "parkinsons_Motor"
 
-DEFAULT_TASKS = ["beta_suppression", "tremor_correction", "full_episode"]
-TASKS = [
-    task.strip()
-    for task in os.getenv("INFERENCE_TASKS", ",".join(DEFAULT_TASKS)).split(",")
-    if task.strip()
-]
-# Must match task n_steps exactly so grader runs at episode end
-MAX_STEPS = {"beta_suppression": 30, "tremor_correction": 48, "full_episode": 100}
-# Must match task success_threshold in scenarios.py
-SUCCESS_THRESHOLD = {"beta_suppression": 0.50, "tremor_correction": 0.36, "full_episode": 0.66}
-TEMPERATURE = 0.2
-MAX_TOKENS  = 300
-REQUEST_SLEEP_SECONDS = float(os.getenv("INFERENCE_SLEEP_SECONDS", "0.5"))
-TASK_SLEEP_SECONDS = float(os.getenv("INFERENCE_TASK_SLEEP_SECONDS", "4.0"))
+DEFAULT_TASKS = ["easy", "medium", "hard"]
+
+DEFAULT_MAX_STEPS = {
+    "easy": 50,
+    "medium": 50,
+    "hard": 30,
+}
+
+DEFAULT_SUCCESS_THRESHOLDS = {
+    "easy": 0.75,
+    "medium": 0.65,
+    "hard": 0.55,
+}
+
+
+def _parse_task_list() -> List[str]:
+    raw = os.getenv("INFERENCE_TASKS", ",".join(DEFAULT_TASKS))
+    tasks = [task.strip() for task in raw.split(",") if task.strip()]
+    if not tasks:
+        raise RuntimeError("INFERENCE_TASKS resolved to an empty task list.")
+    return tasks
+
+
+def _env_float(name: str, default: float) -> float:
+    raw = os.getenv(name)
+    return float(raw) if raw is not None and raw != "" else default
+
+
+def _env_int(name: str, default: int) -> int:
+    raw = os.getenv(name)
+    return int(raw) if raw is not None and raw != "" else default
+
+
+def _resolve_task_runtime_config(tasks: List[str]) -> tuple[Dict[str, int], Dict[str, float], Dict[str, float]]:
+    max_steps: Dict[str, int] = {}
+    success_thresholds: Dict[str, float] = {}
+    side_effect_budgets: Dict[str, float] = {}
+
+    for task_id in tasks:
+        task = get_task(task_id)
+        env_key = task.task_id.upper()
+        default_max_steps = DEFAULT_MAX_STEPS.get(task_id, task.n_steps)
+        max_steps[task_id] = _env_int(f"INFERENCE_MAX_STEPS_{env_key}", default_max_steps)
+        default_success_threshold = DEFAULT_SUCCESS_THRESHOLDS.get(task_id, task.success_threshold)
+        success_thresholds[task_id] = _env_float(
+            f"INFERENCE_SUCCESS_THRESHOLD_{env_key}",
+            default_success_threshold,
+        )
+        side_effect_budgets[task_id] = _env_float(
+            f"INFERENCE_SIDE_EFFECT_BUDGET_{env_key}",
+            task.max_side_effect_load,
+        )
+
+    return max_steps, success_thresholds, side_effect_budgets
+
+
+TASKS = _parse_task_list()
+MAX_STEPS, SUCCESS_THRESHOLD, SIDE_EFFECT_BUDGETS = _resolve_task_runtime_config(TASKS)
+TEMPERATURE = _env_float("OPENAI_TEMPERATURE", 0.2)
+MAX_TOKENS = _env_int("OPENAI_MAX_TOKENS", 300)
+REQUEST_TIMEOUT_SECONDS = _env_float("OPENAI_REQUEST_TIMEOUT_SECONDS", 120.0)
+OPENAI_MAX_RETRIES = _env_int("OPENAI_MAX_RETRIES", 4)
+REQUEST_SLEEP_SECONDS = _env_float("INFERENCE_REQUEST_SLEEP_SECONDS", 0.5)
+TASK_SLEEP_SECONDS = _env_float("INFERENCE_TASK_SLEEP_SECONDS", 4.0)
 OUTPUT_DIR = REPO_ROOT / "outputs" / "runs"
 OUTPUT_BASENAME = os.getenv("INFERENCE_OUTPUT_BASENAME", "local_inference_report")
 OUTPUT_JSON = OUTPUT_DIR / f"{OUTPUT_BASENAME}.json"
@@ -131,81 +233,70 @@ OUTPUT_MD = OUTPUT_DIR / f"{OUTPUT_BASENAME}.md"
 # ── prompts ───────────────────────────────────────────────────────────────────
 
 SYSTEM_PROMPT = textwrap.dedent("""
-You are a closed-loop Deep Brain Stimulation (DBS) controller for a Parkinson's patient.
-Every 20ms you read the patient's brain state and output DBS settings as JSON.
+You are an expert closed-loop DBS controller managing Parkinsonian motor symptoms in real time.
+Every step is a short clinical control decision: suppress pathological activity, preserve movement,
+avoid overstimulation, and keep enough safety budget for the remainder of the episode.
 
-━━━ KEY OBSERVATIONS ━━━
-  beta_arv        [0→1]  STN beta oscillation. 0=suppressed(good), 1=peak pathology(bad).
-  tremor_arv      [0→1]  Tremor envelope. 0=no tremor(good), 1=max tremor(bad).
-  force_preserved [0→1]  Fraction of healthy muscle force. MAXIMISE THIS.
-  side_effect_load[0→1]  Cumulative stimulation burden. Budget varies per task (shown in context).
-  beta_trend      [±]    Negative = beta improving. Positive = worsening → increase amplitude.
-  tremor_trend    [±]    Negative = tremor improving. Positive = worsening → maintain/increase amplitude.
-  side_effect_rate[±]    Positive = load rising. Negative = recovering (safe to hold current amplitude).
-  gamma_arv       [0→1]  Over-stimulation alarm. >0.55 = reduce amplitude now.
-  target_output   [±1]   Motor goal. Copy this EXACTLY into motor_command every step.
-  dbs_entrainment [0→1]  How much DBS is suppressing beta right now (one step lag).
-
-━━━ ACTION FORMAT (JSON only, no explanation) ━━━
+Return JSON only:
 {"dbs_amplitude": X, "dbs_pulse_width": X, "dbs_frequency": X}
-Note: motor_command is handled automatically — do NOT include it.
 
-━━━ DECISION RULES (apply in order) ━━━
+Important:
+- Do not output prose, markdown, or explanation.
+- Do not include motor_command. It is handled separately.
+- Use pulse_width = 0.13 and frequency = 130 unless there is a strong safety reason to deviate.
+- Prefer smooth amplitude changes. Avoid jumps larger than about 0.3 mA in one step.
 
-RULE 1 — EMERGENCY: If tremor_arv > 0.55 OR beta_arv > 0.60:
-  → Set amplitude ≥ 1.2 mA. Keep this level until symptoms drop below 0.45.
+Clinical meaning of observations:
+- beta_arv: pathological beta oscillation. Lower is better.
+- tremor_arv: tremor severity. Lower is better.
+- force_preserved: retained motor force. Higher is better.
+- side_effect_load: cumulative stimulation burden. High values mean budget is being exhausted.
+- beta_trend / tremor_trend: positive means worsening, negative means improving.
+- side_effect_rate: positive means burden is still rising.
+- gamma_arv: overstimulation warning. If high, back off quickly.
+- dbs_entrainment: how much current DBS is suppressing beta.
+- stim_washout: residual stimulation carry-over. High washout means prior DBS is still acting.
 
-RULE 2 — SAFETY: If side_effect_load alert is shown (⚠ SAFETY):
-  → WARNING: reduce amplitude by 20-30%. CRITICAL: reduce by 40%.
+Control priorities in order:
+1. Prevent unsafe overstimulation.
+2. Do not leave the patient undertreated when symptoms are clearly high or worsening.
+3. Restore usable function by reducing tremor/beta while preserving force.
+4. Once stable, taper toward the lowest effective amplitude.
 
-RULE 3 — ADAPTIVE (normal):
-  • beta_trend > 0.015 or tremor_trend > 0.015 → increase amplitude by 0.1-0.15 mA
-  • Both trends negative AND side_effect_rate negative → reduce by 0.05-0.10 mA slowly
-  • Otherwise → hold current amplitude
+Decision policy:
+- If gamma_arv > 0.55, or side_effect_load is near budget, reduce amplitude promptly.
+- If tremor_arv > 0.55 or beta_arv > 0.60, treat actively: usually at least 1.2 mA unless safety signals are severe.
+- If symptoms are worsening and safety is acceptable, increase gradually by about 0.1-0.15 mA.
+- If symptoms are improving and side effects are still rising, hold or reduce slightly.
+- If symptoms are controlled and stable, taper slowly toward an efficient maintenance level.
+- Brief rescue bursts are acceptable; sustained high amplitude is not.
+- Never sit near zero amplitude while symptoms remain elevated.
 
-RULE 4 — EFFICIENCY: When symptoms stable (both arv < target, 3+ consecutive steps improving):
-  → Slowly reduce toward 0.6-0.9 mA. Change ≤0.15 mA per step.
-
-━━━ AMPLITUDE GUIDANCE ━━━
-  Sustainable range (won't exhaust budget): 0.5-1.0 mA for most tasks
-  Rescue range (brief bursts only): 1.2-1.8 mA — reduce after symptoms stabilize
-  Never exceed task ceiling. Large abrupt changes (>0.3 mA/step) → smoothness penalty.
-
-━━━ FIXED PARAMETERS ━━━
-  pulse_width: 0.13 ms (standard — do not change)
-  frequency: 130 Hz (optimal for beta suppression — do not change)
-
-━━━ WHAT KILLS YOUR SCORE ━━━
-  ✗ Letting amplitude stay at 0 while symptoms are elevated → hard grader penalty (-0.20)
-  ✗ Sustained high amplitude past safe range → side_effect_load exceeds budget → safety collapse
-  ✗ Abrupt amplitude changes >0.3 mA per step → smoothness penalty
-  ✗ Never reducing amplitude even when symptoms improve → efficiency score collapses
+Good controller behavior:
+- Early tasks: stabilize without wasting budget.
+- Rescue tasks: intervene decisively, then taper once recovery begins.
+- Long tasks: pace stimulation so the episode stays controllable all the way to the end.
 """).strip()
 
 
 _TASK_CONTEXT = {
-    "beta_suppression": (
-        "EASY — Early stabilization (30 steps). Patient is responsive. "
-        "Ceiling: 1.5 mA. Side-effect BUDGET: 0.55 (trigger safety reduction if load > 0.47). "
-        "STRATEGY: Hold 0.9-1.1 mA. Reduce to 0.7-0.8 mA when BOTH beta_arv<0.22 AND tremor_arv<0.18. "
-        "Changes ≤0.15 mA/step. Avoid exceeding 1.3 mA — approaching 1.5 mA (max) risks budget."
+    "easy": (
+        "EASY / Calm Start. Responsive patient early in symptom build-up. "
+        "Clinical goal: calm rising beta and mild tremor without creating unnecessary side effects. "
+        "Ceiling: 1.5 mA. Side-effect budget: 0.55. "
+        "Preferred pattern: start in a moderate therapeutic range, stabilize quickly, then taper toward a low maintenance dose."
     ),
-    "tremor_correction": (
-        "MEDIUM — Active tremor rescue (48 steps). Episode starts during tremor escalation. "
-        "Ceiling: 1.8 mA. Side-effect BUDGET: 0.60 (trigger safety reduction if load > 0.51). "
-        "TWO-PHASE STRATEGY: "
-        "Phase 1 (steps 1-18): Use 1.2-1.5 mA to arrest escalation. This is urgent. "
-        "Phase 2 (steps 19+): Drop to 0.7-1.0 mA maintenance once tremor_trend turns negative. "
-        "Sustaining >1.5 mA past step 20 risks budget. Grader rewards recovery from bad to good."
+    "medium": (
+        "MEDIUM / Rescue Phase. Symptoms are already escalating and force is at risk. "
+        "Clinical goal: interrupt deterioration, restore usable movement, then step down to maintenance. "
+        "Ceiling: 1.8 mA. Side-effect budget: 0.60. "
+        "Preferred pattern: decisive rescue early, then gradual taper once tremor and beta stop worsening."
     ),
-    "full_episode": (
-        "HARD — Full 100-step closed-loop episode. Patient may be refractory. "
-        "Ceiling: 2.4 mA. Side-effect BUDGET: 0.55 (trigger safety reduction if load > 0.47). "
-        "THREE-PHASE STRATEGY (ESSENTIAL): "
-        "Phase 1 (steps 1-15): Build entrainment at 0.8-1.2 mA. "
-        "Phase 2 (steps 16-45): Push 1.2-1.8 mA during peak escalation — watch side_effect_load. "
-        "Phase 3 (steps 46-100): Reduce to 0.5-0.9 mA maintenance. Budget must survive 100 steps. "
-        "Max amp (2.4 mA) is NEVER sustainable — budget exhausts quickly at full power."
+    "hard": (
+        "HARD / Full Episode. Long closed-loop management across onset, escalation, peak symptoms, and recovery. "
+        "Clinical goal: keep the patient functional through the whole session, not just one short rescue. "
+        "Ceiling: 2.4 mA. Side-effect budget: 0.55. "
+        "Preferred pattern: build entrainment, rescue when needed, then preserve enough budget for late stability."
     ),
 }
 
@@ -224,9 +315,7 @@ def _build_user_prompt(step: int, obs: dict, task_id: str, history: list) -> str
     gamma = obs.get('gamma_arv', 0)
     target = obs.get('target_output', 0)
 
-    # Task-specific safety thresholds
-    _se_budgets = {"beta_suppression": 0.55, "tremor_correction": 0.60, "full_episode": 0.55}
-    se_budget = _se_budgets.get(task_id, 0.44)
+    se_budget = SIDE_EFFECT_BUDGETS.get(task_id, 0.44)
     se_warn = round(se_budget * 0.85, 3)
     se_crit = round(se_budget * 0.95, 3)
 
@@ -248,32 +337,41 @@ def _build_user_prompt(step: int, obs: dict, task_id: str, history: list) -> str
     flag_str = "\n  ".join(flags) if flags else "No alerts — normal adaptive control (Priority 4)"
 
     return textwrap.dedent(f"""
-    TASK: {task_id} | Step {step}
+    TASK: {task_id} | STEP: {step}
     {context}
 
-    ┌─ ALERTS ────────────────────────────────────────────
+    ALERTS:
       {flag_str}
 
-    ┌─ BRAIN STATE ───────────────────────────────────────
-      beta_arv:         {beta:.4f}   tremor_arv:       {tremor:.4f}
-      force_preserved:  {force:.4f}   side_effect_load: {se_load:.4f}
-      beta_trend:      {beta_trend:+.4f}   tremor_trend:    {tremor_trend:+.4f}
-      side_effect_rate:{se_rate:+.4f}   gamma_arv:        {gamma:.4f}
-      dbs_entrainment:  {obs.get('dbs_entrainment', 0):.4f}   stim_washout:     {obs.get('stim_washout', 0):.4f}
+    CURRENT STATE:
+      beta_arv={beta:.4f}
+      tremor_arv={tremor:.4f}
+      force_preserved={force:.4f}
+      side_effect_load={se_load:.4f}
+      beta_trend={beta_trend:+.4f}
+      tremor_trend={tremor_trend:+.4f}
+      side_effect_rate={se_rate:+.4f}
+      gamma_arv={gamma:.4f}
+      dbs_entrainment={obs.get('dbs_entrainment', 0):.4f}
+      stim_washout={obs.get('stim_washout', 0):.4f}
+      tracking_accuracy={obs.get('tracking_accuracy', 0):.4f}
+      target_output={target:.4f}
 
-    ┌─ MOTOR ─────────────────────────────────────────────
-      target_output:    {target:.4f}  ← copy this into motor_command
-      tracking_accuracy:{obs.get('tracking_accuracy', 0):.4f}
+    INTERPRETATION HINTS:
+    - worsening symptoms + acceptable safety => increase a little
+    - high gamma or high side_effect_load => reduce
+    - improving symptoms + positive side_effect_rate => taper or hold
+    - stable control => maintain the lowest effective dose
 
-    ┌─ RECENT HISTORY ────────────────────────────────────
+    RECENT HISTORY:
       {recent if recent != "None" else "(first step)"}
 
-    Output JSON now:
+    Output JSON only now.
     """).strip()
 
 
-def _call_llm(client: OpenAI, step: int, obs: dict, task_id: str, history: list, max_retries: int = 3) -> str:
-    for attempt in range(max_retries):
+def _call_llm(client: OpenAI, step: int, obs: dict, task_id: str, history: list) -> str:
+    for attempt in range(OPENAI_MAX_RETRIES):
         try:
             resp = client.chat.completions.create(
                 model=MODEL_NAME,
@@ -283,11 +381,15 @@ def _call_llm(client: OpenAI, step: int, obs: dict, task_id: str, history: list,
                 ],
                 temperature=TEMPERATURE,
                 max_tokens=MAX_TOKENS,
+                timeout=REQUEST_TIMEOUT_SECONDS,
             )
             return (resp.choices[0].message.content or "").strip()
         except Exception as exc:
-            delay = 2 ** attempt
-            print(f"[DEBUG] LLM call failed (attempt {attempt+1}/{max_retries}): {exc}. Retrying in {delay}s...", flush=True)
+            delay = min(2 ** attempt, 12)
+            print(
+                f"[DEBUG] LLM call failed (attempt {attempt + 1}/{OPENAI_MAX_RETRIES}): {exc}. Retrying in {delay}s...",
+                flush=True,
+            )
             time.sleep(delay)
     return ""
 
@@ -351,7 +453,7 @@ async def run_task(env, client: OpenAI, task_id: str) -> tuple[float, bool]:
             if result.done:
                 break
 
-            raw = _call_llm(client, step, obs_dict, task_id, history)
+            raw = await asyncio.to_thread(_call_llm, client, step, obs_dict, task_id, history)
             parsed = _parse_action(raw)
             action = _make_action(parsed, target_output=obs_dict.get("target_output", 0.0))
             action_str = json.dumps({
@@ -387,7 +489,7 @@ async def run_task(env, client: OpenAI, task_id: str) -> tuple[float, bool]:
             )
 
             if not done and REQUEST_SLEEP_SECONDS > 0:
-                time.sleep(REQUEST_SLEEP_SECONDS)
+                await asyncio.sleep(REQUEST_SLEEP_SECONDS)
 
             if done:
                 gs = obs_dict.get("grader_score", -1.0)
@@ -442,29 +544,31 @@ async def main() -> None:
     print(f"Model  : {MODEL_NAME}", flush=True)
     print(f"Server : {LOCAL_SERVER_URL}", flush=True)
     print(f"Tasks  : {TASKS}", flush=True)
+    print(f"Steps  : {MAX_STEPS}", flush=True)
+    print(f"Pass@  : {SUCCESS_THRESHOLD}", flush=True)
+    print(f"Timeout: {REQUEST_TIMEOUT_SECONDS}s", flush=True)
     print(f"{'='*60}\n", flush=True)
 
     client = OpenAI(base_url=API_BASE_URL, api_key=API_KEY)
 
-    # Connect to local server via URL (no Docker needed)
-    env = ParkinsonsMotorEnv(base_url=LOCAL_SERVER_URL)
-    await env.__aenter__()
-
     all_scores: dict[str, float] = {}
     all_success: dict[str, bool] = {}
 
-    try:
-        for task_id in TASKS:
-            print(f"\n{'-'*50}", flush=True)
+    for task_id in TASKS:
+        print(f"\n{'-'*50}", flush=True)
+        env = ParkinsonsMotorEnv(base_url=LOCAL_SERVER_URL)
+        await env.__aenter__()
+        try:
             score, success = await run_task(env, client, task_id)
             all_scores[task_id] = score
             all_success[task_id] = success
             print(f"  -> {task_id}: score={score:.4f} success={success}", flush=True)
-            if task_id != TASKS[-1] and TASK_SLEEP_SECONDS > 0:
-                print(f"  -> sleeping {TASK_SLEEP_SECONDS:.1f}s before next task", flush=True)
-                time.sleep(TASK_SLEEP_SECONDS)
-    finally:
-        await env.__aexit__(None, None, None)
+        finally:
+            await env.__aexit__(None, None, None)
+
+        if task_id != TASKS[-1] and TASK_SLEEP_SECONDS > 0:
+            print(f"  -> sleeping {TASK_SLEEP_SECONDS:.1f}s before next task", flush=True)
+            await asyncio.sleep(TASK_SLEEP_SECONDS)
 
     print(f"\n{'='*60}", flush=True)
     print(f"SUMMARY", flush=True)

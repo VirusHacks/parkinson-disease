@@ -33,7 +33,7 @@ def constant_policy_factory(amp: float, pw: float, gain: float):
 def run_episode(policy_fn, seed: int, patient_profile_id: str | None = None):
     env = ParkinsonsMotorEnvironment()
     obs = env.reset(
-        task_id="tremor_correction",
+        task_id="medium",
         seed=seed,
         patient_profile_id=patient_profile_id,
     )
@@ -104,7 +104,7 @@ def search():
     lines = [
         "# Tremor Policy Search",
         "",
-        "Simple constant-policy sweep for `tremor_correction`.",
+        "Simple constant-policy sweep for `medium`.",
         "",
         "## Best Candidate",
         "",

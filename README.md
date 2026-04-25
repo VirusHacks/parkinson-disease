@@ -94,21 +94,21 @@ The environment uses three clinically distinct tasks built from the same calibra
 
 | Task ID | Friendly name | Difficulty | Steps | Main goal |
 |---|---|---:|---:|---|
-| `beta_suppression` | Calm Start | Easy | 30 | Early stabilization under a very tight safety budget |
-| `tremor_correction` | Rescue Phase | Medium | 48 | Active tremor rescue as force starts to degrade |
-| `full_episode` | Full Episode | Hard | 100 | Long-horizon control with cumulative side effects and recovery pressure |
+| `easy` | Calm Start | Easy | 30 | Early-session titration on a responsive patient with rising beta activity and mild tremor |
+| `medium` | Rescue Phase | Medium | 48 | Active rescue during symptom escalation, where tremor is worsening and force is beginning to fall |
+| `hard` | Full Episode | Hard | 100 | Long-horizon closed-loop DBS management across onset, peak symptoms, recovery, and cumulative side effects |
 
 Plain-language meaning:
 
-- `beta_suppression` / `Calm Start`: the onboarding task
-- `tremor_correction` / `Rescue Phase`: the first real adaptive-control task
-- `full_episode` / `Full Episode`: the long-horizon benchmark
+- `easy` / `Calm Start`: the onboarding clinical titration task
+- `medium` / `Rescue Phase`: the first real adaptive-control rescue task
+- `hard` / `Full Episode`: the long-horizon clinical management benchmark
 
 Expected public ladder shape:
 
-- `beta_suppression`: `no_dbs`, `const_low`, `const_mid`, and `const_high` all fail; `safety_aware` passes all public runs.
-- `tremor_correction`: `no_dbs` and all constant policies fail; `safety_aware` is currently marginal, passing `2/4` public runs.
-- `full_episode`: passive and constant policies fail; adaptive controllers should remain competitive but not trivial under the long-horizon safety budget.
+- `easy`: `no_dbs`, `const_low`, `const_mid`, and `const_high` all fail; `safety_aware` passes all public runs.
+- `medium`: `no_dbs` and all constant policies fail; `safety_aware` is currently marginal, passing `2/4` public runs.
+- `hard`: passive and constant policies fail; adaptive controllers should remain competitive but not trivial under the long-horizon safety budget.
 
 That ladder shape is intentional. A simple hand-designed controller should solve the onboarding task, stay competitive but imperfect on the rescue task, and still need real pacing discipline on the long-horizon task.
 
@@ -187,9 +187,9 @@ Each task is scored by a deterministic grader in `[0.0, 1.0]`. The grader combin
 
 Task weights shift by clinical goal:
 
-- `beta_suppression` rewards gentle early suppression and clean tracking
-- `tremor_correction` rewards active rescue instead of passive waiting
-- `full_episode` rewards long-horizon stability and punishes weak terminal control
+- `easy` rewards gentle early suppression and clean tracking
+- `medium` rewards active rescue instead of passive waiting
+- `hard` rewards long-horizon stability and punishes weak terminal control
 
 The grader also includes hard-failure logic for unsafe stimulation, repeated task-envelope violation, non-treatment on rescue tasks, and poor terminal quality on the hard task.
 
@@ -310,7 +310,7 @@ That helper saves separate per-task logs and a final summary into `outputs/runs/
 from parkinsons_Motor import ParkinsonsMotorAction, ParkinsonsMotorEnv
 
 with ParkinsonsMotorEnv(base_url="http://localhost:8000") as env:
-    result = env.reset(task_id="tremor_correction")
+    result = env.reset(task_id="medium")
     print(result.observation.tremor_arv)
 
     action = ParkinsonsMotorAction(
