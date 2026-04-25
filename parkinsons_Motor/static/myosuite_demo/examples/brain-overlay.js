@@ -1,6 +1,28 @@
 import * as THREE from 'three';
 import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
 
+// Brain overlay panel.
+//
+// Three vertically stacked sections:
+//   1. 3D brain (GLTF) with bilateral STN leads, glowing electrodes, animated
+//      pulse shells, and a screen-space SVG label layer that pins anatomical
+//      labels (Motor Cortex, Thalamus, STN-L, STN-R) to projected 3D points.
+//   2. Dual-trace EEG strip showing:
+//        - Pathological STN beta (~20 Hz) in red, scaled by beta_arv
+//        - Effective motor cortex output in cyan/green, scaled by
+//          dbs_entrainment * (1 - beta_arv)
+//      The visual contrast between the two traces is the "before vs. after
+//      DBS" story in one glance.
+//   3. Compact pathway diagram (M1 -> Thalamus -> STN with a DBS lead arrow)
+//      that lights up cooler when DBS is suppressing pathology.
+
+const PANEL_W = 340;
+const BRAIN_W = 320;
+const BRAIN_H = 280;
+const EEG_W = 320;
+const EEG_H = 96;
+const PATHWAY_H = 64;
+
 function makeStat(label, value) {
   const span = document.createElement('span');
   span.appendChild(document.createTextNode(label + ' '));
@@ -17,30 +39,39 @@ function clamp01(value) {
 
 class BrainOverlay {
   constructor() {
-    this.time         = 0;
-    this.tipMeshes    = [];
+    this.time = 0;
+    this.tipMeshes = [];
     this.tipPositions = [];
-    this.pulseGroups  = [];
-    this._stnMeshes   = [];
-    this.eegBuffer    = new Float32Array(240).fill(19);
-    this.brainRoot    = null;
-    this.signalState   = {
+    this.pulseGroups = [];
+    this._stnMeshes = [];
+    // Dual EEG ring buffers — pathological beta and DBS-corrected motor signal.
+    this.betaBuffer = new Float32Array(EEG_W).fill(EEG_H * 0.30);
+    this.motorBuffer = new Float32Array(EEG_W).fill(EEG_H * 0.72);
+    this.brainRoot = null;
+    this.signalState = {
       beta_arv: 0.55,
       tremor_arv: 0.35,
       dbs_entrainment: 0.0,
       side_effect_load: 0.0,
       gamma_arv: 0.0,
+      force_preserved: 0.0,
+      tracking_accuracy: 0.0,
       dbs_amplitude: 0.0,
       dbs_pulse_width: 0.06,
       dbs_frequency: 130.0,
       phase: 'ready',
     };
 
+    // Anchor points (in pivot-local 3D space) used for screen-space labels.
+    // These are set once we know where electrodes / STN are.
+    this.labelAnchors = [];
+
     this._setupPanel();
     this._setupRenderer();
     this._setupScene();
     this._buildLights();
     this._buildEEG();
+    this._buildPathwayDiagram();
     this._loadBrain();
 
     this._loop = this._loop.bind(this);
@@ -48,81 +79,127 @@ class BrainOverlay {
   }
 
   // -------------------------------------------------------------------------
+  // Panel & DOM
+  // -------------------------------------------------------------------------
+
   _setupPanel() {
     this.panel = document.createElement('div');
     Object.assign(this.panel.style, {
-      position:       'fixed',
-      top:            '10px',
-      left:           '10px',
-      width:          '260px',
-      background:     'rgba(3, 10, 22, 0.90)',
-      border:         '1px solid rgba(0, 210, 255, 0.30)',
-      borderRadius:   '14px',
-      padding:        '10px 10px 8px',
-      zIndex:         '100',
+      position: 'fixed',
+      top: '10px',
+      left: '10px',
+      width: `${PANEL_W}px`,
+      background: 'rgba(3, 10, 22, 0.92)',
+      border: '1px solid rgba(0, 210, 255, 0.30)',
+      borderRadius: '14px',
+      padding: '10px 10px 10px',
+      zIndex: '100',
       backdropFilter: 'blur(8px)',
-      boxShadow:      '0 0 28px rgba(0,140,255,0.18), inset 0 0 40px rgba(0,0,0,0.4)',
-      fontFamily:     'monospace',
-      color:          '#b8d8f0',
-      userSelect:     'none',
+      boxShadow: '0 0 28px rgba(0,140,255,0.18), inset 0 0 40px rgba(0,0,0,0.4)',
+      fontFamily: 'monospace',
+      color: '#b8d8f0',
+      userSelect: 'none',
     });
     document.body.appendChild(this.panel);
 
+    const headerRow = document.createElement('div');
+    Object.assign(headerRow.style, {
+      display: 'flex',
+      alignItems: 'center',
+      justifyContent: 'space-between',
+      marginBottom: '7px',
+    });
+
     const title = document.createElement('div');
     Object.assign(title.style, {
-      fontSize:      '10px',
+      fontSize: '10px',
       letterSpacing: '2.5px',
       textTransform: 'uppercase',
-      color:         '#00d8ff',
-      marginBottom:  '7px',
-      textAlign:     'center',
-      textShadow:    '0 0 8px rgba(0,200,255,0.6)',
+      color: '#00d8ff',
+      textShadow: '0 0 8px rgba(0,200,255,0.6)',
     });
-    title.textContent = '⚡  Deep Brain Stimulation';
-    this.panel.appendChild(title);
+    title.textContent = '⚡ Deep Brain Stimulation';
+
+    this.statusPill = document.createElement('span');
+    Object.assign(this.statusPill.style, {
+      fontSize: '9px',
+      padding: '2px 7px',
+      borderRadius: '999px',
+      letterSpacing: '0.8px',
+      textTransform: 'uppercase',
+      border: '1px solid rgba(255, 90, 70, 0.5)',
+      color: '#ff8d6f',
+      background: 'rgba(255, 90, 70, 0.08)',
+    });
+    this.statusPill.textContent = 'STN over-active';
+
+    headerRow.append(title, this.statusPill);
+    this.panel.appendChild(headerRow);
+
+    // Brain canvas + label overlay live in a positioned wrapper so SVG labels
+    // can sit on top of the WebGL canvas.
+    const brainWrap = document.createElement('div');
+    Object.assign(brainWrap.style, {
+      position: 'relative',
+      width: `${BRAIN_W}px`,
+      height: `${BRAIN_H}px`,
+    });
+    this.panel.appendChild(brainWrap);
 
     this.canvas = document.createElement('canvas');
-    this.canvas.width  = 240;
-    this.canvas.height = 230;
+    this.canvas.width = BRAIN_W;
+    this.canvas.height = BRAIN_H;
     Object.assign(this.canvas.style, {
-      display:      'block',
-      width:        '240px',
-      height:       '230px',
+      display: 'block',
+      width: `${BRAIN_W}px`,
+      height: `${BRAIN_H}px`,
       borderRadius: '8px',
-      border:       '1px solid rgba(0,160,200,0.15)',
+      border: '1px solid rgba(0,160,200,0.15)',
     });
-    this.panel.appendChild(this.canvas);
+    brainWrap.appendChild(this.canvas);
 
-    // Loading overlay (shown while GLTF loads)
+    this.labelSvg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
+    this.labelSvg.setAttribute('width', String(BRAIN_W));
+    this.labelSvg.setAttribute('height', String(BRAIN_H));
+    Object.assign(this.labelSvg.style, {
+      position: 'absolute',
+      top: '0',
+      left: '0',
+      width: `${BRAIN_W}px`,
+      height: `${BRAIN_H}px`,
+      pointerEvents: 'none',
+    });
+    brainWrap.appendChild(this.labelSvg);
+
     this.loadingDiv = document.createElement('div');
     Object.assign(this.loadingDiv.style, {
-      position:   'absolute',
-      top:        '40px',
-      left:       '10px',
-      width:      '240px',
-      height:     '230px',
-      display:    'flex',
+      position: 'absolute',
+      top: '0',
+      left: '0',
+      width: `${BRAIN_W}px`,
+      height: `${BRAIN_H}px`,
+      display: 'flex',
       alignItems: 'center',
       justifyContent: 'center',
-      color:      '#00d8ff',
-      fontSize:   '11px',
+      color: '#00d8ff',
+      fontSize: '11px',
       letterSpacing: '1px',
       pointerEvents: 'none',
     });
     this.loadingDiv.textContent = 'Loading brain model…';
-    this.panel.appendChild(this.loadingDiv);
+    brainWrap.appendChild(this.loadingDiv);
 
     const stats = document.createElement('div');
     Object.assign(stats.style, {
-      display:        'flex',
+      display: 'flex',
       justifyContent: 'space-between',
-      fontSize:       '9.5px',
-      marginTop:      '7px',
-      color:          '#80b8cc',
-      letterSpacing:  '0.5px',
+      fontSize: '9.5px',
+      marginTop: '7px',
+      color: '#80b8cc',
+      letterSpacing: '0.5px',
     });
     this.statFields = {
-      target: makeStat('Target', 'STN'),
+      target: makeStat('Target', 'STN bilateral'),
       freq: makeStat('Freq', '130 Hz'),
       amp: makeStat('Amp', '0.0 mA'),
       pw: makeStat('PW', '60 µs'),
@@ -135,19 +212,19 @@ class BrainOverlay {
 
     this.pulseBar = document.createElement('div');
     Object.assign(this.pulseBar.style, {
-      height:          '3px',
-      borderRadius:    '2px',
-      marginTop:       '7px',
-      background:      'linear-gradient(90deg, #003eff, #00ffc8)',
+      height: '3px',
+      borderRadius: '2px',
+      marginTop: '7px',
+      background: 'linear-gradient(90deg, #003eff, #00ffc8)',
       transformOrigin: 'left center',
-      transform:       'scaleX(0)',
-      boxShadow:       '0 0 6px rgba(0,255,200,0.5)',
+      transform: 'scaleX(0)',
+      boxShadow: '0 0 6px rgba(0,255,200,0.5)',
     });
     this.panel.appendChild(this.pulseBar);
 
     this.phaseLine = document.createElement('div');
     Object.assign(this.phaseLine.style, {
-      marginTop: '7px',
+      marginTop: '6px',
       color: '#e5f8ff',
       fontSize: '10px',
       textAlign: 'center',
@@ -178,27 +255,50 @@ class BrainOverlay {
     this.statFields.amp.val.textContent = `${this.signalState.dbs_amplitude.toFixed(2)} mA`;
     this.statFields.pw.val.textContent = `${Math.round(this.signalState.dbs_pulse_width * 1000)} µs`;
     this.phaseLine.textContent = this.signalState.phase.toUpperCase();
+
+    const pathology = Math.max(this.signalState.beta_arv, this.signalState.tremor_arv);
+    const dbsControl = this.signalState.dbs_entrainment;
+    const warn = this.signalState.side_effect_load > 0.5 || this.signalState.gamma_arv > 0.5;
+    if (warn) {
+      this._setStatusPill('side-effect risk', '#c13cff');
+    } else if (dbsControl > pathology * 0.85 && pathology < 0.45) {
+      this._setStatusPill('STN suppressed', '#00e6c8');
+    } else if (dbsControl > pathology * 0.6) {
+      this._setStatusPill('DBS engaging', '#69a7ff');
+    } else {
+      this._setStatusPill('STN over-active', '#ff5a46');
+    }
+    this._updatePathwayDiagram();
+  }
+
+  _setStatusPill(text, color) {
+    this.statusPill.textContent = text;
+    this.statusPill.style.color = color;
+    this.statusPill.style.borderColor = color + '99';
+    this.statusPill.style.background = color + '14';
   }
 
   // -------------------------------------------------------------------------
+  // WebGL setup
+  // -------------------------------------------------------------------------
+
   _setupRenderer() {
     this.renderer = new THREE.WebGLRenderer({
-      canvas:    this.canvas,
+      canvas: this.canvas,
       antialias: true,
-      alpha:     true,
+      alpha: true,
     });
     this.renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
-    this.renderer.setSize(240, 230);
-    this.renderer.toneMapping         = THREE.ACESFilmicToneMapping;
+    this.renderer.setSize(BRAIN_W, BRAIN_H);
+    this.renderer.toneMapping = THREE.ACESFilmicToneMapping;
     this.renderer.toneMappingExposure = 1.2;
-    this.renderer.shadowMap.enabled   = true;
+    this.renderer.shadowMap.enabled = true;
   }
 
-  // -------------------------------------------------------------------------
   _setupScene() {
-    this.scene  = new THREE.Scene();
-    this.camera = new THREE.PerspectiveCamera(38, 240 / 230, 0.01, 60);
-    this.camera.position.set(0.05, 0.15, 3.8);
+    this.scene = new THREE.Scene();
+    this.camera = new THREE.PerspectiveCamera(38, BRAIN_W / BRAIN_H, 0.01, 60);
+    this.camera.position.set(0.05, 0.18, 3.6);
     this.camera.lookAt(0, 0, 0);
 
     this.pivot = new THREE.Group();
@@ -206,10 +306,11 @@ class BrainOverlay {
   }
 
   // -------------------------------------------------------------------------
+  // Brain GLTF + fallback
+  // -------------------------------------------------------------------------
+
   _loadBrain() {
     const loader = new GLTFLoader();
-
-    // Paths to try — user may place file as scene.gltf or scene.glb
     const modelPath = './models/brain/scene.gltf';
 
     loader.load(
@@ -217,29 +318,26 @@ class BrainOverlay {
       (gltf) => {
         const model = gltf.scene;
 
-        // Auto-fit the loaded model to a ~2-unit bounding box
-        const box    = new THREE.Box3().setFromObject(model);
-        const size   = box.getSize(new THREE.Vector3());
+        const box = new THREE.Box3().setFromObject(model);
+        const size = box.getSize(new THREE.Vector3());
         const center = box.getCenter(new THREE.Vector3());
         const maxDim = Math.max(size.x, size.y, size.z);
-        const scale  = 2.0 / maxDim;
+        const scale = 2.0 / maxDim;
 
         model.scale.setScalar(scale);
         model.position.sub(center.multiplyScalar(scale));
-        // Shift slightly upward so brain stem is below center
         model.position.y += 0.1;
 
-        // Enhance materials: boost roughness, keep original colors
         model.traverse((child) => {
           if (child.isMesh) {
-            child.castShadow    = true;
+            child.castShadow = true;
             child.receiveShadow = true;
             if (child.material) {
               const mats = Array.isArray(child.material) ? child.material : [child.material];
               mats.forEach((mat) => {
                 if (mat.isMeshStandardMaterial || mat.isMeshPhongMaterial) {
-                  mat.roughness  = Math.max(mat.roughness  ?? 0.8, 0.72);
-                  mat.metalness  = Math.min(mat.metalness  ?? 0.0, 0.05);
+                  mat.roughness = Math.max(mat.roughness ?? 0.8, 0.72);
+                  mat.metalness = Math.min(mat.metalness ?? 0.0, 0.05);
                   mat.envMapIntensity = 0.4;
                 }
               });
@@ -249,14 +347,11 @@ class BrainOverlay {
 
         this.brainRoot = model;
         this.pivot.add(model);
-
-        // Hide loading indicator
         this.loadingDiv.style.display = 'none';
-
-        // Now that brain is loaded, add electrodes targeting its center
         this._buildElectrodes();
         this._buildPulses();
         this._buildSTN();
+        this._buildAnatomicalLabels();
       },
       (xhr) => {
         const pct = Math.round((xhr.loaded / (xhr.total || 1)) * 100);
@@ -265,55 +360,56 @@ class BrainOverlay {
       (err) => {
         console.warn('[BrainOverlay] GLTF load failed:', err);
         this.loadingDiv.textContent = '⚠ Place brain/scene.gltf in models/brain/';
-        // Fallback to procedural brain
         this._buildFallbackBrain();
         this._buildElectrodes();
         this._buildPulses();
         this._buildSTN();
-      }
+        this._buildAnatomicalLabels();
+      },
     );
   }
 
-  // -------------------------------------------------------------------------
   _buildFallbackBrain() {
-    // Procedural fallback if model file not found
     const geo = new THREE.IcosahedronGeometry(1.0, 5);
     const pos = geo.attributes.position;
     for (let i = 0; i < pos.count; i++) {
-      const x = pos.getX(i), y = pos.getY(i), z = pos.getZ(i);
+      const x = pos.getX(i);
+      const y = pos.getY(i);
+      const z = pos.getZ(i);
       const d =
-        Math.sin(x * 8.4 + z * 2.0)  * Math.cos(y * 7.1)          * 0.095 +
-        Math.sin(x * 14.1 + y * 3.6) * Math.cos(z * 11.5)          * 0.048 +
-        Math.cos(x * 5.2 + y * 4.8 + z * 3.1)                      * 0.068 +
-        Math.sin(y * 17.8 + z * 6.8)                                * 0.022;
-      const len = Math.sqrt(x*x + y*y + z*z);
-      pos.setXYZ(i, x*(1+d)/len, y*(1+d)/len, z*(1+d)/len);
+        Math.sin(x * 8.4 + z * 2.0) * Math.cos(y * 7.1) * 0.095 +
+        Math.sin(x * 14.1 + y * 3.6) * Math.cos(z * 11.5) * 0.048 +
+        Math.cos(x * 5.2 + y * 4.8 + z * 3.1) * 0.068 +
+        Math.sin(y * 17.8 + z * 6.8) * 0.022;
+      const len = Math.sqrt(x * x + y * y + z * z);
+      pos.setXYZ(i, (x * (1 + d)) / len, (y * (1 + d)) / len, (z * (1 + d)) / len);
     }
     pos.needsUpdate = true;
     geo.computeVertexNormals();
 
-    const mesh = new THREE.Mesh(geo, new THREE.MeshStandardMaterial({
-      color: 0xBE7882, roughness: 0.84,
-    }));
+    const mesh = new THREE.Mesh(
+      geo,
+      new THREE.MeshStandardMaterial({ color: 0xbe7882, roughness: 0.84 }),
+    );
     mesh.scale.set(1.08, 0.87, 0.96);
     this.pivot.add(mesh);
 
-    // Cerebellum
     const cbl = new THREE.Mesh(
       new THREE.IcosahedronGeometry(0.42, 3),
-      new THREE.MeshStandardMaterial({ color: 0xBE7882, roughness: 0.84 })
+      new THREE.MeshStandardMaterial({ color: 0xbe7882, roughness: 0.84 }),
     );
     cbl.position.set(0, -0.72, -0.58);
     cbl.scale.set(1.3, 0.7, 0.9);
     this.pivot.add(cbl);
 
-    this.pivot.add(Object.assign(new THREE.Mesh(
+    const stem = new THREE.Mesh(
       new THREE.CylinderGeometry(0.13, 0.10, 0.58, 10),
-      new THREE.MeshStandardMaterial({ color: 0xBE7882, roughness: 0.84 })
-    ), { position: new THREE.Vector3(0, -1.02, -0.18) }));
+      new THREE.MeshStandardMaterial({ color: 0xbe7882, roughness: 0.84 }),
+    );
+    stem.position.set(0, -1.02, -0.18);
+    this.pivot.add(stem);
   }
 
-  // -------------------------------------------------------------------------
   _buildElectrodes() {
     const shaftMat = new THREE.MeshStandardMaterial({
       color: 0xd8d8d8, metalness: 0.96, roughness: 0.12,
@@ -322,33 +418,30 @@ class BrainOverlay {
       color: 0x999999, metalness: 1.0, roughness: 0.08,
     });
 
-    // Bilateral STN leads — entry at skull top, target at STN depth
     const leads = [
       { entry: new THREE.Vector3(-0.30, 1.28, 0.10), target: new THREE.Vector3(-0.17, -0.08, 0.04) },
-      { entry: new THREE.Vector3( 0.30, 1.28, 0.10), target: new THREE.Vector3( 0.17, -0.08, 0.04) },
+      { entry: new THREE.Vector3(0.30, 1.28, 0.10), target: new THREE.Vector3(0.17, -0.08, 0.04) },
     ];
 
     leads.forEach(({ entry, target }) => {
-      const top  = entry.clone().add(entry.clone().sub(target).normalize().multiplyScalar(0.28));
-      const dir  = target.clone().sub(top);
-      const len  = dir.length();
-      const mid  = top.clone().add(target).multiplyScalar(0.5);
+      const top = entry.clone().add(entry.clone().sub(target).normalize().multiplyScalar(0.28));
+      const dir = target.clone().sub(top);
+      const len = dir.length();
+      const mid = top.clone().add(target).multiplyScalar(0.5);
 
       const shaft = new THREE.Mesh(new THREE.CylinderGeometry(0.022, 0.018, len, 8), shaftMat);
       shaft.position.copy(mid);
       shaft.quaternion.setFromUnitVectors(new THREE.Vector3(0, 1, 0), dir.clone().normalize());
       this.pivot.add(shaft);
 
-      // 4 platinum contact rings — actual DBS lead anatomy
       for (let c = 0; c < 4; c++) {
-        const cp   = target.clone().lerp(top, (c + 0.5) / 6);
+        const cp = target.clone().lerp(top, (c + 0.5) / 6);
         const ring = new THREE.Mesh(new THREE.TorusGeometry(0.027, 0.007, 6, 22), contactMat);
         ring.position.copy(cp);
         ring.quaternion.setFromUnitVectors(new THREE.Vector3(0, 1, 0), dir.clone().normalize());
         this.pivot.add(ring);
       }
 
-      // Glowing active tip
       const tipMat = new THREE.MeshStandardMaterial({
         color: 0x00ffee, emissive: 0x00ffee, emissiveIntensity: 3.0,
         roughness: 0.0, metalness: 0.2, transparent: true, opacity: 0.95,
@@ -361,7 +454,6 @@ class BrainOverlay {
     });
   }
 
-  // -------------------------------------------------------------------------
   _buildSTN() {
     const mat = new THREE.MeshStandardMaterial({
       color: 0xffcc44, emissive: 0xffaa00, emissiveIntensity: 1.8, roughness: 0.2,
@@ -374,7 +466,6 @@ class BrainOverlay {
     }
   }
 
-  // -------------------------------------------------------------------------
   _buildPulses() {
     this.tipPositions.forEach((pos, i) => {
       const group = [];
@@ -394,7 +485,68 @@ class BrainOverlay {
     });
   }
 
+  // Anchor anatomical labels to specific 3D points. We project each anchor
+  // every frame in screen space and keep the SVG <text> positioned over it.
+  _buildAnatomicalLabels() {
+    this.labelAnchors = [
+      { id: 'cortex', text: 'Motor Cortex', position: new THREE.Vector3(-0.55, 0.95, 0.35), color: '#9adfff', offset: { x: -10, y: -8 } },
+      { id: 'thalamus', text: 'Thalamus', position: new THREE.Vector3(0.0, 0.05, 0.35), color: '#ffcf6e', offset: { x: 6, y: 4 } },
+      { id: 'stnL', text: 'STN-L', position: new THREE.Vector3(-0.17, -0.08, 0.04), color: '#ff7f7f', offset: { x: -38, y: 12 } },
+      { id: 'stnR', text: 'STN-R', position: new THREE.Vector3(0.17, -0.08, 0.04), color: '#ff7f7f', offset: { x: 14, y: 12 } },
+      { id: 'lead', text: 'DBS Lead', position: new THREE.Vector3(-0.27, 0.85, 0.10), color: '#00ffe1', offset: { x: -68, y: 0 } },
+    ];
+
+    this.labelNodes = this.labelAnchors.map((anchor) => {
+      const text = document.createElementNS('http://www.w3.org/2000/svg', 'text');
+      text.setAttribute('x', '0');
+      text.setAttribute('y', '0');
+      text.setAttribute('fill', anchor.color);
+      text.setAttribute('font-family', 'monospace');
+      text.setAttribute('font-size', '9');
+      text.setAttribute('font-weight', '600');
+      text.setAttribute('letter-spacing', '0.6');
+      text.style.textShadow = '0 0 6px rgba(0,0,0,0.9)';
+      text.style.paintOrder = 'stroke';
+      text.style.stroke = 'rgba(0,0,0,0.7)';
+      text.style.strokeWidth = '2.5px';
+      text.textContent = anchor.text;
+      this.labelSvg.appendChild(text);
+
+      const tick = document.createElementNS('http://www.w3.org/2000/svg', 'line');
+      tick.setAttribute('stroke', anchor.color);
+      tick.setAttribute('stroke-width', '0.9');
+      tick.setAttribute('opacity', '0.6');
+      this.labelSvg.appendChild(tick);
+
+      return { anchor, text, tick };
+    });
+  }
+
+  _updateAnatomicalLabels() {
+    if (!this.labelNodes || !this.labelNodes.length) { return; }
+    const proj = new THREE.Vector3();
+    this.labelNodes.forEach(({ anchor, text, tick }) => {
+      proj.copy(anchor.position).applyMatrix4(this.pivot.matrixWorld).project(this.camera);
+      const sx = (proj.x * 0.5 + 0.5) * BRAIN_W;
+      const sy = (1 - (proj.y * 0.5 + 0.5)) * BRAIN_H;
+      const visible = proj.z < 1 && proj.z > -1;
+      const tx = sx + anchor.offset.x;
+      const ty = sy + anchor.offset.y;
+      text.setAttribute('x', String(tx));
+      text.setAttribute('y', String(ty));
+      text.setAttribute('opacity', visible ? '0.95' : '0.0');
+      tick.setAttribute('x1', String(sx));
+      tick.setAttribute('y1', String(sy));
+      tick.setAttribute('x2', String(tx + (anchor.offset.x < 0 ? 6 : -6)));
+      tick.setAttribute('y2', String(ty - 3));
+      tick.setAttribute('opacity', visible ? '0.55' : '0.0');
+    });
+  }
+
   // -------------------------------------------------------------------------
+  // Lights
+  // -------------------------------------------------------------------------
+
   _buildLights() {
     this.scene.add(new THREE.AmbientLight(0xffffff, 0.45));
 
@@ -421,14 +573,17 @@ class BrainOverlay {
   }
 
   // -------------------------------------------------------------------------
+  // Dual-trace EEG strip
+  // -------------------------------------------------------------------------
+
   _buildEEG() {
     const eegCanvas = document.createElement('canvas');
-    eegCanvas.width  = 240;
-    eegCanvas.height = 38;
+    eegCanvas.width = EEG_W;
+    eegCanvas.height = EEG_H;
     Object.assign(eegCanvas.style, {
-      display: 'block', width: '240px', height: '38px',
-      marginTop: '6px', borderRadius: '4px',
-      border: '1px solid rgba(0,160,200,0.12)',
+      display: 'block', width: `${EEG_W}px`, height: `${EEG_H}px`,
+      marginTop: '8px', borderRadius: '6px',
+      border: '1px solid rgba(0,160,200,0.18)',
     });
     this.panel.appendChild(eegCanvas);
     this.eegCtx = eegCanvas.getContext('2d');
@@ -436,49 +591,249 @@ class BrainOverlay {
 
   _tickEEG(t) {
     const ctx = this.eegCtx;
-    const buf = this.eegBuffer;
-    buf.copyWithin(0, 1);
+    const beta = this.betaBuffer;
+    const motor = this.motorBuffer;
+    beta.copyWithin(0, 1);
+    motor.copyWithin(0, 1);
 
-    const freq = Math.max(60, Math.min(185, this.signalState.dbs_frequency || 130));
-    const dbs = clamp01(this.signalState.dbs_entrainment);
-    const pathology = Math.max(this.signalState.beta_arv, this.signalState.tremor_arv);
-    const phase = (t % (1 / freq)) / (1 / freq);
-    let s = 19;
-    const amp = 5 + 11 * dbs + 8 * pathology;
-    if      (phase < 0.06) { s = 19 - Math.sin((phase / 0.06) * Math.PI) * amp; }
-    else if (phase < 0.10) { s = 19 + Math.sin(((phase - 0.06) / 0.04) * Math.PI) * amp * 0.38; }
-    else { s = 19 + Math.sin(t * 45) * pathology * 4; }
-    buf[239] = s;
+    const betaArv = this.signalState.beta_arv;
+    const tremor = this.signalState.tremor_arv;
+    const dbs = this.signalState.dbs_entrainment;
+    const sideFx = this.signalState.side_effect_load;
+    const tracking = this.signalState.tracking_accuracy || 0;
 
-    const w = 240, h = 38;
-    ctx.clearRect(0, 0, w, h);
-    ctx.fillStyle = 'rgba(0,0,0,0.7)';
-    ctx.fillRect(0, 0, w, h);
+    // Pathological STN beta: ~20 Hz oscillation, amplitude grows with beta_arv
+    // and tremor_arv. Sits in upper half of canvas around y=EEG_H*0.30.
+    const betaCenter = EEG_H * 0.30;
+    const betaAmp = 4 + 18 * betaArv + 8 * tremor;
+    const betaWave =
+      Math.sin(t * 125) * 0.55 +
+      Math.sin(t * 207) * 0.30 +
+      Math.sin(t * 47) * 0.15 +
+      Math.sin(t * 313) * (0.10 + tremor * 0.20);
+    beta[EEG_W - 1] = betaCenter + betaWave * betaAmp;
 
-    ctx.strokeStyle = 'rgba(0,180,140,0.12)';
-    ctx.lineWidth   = 0.5;
-    for (let x = 0; x < w; x += 48) {
-      ctx.beginPath(); ctx.moveTo(x, 0); ctx.lineTo(x, h); ctx.stroke();
+    // Effective motor cortex output: clean smooth low-freq sinusoid that
+    // grows as DBS engages and tracking improves; lower noise floor as
+    // side-effect load drops.
+    const motorCenter = EEG_H * 0.72;
+    const motorAmp = 4 + 14 * dbs + 6 * tracking;
+    const noise = (1 - dbs) * 4 + sideFx * 6;
+    const motorWave =
+      Math.sin(t * 6.5) * 0.7 +
+      Math.sin(t * 11.2) * 0.25 +
+      (Math.random() - 0.5) * noise * 0.18;
+    motor[EEG_W - 1] = motorCenter + motorWave * motorAmp;
+
+    ctx.clearRect(0, 0, EEG_W, EEG_H);
+    ctx.fillStyle = 'rgba(0,0,0,0.78)';
+    ctx.fillRect(0, 0, EEG_W, EEG_H);
+
+    // Mid divider so the two traces have visual separation.
+    ctx.strokeStyle = 'rgba(0,180,140,0.18)';
+    ctx.lineWidth = 0.6;
+    ctx.beginPath();
+    ctx.moveTo(0, EEG_H * 0.51);
+    ctx.lineTo(EEG_W, EEG_H * 0.51);
+    ctx.stroke();
+
+    ctx.strokeStyle = 'rgba(0,180,140,0.10)';
+    for (let x = 0; x < EEG_W; x += 48) {
+      ctx.beginPath();
+      ctx.moveTo(x, 0);
+      ctx.lineTo(x, EEG_H);
+      ctx.stroke();
     }
-    ctx.beginPath(); ctx.moveTo(0, 19); ctx.lineTo(w, 19); ctx.stroke();
 
-    ctx.strokeStyle = dbs > pathology ? '#00ffcc' : '#ff4d3d';
-    ctx.lineWidth   = 1.5;
-    ctx.shadowBlur  = 4;
+    ctx.strokeStyle = '#ff5a46';
+    ctx.lineWidth = 1.2;
+    ctx.shadowBlur = 4;
+    ctx.shadowColor = '#ff5a46';
+    ctx.beginPath();
+    for (let i = 0; i < EEG_W; i++) {
+      i === 0 ? ctx.moveTo(i, beta[i]) : ctx.lineTo(i, beta[i]);
+    }
+    ctx.stroke();
+
+    ctx.strokeStyle = dbs > 0.4 ? '#00ffcc' : '#69a7ff';
     ctx.shadowColor = '#00ffcc';
     ctx.beginPath();
-    for (let i = 0; i < 240; i++) {
-      i === 0 ? ctx.moveTo(i, buf[i]) : ctx.lineTo(i, buf[i]);
+    for (let i = 0; i < EEG_W; i++) {
+      i === 0 ? ctx.moveTo(i, motor[i]) : ctx.lineTo(i, motor[i]);
     }
     ctx.stroke();
     ctx.shadowBlur = 0;
 
-    ctx.fillStyle = 'rgba(0,200,160,0.45)';
-    ctx.font      = '8px monospace';
-    ctx.fillText(`STN LFP  ${Math.round(freq)} Hz`, 4, 10);
+    ctx.fillStyle = 'rgba(255,90,70,0.85)';
+    ctx.font = '8.5px monospace';
+    ctx.fillText(`STN β  ${(betaArv * 100).toFixed(0)}%`, 6, 11);
+    ctx.fillStyle = dbs > 0.4 ? 'rgba(0,255,200,0.88)' : 'rgba(105,167,255,0.85)';
+    ctx.fillText(`Motor  ${(tracking * 100).toFixed(0)}% track`, 6, EEG_H - 5);
+    ctx.fillStyle = 'rgba(120,200,255,0.45)';
+    ctx.fillText(`${Math.round(this.signalState.dbs_frequency)} Hz`, EEG_W - 56, 11);
   }
 
   // -------------------------------------------------------------------------
+  // Pathway diagram (bottom strip)
+  // -------------------------------------------------------------------------
+
+  _buildPathwayDiagram() {
+    const wrap = document.createElement('div');
+    Object.assign(wrap.style, {
+      marginTop: '8px',
+      padding: '6px 4px 4px',
+      borderRadius: '6px',
+      background: 'rgba(0,40,70,0.35)',
+      border: '1px solid rgba(0,160,200,0.18)',
+      display: 'flex',
+      flexDirection: 'column',
+      gap: '4px',
+    });
+
+    const heading = document.createElement('div');
+    Object.assign(heading.style, {
+      fontSize: '8.5px',
+      letterSpacing: '1.6px',
+      textTransform: 'uppercase',
+      color: 'rgba(155, 220, 255, 0.6)',
+      textAlign: 'center',
+    });
+    heading.textContent = 'basal ganglia – thalamo-cortical loop';
+    wrap.appendChild(heading);
+
+    const svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
+    svg.setAttribute('width', String(BRAIN_W));
+    svg.setAttribute('height', String(PATHWAY_H));
+    svg.setAttribute('viewBox', `0 0 ${BRAIN_W} ${PATHWAY_H}`);
+    svg.style.display = 'block';
+    wrap.appendChild(svg);
+    this.panel.appendChild(wrap);
+    this.pathwaySvg = svg;
+
+    const SVG_NS = 'http://www.w3.org/2000/svg';
+    const nodes = [
+      { id: 'm1', label: 'M1', x: 36, y: 32, color: '#9adfff' },
+      { id: 'th', label: 'Thal', x: 130, y: 32, color: '#ffcf6e' },
+      { id: 'stn', label: 'STN', x: 224, y: 32, color: '#ff7f7f' },
+    ];
+    this.pathwayNodes = {};
+    nodes.forEach((node) => {
+      const circle = document.createElementNS(SVG_NS, 'circle');
+      circle.setAttribute('cx', String(node.x));
+      circle.setAttribute('cy', String(node.y));
+      circle.setAttribute('r', '14');
+      circle.setAttribute('fill', node.color + '33');
+      circle.setAttribute('stroke', node.color);
+      circle.setAttribute('stroke-width', '1.4');
+      svg.appendChild(circle);
+
+      const label = document.createElementNS(SVG_NS, 'text');
+      label.setAttribute('x', String(node.x));
+      label.setAttribute('y', String(node.y + 3.5));
+      label.setAttribute('text-anchor', 'middle');
+      label.setAttribute('font-family', 'monospace');
+      label.setAttribute('font-size', '9');
+      label.setAttribute('font-weight', '700');
+      label.setAttribute('fill', node.color);
+      label.textContent = node.label;
+      svg.appendChild(label);
+
+      this.pathwayNodes[node.id] = { circle, label, color: node.color };
+    });
+
+    // Arrows between nodes — direction: STN → Thal (inhibitory in PD), Thal → M1.
+    const arrows = [
+      { id: 'stn_th', from: { x: 210, y: 32 }, to: { x: 144, y: 32 } },
+      { id: 'th_m1', from: { x: 116, y: 32 }, to: { x: 50, y: 32 } },
+    ];
+    this.pathwayArrows = {};
+    arrows.forEach((arr) => {
+      const line = document.createElementNS(SVG_NS, 'line');
+      line.setAttribute('x1', String(arr.from.x));
+      line.setAttribute('y1', String(arr.from.y));
+      line.setAttribute('x2', String(arr.to.x));
+      line.setAttribute('y2', String(arr.to.y));
+      line.setAttribute('stroke', '#ff7f7f');
+      line.setAttribute('stroke-width', '1.6');
+      line.setAttribute('marker-end', 'url(#arrowhead)');
+      svg.appendChild(line);
+      this.pathwayArrows[arr.id] = line;
+    });
+
+    const defs = document.createElementNS(SVG_NS, 'defs');
+    const marker = document.createElementNS(SVG_NS, 'marker');
+    marker.setAttribute('id', 'arrowhead');
+    marker.setAttribute('viewBox', '0 0 10 10');
+    marker.setAttribute('refX', '8');
+    marker.setAttribute('refY', '5');
+    marker.setAttribute('markerWidth', '6');
+    marker.setAttribute('markerHeight', '6');
+    marker.setAttribute('orient', 'auto-start-reverse');
+    const arrowPath = document.createElementNS(SVG_NS, 'path');
+    arrowPath.setAttribute('d', 'M0,0 L10,5 L0,10 Z');
+    arrowPath.setAttribute('fill', 'currentColor');
+    marker.appendChild(arrowPath);
+    defs.appendChild(marker);
+    svg.appendChild(defs);
+
+    // DBS lead arrow pointing into STN from above.
+    const dbsLine = document.createElementNS(SVG_NS, 'line');
+    dbsLine.setAttribute('x1', String(224));
+    dbsLine.setAttribute('y1', '4');
+    dbsLine.setAttribute('x2', String(224));
+    dbsLine.setAttribute('y2', String(20));
+    dbsLine.setAttribute('stroke', '#00ffcc');
+    dbsLine.setAttribute('stroke-width', '2');
+    dbsLine.setAttribute('marker-end', 'url(#arrowhead)');
+    svg.appendChild(dbsLine);
+    this.dbsArrow = dbsLine;
+
+    const dbsLabel = document.createElementNS(SVG_NS, 'text');
+    dbsLabel.setAttribute('x', String(244));
+    dbsLabel.setAttribute('y', '12');
+    dbsLabel.setAttribute('font-family', 'monospace');
+    dbsLabel.setAttribute('font-size', '8');
+    dbsLabel.setAttribute('fill', '#00ffcc');
+    dbsLabel.textContent = 'DBS';
+    svg.appendChild(dbsLabel);
+    this.dbsArrowLabel = dbsLabel;
+
+    this._updatePathwayDiagram();
+  }
+
+  _updatePathwayDiagram() {
+    if (!this.pathwayNodes) { return; }
+    const beta = this.signalState.beta_arv;
+    const dbs = this.signalState.dbs_entrainment;
+    const sideFx = this.signalState.side_effect_load;
+    const gamma = this.signalState.gamma_arv;
+    const warning = Math.max(sideFx, gamma);
+
+    const stnHot = warning > 0.55 ? '#c13cff' : (dbs > beta * 0.85 ? '#00ffc8' : '#ff7f7f');
+    const stn = this.pathwayNodes.stn;
+    stn.circle.setAttribute('stroke', stnHot);
+    stn.circle.setAttribute('fill', stnHot + '33');
+    stn.label.setAttribute('fill', stnHot);
+
+    const arrowColor = dbs > beta * 0.85 ? '#69a7ff' : '#ff7f7f';
+    Object.values(this.pathwayArrows).forEach((line) => {
+      line.setAttribute('stroke', arrowColor);
+      line.style.color = arrowColor;
+    });
+
+    const dbsActive = this.signalState.dbs_amplitude > 0.05;
+    const dbsColor = warning > 0.55 ? '#c13cff' : '#00ffcc';
+    this.dbsArrow.setAttribute('stroke', dbsColor);
+    this.dbsArrow.setAttribute('opacity', dbsActive ? '1' : '0.25');
+    this.dbsArrow.style.color = dbsColor;
+    this.dbsArrowLabel.setAttribute('fill', dbsColor);
+    this.dbsArrowLabel.setAttribute('opacity', dbsActive ? '1' : '0.4');
+  }
+
+  // -------------------------------------------------------------------------
+  // Animation loop
+  // -------------------------------------------------------------------------
+
   _loop(timeMS) {
     const t = timeMS * 0.001;
     this.time = t;
@@ -524,6 +879,7 @@ class BrainOverlay {
       : 'linear-gradient(90deg, #003eff, #00ffc8)';
     this._tickEEG(t);
     this.renderer.render(this.scene, this.camera);
+    this._updateAnatomicalLabels();
     requestAnimationFrame(this._loop);
   }
 }

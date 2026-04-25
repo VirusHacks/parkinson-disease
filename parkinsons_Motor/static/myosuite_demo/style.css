@@ -127,8 +127,8 @@ a:hover {
 
 .openenv-buttons {
   display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
-  gap: 7px;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 6px;
 }
 
 .openenv-meta {
@@ -306,6 +306,69 @@ a:hover {
   color: #ffffff;
 }
 
+.event-strip {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 5px;
+  margin: 0 0 8px 0;
+  min-height: 22px;
+}
+
+.event-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 3px 9px;
+  border-radius: 999px;
+  font-size: 10.5px;
+  letter-spacing: 0.4px;
+  border: 1px solid transparent;
+  background: rgba(255, 255, 255, 0.04);
+  color: #d6effa;
+  white-space: nowrap;
+  cursor: help;
+  animation: event-chip-pulse 1.4s ease-out;
+}
+
+.event-chip-icon {
+  font-size: 11px;
+  line-height: 1;
+}
+
+.event-chip-quiet {
+  border-color: rgba(146, 215, 230, 0.18);
+  color: rgba(168, 203, 218, 0.55);
+  background: transparent;
+  animation: none;
+  cursor: default;
+}
+
+.event-chip-info {
+  border-color: rgba(105, 167, 255, 0.55);
+  background: rgba(105, 167, 255, 0.12);
+  color: #c3dcff;
+}
+
+.event-chip-warn {
+  border-color: rgba(255, 176, 46, 0.65);
+  background: rgba(255, 176, 46, 0.14);
+  color: #ffd58a;
+  box-shadow: 0 0 12px rgba(255, 176, 46, 0.18);
+}
+
+.event-chip-crisis {
+  border-color: rgba(255, 77, 61, 0.7);
+  background: rgba(255, 77, 61, 0.16);
+  color: #ffb1a4;
+  box-shadow: 0 0 14px rgba(255, 77, 61, 0.25);
+}
+
+@keyframes event-chip-pulse {
+  0% { transform: scale(0.85); opacity: 0; }
+  60% { transform: scale(1.06); opacity: 1; }
+  100% { transform: scale(1); opacity: 1; }
+}
+
 @media (max-width: 760px) {
   .agent-panel {
     top: auto;
@@ -337,5 +400,15 @@ a:hover {
   .openenv-grid,
   .openenv-buttons {
     grid-template-columns: 1fr 1fr;
+  }
+}
+
+/* Brain panel grew to ~340px wide with EEG + pathway diagram below it.
+ * On narrow viewports, the agent panel and brain panel both anchor to the
+ * top edges, so make sure the agent panel's right anchor still leaves clear
+ * horizontal space for the larger brain card on the left. */
+@media (max-width: 1100px) {
+  .agent-panel {
+    width: min(330px, calc(100vw - 360px));
   }
 }

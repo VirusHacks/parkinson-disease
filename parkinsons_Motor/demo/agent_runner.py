@@ -20,10 +20,26 @@ from parkinsons_Motor.server.parkinsons_Motor_environment import ParkinsonsMotor
 
 
 TASK_LIMITS = {
-    "beta_suppression": 30,
-    "tremor_correction": 48,
+    # Public tier — keep demo runs short enough to feel snappy.
+    "easy": 36,
+    "beta_suppression": 36,
+    "calm_start": 36,
+    "medium": 60,
+    "tremor_correction": 60,
+    "rescue_phase": 60,
+    "hard": 100,
     "full_episode": 100,
+    # Expert tier — capped to keep demo episodes bounded.
+    "fragile_patient": 64,
+    "refractory_patient": 90,
+    "personalization_generalization": 90,
+    "exercise_bout": 70,
+    "medication_interaction": 90,
+    "nocturnal_transition": 90,
+    "surgical_followup": 90,
 }
+
+DEFAULT_DEMO_TASK = "hard"
 
 
 SYSTEM_PROMPT = textwrap.dedent(
@@ -39,9 +55,21 @@ SYSTEM_PROMPT = textwrap.dedent(
 
 
 TASK_CONTEXT = {
+    "easy": "Easy early stabilization. Ceiling 1.5 mA. Keep DBS gentle and efficient.",
     "beta_suppression": "Easy early stabilization. Ceiling 1.5 mA. Keep DBS gentle and efficient.",
+    "calm_start": "Easy early stabilization. Ceiling 1.5 mA. Keep DBS gentle and efficient.",
+    "medium": "Medium tremor rescue. Use a short rescue push, then taper to maintenance.",
     "tremor_correction": "Medium tremor rescue. Use a short rescue push, then taper to maintenance.",
+    "rescue_phase": "Medium tremor rescue. Use a short rescue push, then taper to maintenance.",
+    "hard": "Hard full episode. Preserve safety budget while moving through rescue and maintenance phases.",
     "full_episode": "Hard full episode. Preserve safety budget while moving through rescue and maintenance phases.",
+    "fragile_patient": "Fragile window: tight side-effect budget. Stay below ~1.4 mA, recover quickly from spikes.",
+    "refractory_patient": "Drug-resistant patient: high baseline beta and tremor; needs sustained but smooth higher-amplitude DBS.",
+    "personalization_generalization": "Mixed patient profile per episode: read responses early, adapt amplitude to that patient.",
+    "exercise_bout": "Exercise burst: motor demand spikes — be ready for tracking surges and wider pulse widths briefly.",
+    "medication_interaction": "L-DOPA cycle interacts with DBS: lower amplitude near medication peaks, raise during troughs.",
+    "nocturnal_transition": "Sleep transition: very low amplitude required; avoid driving over-stimulation overnight.",
+    "surgical_followup": "Post-implant follow-up: tolerance and impedance shifts; favor smooth, conservative changes.",
 }
 
 
@@ -144,12 +172,31 @@ def _heuristic_action(obs: dict, task_id: str) -> ParkinsonsMotorAction:
     tremor_trend = float(obs.get("tremor_trend", 0.0))
     prev_amp = float(obs.get("dbs_amplitude_ma", 0.0))
 
-    if task_id == "beta_suppression":
+    if task_id in ("easy", "beta_suppression", "calm_start"):
         amp = 0.72 + 0.38 * beta + 0.18 * tremor
         ceiling = 1.5
-    elif task_id == "tremor_correction":
+    elif task_id in ("medium", "tremor_correction", "rescue_phase"):
         amp = 1.15 + 0.32 * tremor + 0.18 * beta
         ceiling = 1.8
+    elif task_id == "fragile_patient":
+        amp = 0.65 + 0.30 * beta + 0.18 * tremor
+        ceiling = 1.4
+    elif task_id == "refractory_patient":
+        amp = 1.40 + 0.48 * beta + 0.32 * tremor
+        ceiling = 2.6
+    elif task_id == "exercise_bout":
+        amp = 1.10 + 0.34 * tremor + 0.20 * beta
+        ceiling = 2.2
+    elif task_id == "nocturnal_transition":
+        amp = 0.40 + 0.18 * beta + 0.10 * tremor
+        ceiling = 1.0
+    elif task_id == "medication_interaction":
+        med = float(obs.get("medication_phase", 0.5))
+        amp = (1.20 - 0.30 * med) + 0.32 * beta + 0.20 * tremor
+        ceiling = 2.0
+    elif task_id == "surgical_followup":
+        amp = 0.85 + 0.30 * beta + 0.20 * tremor
+        ceiling = 1.7
     else:
         amp = 0.95 + 0.38 * beta + 0.28 * tremor
         ceiling = 2.4
@@ -227,8 +274,10 @@ def _visual_phase(task_id: str, step: int, obs: dict) -> str:
         return "safety backoff"
     if obs.get("tremor_arv", 0.0) > 0.52 or obs.get("beta_arv", 0.0) > 0.58:
         return "rescue"
-    if task_id == "full_episode" and step > 45:
+    if task_id in ("hard", "full_episode") and step > 45:
         return "maintenance"
+    if task_id == "nocturnal_transition" and step > 30:
+        return "low-drive sleep"
     return "stabilizing"
 
 
@@ -245,8 +294,12 @@ def _build_rationale(task_id: str, obs: dict, action: ParkinsonsMotorAction) -> 
         return f"Symptoms are high, so the agent is pushing a rescue pulse at {action.dbs_amplitude:.2f} mA."
     if beta_trend > 0.015 or tremor_trend > 0.015:
         return f"Signals are worsening, so DBS is stepping up to {action.dbs_amplitude:.2f} mA."
-    if task_id == "full_episode" and action.dbs_amplitude < 1.0:
+    if task_id in ("hard", "full_episode") and action.dbs_amplitude < 1.0:
         return f"The episode is in a maintenance window, holding a lighter dose at {action.dbs_amplitude:.2f} mA."
+    if task_id == "nocturnal_transition":
+        return f"Sleep window — keeping DBS gentle at {action.dbs_amplitude:.2f} mA to avoid over-stimulation."
+    if task_id == "exercise_bout":
+        return f"Exercise burst — pushing {action.dbs_amplitude:.2f} mA to keep tracking through the motor demand."
     return f"Control is staying smooth at {action.dbs_amplitude:.2f} mA while tracking the target movement."
 
 
@@ -258,6 +311,8 @@ def _snapshot(
     model: str,
     agent_runtime: str,
 ) -> dict:
+    metadata = obs.get("metadata") or {}
+    active_events = list(metadata.get("active_events", [])) if isinstance(metadata, dict) else []
     return {
         "type": "step",
         "step": step,
@@ -266,6 +321,7 @@ def _snapshot(
         "agent_runtime": agent_runtime,
         "action": _action_dict(action),
         "observation": obs,
+        "active_events": active_events,
         "rationale": _build_rationale(task_id, obs, action),
         "derived_visuals": {
             "active_region": "stn",
@@ -273,12 +329,13 @@ def _snapshot(
             "tremor_level": float(obs.get("tremor_arv", 0.0)),
             "safe": float(obs.get("side_effect_load", 0.0)) < 0.5,
             "phase": _visual_phase(task_id, step, obs),
+            "active_events": active_events,
         },
     }
 
 
 async def stream_demo_episode(config: DemoConfig) -> AsyncIterator[dict]:
-    task_id = config.task_id if config.task_id in TASK_LIMITS else "beta_suppression"
+    task_id = config.task_id if config.task_id in TASK_LIMITS else DEFAULT_DEMO_TASK
     delay = max(0, min(config.step_delay_ms, 2500)) / 1000
     max_steps = min(config.max_steps or TASK_LIMITS[task_id], TASK_LIMITS[task_id])
     client, model, agent_runtime = _resolve_llm_client(config.agent_type)
@@ -288,17 +345,21 @@ async def stream_demo_episode(config: DemoConfig) -> AsyncIterator[dict]:
     obs_data = _obs_dict(obs)
     history: list[str] = []
 
+    reset_metadata = obs_data.get("metadata") or {}
+    reset_events = list(reset_metadata.get("active_events", [])) if isinstance(reset_metadata, dict) else []
     yield {
         "type": "reset",
         "task_id": task_id,
         "agent_model": model,
         "agent_runtime": agent_runtime,
         "observation": obs_data,
+        "active_events": reset_events,
         "rationale": "The environment is ready. Start the episode to watch the controller adapt DBS in real time.",
         "derived_visuals": {
             "active_region": "stn",
             "brain_intensity": max(obs_data.get("beta_arv", 0.0), obs_data.get("tremor_arv", 0.0)),
             "tremor_level": obs_data.get("tremor_arv", 0.0),
+            "active_events": reset_events,
             "safe": True,
             "phase": "ready",
         },

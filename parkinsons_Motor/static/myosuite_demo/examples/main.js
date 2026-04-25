@@ -107,6 +107,7 @@ export class MuJoCoDemo {
 
   applyMotorState(snapshot) {
     const obs = snapshot?.observation || {};
+    const action = snapshot?.action || {};
     this.agentMotorState = {
       target: Number(obs.target_output ?? 0),
       effective: Number(obs.effective_motor_output ?? 0),
@@ -114,6 +115,9 @@ export class MuJoCoDemo {
       beta: Math.max(0, Math.min(1, Number(obs.beta_arv ?? 0))),
       force: Math.max(0, Math.min(1, Number(obs.force_preserved ?? 0))),
       tracking: Math.max(0, Math.min(1, Number(obs.tracking_accuracy ?? 0))),
+      entrainment: Math.max(0, Math.min(1, Number(obs.dbs_entrainment ?? 0))),
+      sideEffect: Math.max(0, Math.min(1, Number(obs.side_effect_load ?? 0))),
+      dbsAmp: Math.max(0, Number(action.dbs_amplitude ?? obs.dbs_amplitude_ma ?? 0)),
       step: Number(snapshot?.step ?? 0),
     };
   }
@@ -121,20 +125,50 @@ export class MuJoCoDemo {
   _applyAgentMotorControls(timeMS) {
     if (!this.agentMotorState || !this.simulation || !this.model || !this.simulation.ctrl) { return; }
     const s = this.agentMotorState;
-    const tremorWave = Math.sin(timeMS * 0.055) * s.tremor * (1.0 - s.tracking * 0.45);
+
+    // Effective tremor amplitude: starts from obs.tremor_arv but is suppressed
+    // proportional to DBS entrainment. This is the visual story — once DBS
+    // engages, the actuator-level tremor wave shrinks toward zero.
+    const dbsSuppression = 0.20 + 0.80 * s.entrainment;        // [0.2, 1.0]
+    const visibleTremor = s.tremor * (1.0 - 0.85 * s.entrainment);
+
+    // Parkinson rest tremor sits at 4–6 Hz. timeMS is in ms; angular freq is
+    // 2π * f / 1000. Use 5 Hz primary + 9 Hz harmonic to look organic.
+    const omega5 = (2 * Math.PI * 5) / 1000;
+    const omega9 = (2 * Math.PI * 9) / 1000;
+    const tremorWave =
+      Math.sin(timeMS * omega5) * 0.85 +
+      Math.sin(timeMS * omega9 + 0.7) * 0.18;
+
+    // Dyskinesia (over-stimulation) shows up as faster, jittery wobble when
+    // side_effect_load is high — different visual signature than tremor.
+    const dyskinesia = s.sideEffect > 0.35
+      ? Math.sin(timeMS * 0.018) * (s.sideEffect - 0.25) * 0.6
+      : 0;
+
     const slowWave = Math.sin(timeMS * 0.003 + s.step * 0.12);
     const movement = (s.effective || s.target || slowWave * 0.35) * (0.35 + s.force * 0.75);
     const stiffness = 1.0 - s.beta * 0.42;
-    const drive = Math.max(-1, Math.min(1, movement * stiffness + tremorWave * 0.45));
+    const tremorComponent = tremorWave * visibleTremor * 0.85;
+    const drive = Math.max(-1, Math.min(1, movement * stiffness + tremorComponent + dyskinesia));
 
     for (let i = 0; i < this.model.nu; i++) {
       const lo = this.model.actuator_ctrlrange ? this.model.actuator_ctrlrange[2 * i] : -1;
       const hi = this.model.actuator_ctrlrange ? this.model.actuator_ctrlrange[2 * i + 1] : 1;
       const polarity = i % 2 === 0 ? 1 : -0.65;
+      // Per-actuator tremor phase scatter so the limb shakes (not breathes).
+      const tremorPhase =
+        Math.sin(timeMS * omega5 + i * 1.7) * visibleTremor * 0.45;
       const phase = Math.sin(timeMS * 0.004 + i * 0.8) * 0.18;
-      const value = Math.max(lo, Math.min(hi, (drive + phase * s.force) * polarity));
+      const value = Math.max(
+        lo,
+        Math.min(hi, (drive + phase * s.force + tremorPhase) * polarity),
+      );
       this.simulation.ctrl[i] = value;
     }
+    // dbsSuppression is intentionally referenced for future per-muscle gain
+    // shaping; touched here so linters don't strip it.
+    void dbsSuppression;
   }
 
   render(timeMS) {

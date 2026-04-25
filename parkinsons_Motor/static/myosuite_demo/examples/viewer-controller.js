@@ -1,8 +1,42 @@
-const TASKS = [
-  { id: 'beta_suppression', label: 'Calm Start' },
-  { id: 'tremor_correction', label: 'Rescue Phase' },
-  { id: 'full_episode', label: 'Full Episode' },
+// MotorAssistEnv viewer controller
+//
+// Wires the brain overlay + MuJoCo body to the OpenEnv backend via two paths:
+//   1. SSE-streamed agent demo (/viewer/api/demo/...) for Start/Stop hero loop.
+//   2. A persistent WebSocket session (/ws) for the OpenEnv Controls dock so
+//      manual Step/Reset actually progress a single env across clicks.
+//
+// The previous implementation called /step and /reset directly which failed in
+// two ways:
+//   - /step requires {"action": {...}} as the body, not the action fields at
+//     top-level. That returned 422 with detail=[{...}], rendered as
+//     "[object Object]" in the UI.
+//   - Each /step or /reset HTTP call spawns a fresh env factory, so the
+//     dock could never show progressing dynamics — every click was step 0.
+
+const TASK_GROUPS = [
+  {
+    label: 'Public',
+    tasks: [
+      { id: 'easy', label: 'Calm Start (easy)' },
+      { id: 'medium', label: 'Rescue Phase (medium)' },
+      { id: 'hard', label: 'Full Episode (hard)' },
+    ],
+  },
+  {
+    label: 'Expert',
+    tasks: [
+      { id: 'fragile_patient', label: 'Fragile Window' },
+      { id: 'refractory_patient', label: 'Drug-Resistant' },
+      { id: 'personalization_generalization', label: 'Mixed Profiles' },
+      { id: 'exercise_bout', label: 'Exercise Burst' },
+      { id: 'medication_interaction', label: 'L-DOPA Interaction' },
+      { id: 'nocturnal_transition', label: 'Sleep Transition' },
+      { id: 'surgical_followup', label: 'Post-Implant' },
+    ],
+  },
 ];
+
+const ALL_TASK_IDS = TASK_GROUPS.flatMap((g) => g.tasks.map((t) => t.id));
 
 const SIGNALS = [
   { key: 'beta_arv', label: 'Beta', color: '#ff4d3d' },
@@ -22,11 +56,26 @@ const PARTS = [
   { label: 'Myo Finger', scene: 'myo_sim/finger/myo_finger_v0.xml' },
 ];
 
+const EVENT_DISPLAY = {
+  tachyphylaxis: { label: 'Tachyphylaxis', tone: 'warn', icon: '⚠', detail: 'tolerance building — entrainment dropping' },
+  off_med_crisis: { label: 'L-DOPA OFF', tone: 'crisis', icon: '💊', detail: 'medication trough — beta surge incoming' },
+  dyskinesia_spike: { label: 'Dyskinesia', tone: 'crisis', icon: '💥', detail: 'over-treatment risk — back off amplitude' },
+  motor_surge: { label: 'Motor Surge', tone: 'info', icon: '🏃', detail: 'high-force demand — track new target' },
+  impedance_surge: { label: 'Impedance Surge', tone: 'warn', icon: '⚡', detail: 'electrode fault — delivered current reduced' },
+  second_deterioration: { label: 'Symptom Wave', tone: 'warn', icon: '🌊', detail: 'second deterioration wave — re-rescue needed' },
+};
+
 function el(tag, className, text) {
   const node = document.createElement(tag);
   if (className) { node.className = className; }
-  if (text) { node.textContent = text; }
+  if (text != null) { node.textContent = text; }
   return node;
+}
+
+function clearChildren(node) {
+  while (node.firstChild) {
+    node.removeChild(node.firstChild);
+  }
 }
 
 function clamp01(value) {
@@ -46,6 +95,38 @@ function waitForGlobal(name) {
   });
 }
 
+function populateTaskSelect(select) {
+  TASK_GROUPS.forEach((group) => {
+    const optgroup = document.createElement('optgroup');
+    optgroup.label = group.label;
+    group.tasks.forEach((task) => {
+      const opt = el('option', '', task.label);
+      opt.value = task.id;
+      optgroup.appendChild(opt);
+    });
+    select.appendChild(optgroup);
+  });
+}
+
+function describeApiError(payload, fallback) {
+  if (!payload) { return fallback; }
+  const detail = payload.detail;
+  if (typeof detail === 'string') { return detail; }
+  if (Array.isArray(detail)) {
+    const parts = detail
+      .map((d) => {
+        if (!d || typeof d !== 'object') { return String(d); }
+        const loc = Array.isArray(d.loc) ? d.loc.join('.') : '';
+        const msg = d.msg || d.message || JSON.stringify(d);
+        return loc ? `${loc}: ${msg}` : msg;
+      })
+      .filter(Boolean);
+    if (parts.length) { return parts.join(' | '); }
+  }
+  if (typeof payload.message === 'string') { return payload.message; }
+  return fallback;
+}
+
 class ViewerController {
   constructor() {
     this.eventSource = null;
@@ -54,6 +135,19 @@ class ViewerController {
     this.sceneChanging = false;
     this.signalRows = {};
     this.latestObservation = null;
+
+    // WebSocket OpenEnv session — separate from the SSE demo stream so manual
+    // step/reset actually persist state across clicks.
+    this.ws = null;
+    this.wsReady = false;
+    this.wsRequestId = 0;
+    this.wsPending = new Map();
+    this.wsCurrentTaskId = null;
+    this.wsStepCount = 0;
+
+    // Active events seen on the latest observation, used to render chips.
+    this.activeEvents = [];
+
     this._buildUI();
     this._setStatus('Ready');
   }
@@ -66,6 +160,10 @@ class ViewerController {
     this._setStatus('Viewer connected');
   }
 
+  // ----------------------------------------------------------------------
+  // UI scaffolding
+  // ----------------------------------------------------------------------
+
   _buildUI() {
     this.panel = el('section', 'agent-panel');
 
@@ -76,11 +174,7 @@ class ViewerController {
 
     const controls = el('div', 'agent-controls');
     this.taskSelect = el('select', 'agent-select');
-    TASKS.forEach((task) => {
-      const opt = el('option', '', task.label);
-      opt.value = task.id;
-      this.taskSelect.appendChild(opt);
-    });
+    populateTaskSelect(this.taskSelect);
 
     this.agentSelect = el('select', 'agent-select');
     [
@@ -105,6 +199,9 @@ class ViewerController {
     this.runtimeLine = el('div', 'runtime-line', 'Local heuristic controller');
     this.rationaleLine = el('div', 'rationale-line', 'Choose a task, then start the agent to stream live DBS decisions.');
 
+    this.eventStrip = el('div', 'event-strip');
+    this._renderEventChips();
+
     this.signalPanel = el('div', 'signal-panel');
     SIGNALS.forEach((signal) => {
       const row = el('div', 'signal-row');
@@ -124,6 +221,7 @@ class ViewerController {
       heading,
       controls,
       this.phase,
+      this.eventStrip,
       this.actionLine,
       this.runtimeLine,
       this.rationaleLine,
@@ -142,17 +240,13 @@ class ViewerController {
     const header = el('div', 'openenv-heading');
     header.append(
       el('div', 'openenv-title', 'OpenEnv Controls'),
-      el('div', 'openenv-subtitle', 'Direct reset, step, and state access'),
+      el('div', 'openenv-subtitle', 'Persistent WebSocket session — step, reset, inspect'),
     );
 
     const taskRow = el('div', 'openenv-row');
     const taskLabel = el('label', 'openenv-label', 'Task');
     this.manualTaskSelect = el('select', 'openenv-select');
-    TASKS.forEach((task) => {
-      const opt = el('option', '', task.label);
-      opt.value = task.id;
-      this.manualTaskSelect.appendChild(opt);
-    });
+    populateTaskSelect(this.manualTaskSelect);
     this.manualTaskSelect.value = this.taskSelect.value;
     this.manualTaskSelect.addEventListener('change', () => {
       this.taskSelect.value = this.manualTaskSelect.value;
@@ -166,9 +260,9 @@ class ViewerController {
     const inputGrid = el('div', 'openenv-grid');
     [
       ['motor_command', 'Motor', '0.00'],
-      ['dbs_amplitude', 'Amp', '0.00'],
-      ['dbs_pulse_width', 'PW', '0.06'],
-      ['dbs_frequency', 'Freq', '130'],
+      ['dbs_amplitude', 'Amp (mA)', '1.00'],
+      ['dbs_pulse_width', 'PW (ms)', '0.13'],
+      ['dbs_frequency', 'Freq (Hz)', '130'],
     ].forEach(([key, label, value]) => {
       const wrap = el('label', 'openenv-field');
       wrap.appendChild(el('span', 'openenv-field-label', label));
@@ -182,15 +276,20 @@ class ViewerController {
     });
 
     const buttonRow = el('div', 'openenv-buttons');
+    this.connectApiButton = el('button', 'agent-button primary', 'Connect');
     this.stepApiButton = el('button', 'agent-button primary', 'Step');
     this.resetApiButton = el('button', 'agent-button', 'Reset');
-    this.getStateButton = el('button', 'agent-button', 'Get state');
-    this.stepApiButton.addEventListener('click', () => this.stepViaApi());
-    this.resetApiButton.addEventListener('click', () => this.resetViaApi());
-    this.getStateButton.addEventListener('click', () => this.getStateViaApi());
-    buttonRow.append(this.stepApiButton, this.resetApiButton, this.getStateButton);
+    this.disconnectApiButton = el('button', 'agent-button', 'Disconnect');
+    this.connectApiButton.addEventListener('click', () => this.connectSession());
+    this.stepApiButton.addEventListener('click', () => this.stepViaSession());
+    this.resetApiButton.addEventListener('click', () => this.resetViaSession());
+    this.disconnectApiButton.addEventListener('click', () => this.closeSession());
+    this.stepApiButton.disabled = true;
+    this.resetApiButton.disabled = true;
+    this.disconnectApiButton.disabled = true;
+    buttonRow.append(this.connectApiButton, this.stepApiButton, this.resetApiButton, this.disconnectApiButton);
 
-    this.openEnvMeta = el('div', 'openenv-meta', 'Episode state will appear here.');
+    this.openEnvMeta = el('div', 'openenv-meta', 'Click Connect to open a persistent OpenEnv session.');
     this.jsonOutput = el('pre', 'openenv-json', '{\n  "status": "ready"\n}');
 
     this.openEnvDock.append(header, taskRow, inputGrid, buttonRow, this.openEnvMeta, this.jsonOutput);
@@ -202,7 +301,7 @@ class ViewerController {
 
     const header = el('div', 'part-heading');
     header.append(
-      el('div', 'part-title', 'Part Switcher'),
+      el('div', 'part-title', 'Body Part'),
       el('div', 'part-subtitle', 'Swap the MuJoCo body model'),
     );
 
@@ -222,6 +321,10 @@ class ViewerController {
     document.body.appendChild(this.partDock);
   }
 
+  // ----------------------------------------------------------------------
+  // Status helpers
+  // ----------------------------------------------------------------------
+
   _setStatus(text) {
     this.status.textContent = text;
   }
@@ -237,6 +340,10 @@ class ViewerController {
   _partLabelForScene(scene) {
     return PARTS.find((part) => part.scene === scene)?.label || 'Custom';
   }
+
+  // ----------------------------------------------------------------------
+  // MuJoCo body part swap
+  // ----------------------------------------------------------------------
 
   async switchPart() {
     if (this.sceneChanging || !this.body?.switchScene) { return; }
@@ -258,13 +365,198 @@ class ViewerController {
     }
   }
 
+  // ----------------------------------------------------------------------
+  // OpenEnv WebSocket session
+  // ----------------------------------------------------------------------
+
+  _wsUrl() {
+    const proto = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+    return `${proto}//${window.location.host}/ws`;
+  }
+
+  async connectSession() {
+    if (this.ws && this.ws.readyState === WebSocket.OPEN) {
+      this.openEnvMeta.textContent = 'Already connected.';
+      return;
+    }
+    this.connectApiButton.disabled = true;
+    this.openEnvMeta.textContent = 'Opening session...';
+    try {
+      await this._openWs();
+      this.wsReady = true;
+      this.stepApiButton.disabled = false;
+      this.resetApiButton.disabled = false;
+      this.disconnectApiButton.disabled = false;
+      this.connectApiButton.disabled = true;
+      this.openEnvMeta.textContent = 'Session ready. Loading task...';
+      this._setStatus('Session connected');
+      // Auto-reset on connect so the env loads the chosen task immediately.
+      await this.resetViaSession();
+    } catch (error) {
+      this.connectApiButton.disabled = false;
+      this.openEnvMeta.textContent = `Connect failed | ${error.message}`;
+      console.error(error);
+    }
+  }
+
+  _openWs() {
+    return new Promise((resolve, reject) => {
+      const ws = new WebSocket(this._wsUrl());
+      let opened = false;
+      ws.addEventListener('open', () => {
+        opened = true;
+        this.ws = ws;
+        resolve();
+      });
+      ws.addEventListener('message', (event) => this._handleWsMessage(event));
+      ws.addEventListener('close', () => {
+        this.wsReady = false;
+        this.ws = null;
+        this.stepApiButton.disabled = true;
+        this.resetApiButton.disabled = true;
+        this.disconnectApiButton.disabled = true;
+        this.connectApiButton.disabled = false;
+        if (this.wsPending.size) {
+          this.wsPending.forEach(({ reject: rej }) => rej(new Error('WebSocket closed')));
+          this.wsPending.clear();
+        }
+        if (opened) {
+          this.openEnvMeta.textContent = 'Session closed.';
+          this._setStatus('Session closed');
+        }
+      });
+      ws.addEventListener('error', () => {
+        if (!opened) {
+          reject(new Error('WebSocket connection failed'));
+        }
+      });
+    });
+  }
+
+  _handleWsMessage(event) {
+    let payload = null;
+    try {
+      payload = JSON.parse(event.data);
+    } catch {
+      return;
+    }
+    // OpenEnv WS responses don't carry request_id, so we use a FIFO queue.
+    const queue = this._pendingQueue();
+    if (queue.length) {
+      const next = queue.shift();
+      this.wsPending.delete(next.id);
+      const data = payload?.data ?? payload;
+      if (payload?.type === 'error') {
+        const message = data?.message || 'WebSocket error';
+        next.reject(new Error(message));
+      } else {
+        next.resolve({ type: payload?.type, data });
+      }
+    }
+  }
+
+  _pendingQueue() {
+    return Array.from(this.wsPending.values()).sort((a, b) => a.id - b.id);
+  }
+
+  _wsRequest(message) {
+    if (!this.ws || this.ws.readyState !== WebSocket.OPEN) {
+      return Promise.reject(new Error('WebSocket not connected'));
+    }
+    const id = ++this.wsRequestId;
+    const promise = new Promise((resolve, reject) => {
+      this.wsPending.set(id, { id, resolve, reject });
+    });
+    this.ws.send(JSON.stringify(message));
+    return promise;
+  }
+
+  async closeSession() {
+    if (this.ws && this.ws.readyState === WebSocket.OPEN) {
+      try { this.ws.send(JSON.stringify({ type: 'close' })); } catch {}
+      this.ws.close();
+    }
+    this.ws = null;
+    this.wsReady = false;
+    this.stepApiButton.disabled = true;
+    this.resetApiButton.disabled = true;
+    this.disconnectApiButton.disabled = true;
+    this.connectApiButton.disabled = false;
+    this.openEnvMeta.textContent = 'Session closed.';
+    this._setStatus('Session closed');
+  }
+
+  async resetViaSession() {
+    if (!this.wsReady) {
+      this.openEnvMeta.textContent = 'Connect a session first.';
+      return;
+    }
+    if (this.running) {
+      await this.stop();
+    }
+    try {
+      this.openEnvMeta.textContent = 'Resetting environment...';
+      const taskId = this.manualTaskSelect.value;
+      const { data } = await this._wsRequest({
+        type: 'reset',
+        data: { task_id: taskId },
+      });
+      this.wsCurrentTaskId = taskId;
+      this.wsStepCount = 0;
+      const observation = data?.observation || data;
+      const snapshot = this._buildSnapshotFromApi('reset', { observation }, null);
+      this._syncManualInputsFromObservation(snapshot.observation);
+      this._applySnapshot(snapshot);
+      this._setJsonOutput({ observation, reward: data?.reward, done: data?.done });
+      this.openEnvMeta.textContent = `Reset complete | ${taskId} | step 0`;
+      this._setStatus('Manual reset');
+    } catch (error) {
+      this.openEnvMeta.textContent = `Reset failed | ${error.message}`;
+      console.error(error);
+    }
+  }
+
+  async stepViaSession() {
+    if (!this.wsReady) {
+      this.openEnvMeta.textContent = 'Connect a session first.';
+      return;
+    }
+    if (this.running) {
+      await this.stop();
+    }
+    const action = this._getManualAction();
+    try {
+      this.openEnvMeta.textContent = `Stepping environment... amp=${action.dbs_amplitude.toFixed(2)} mA`;
+      const { data } = await this._wsRequest({
+        type: 'step',
+        data: action,
+      });
+      this.wsStepCount += 1;
+      const observation = data?.observation || data;
+      const snapshot = this._buildSnapshotFromApi('step', { observation, reward: data?.reward, done: data?.done }, action);
+      this._syncManualInputsFromObservation(snapshot.observation);
+      this._applySnapshot(snapshot);
+      this._setJsonOutput({ observation, reward: data?.reward, done: data?.done });
+      const reward = Number(data?.reward ?? 0);
+      const doneTag = data?.done ? ' | DONE' : '';
+      this.openEnvMeta.textContent = `Step ${this.wsStepCount} | reward ${reward.toFixed(3)}${doneTag}`;
+      this._setStatus('Manual step');
+    } catch (error) {
+      this.openEnvMeta.textContent = `Step failed | ${error.message}`;
+      console.error(error);
+    }
+  }
+
+  // ----------------------------------------------------------------------
+  // Snapshot building shared between WS responses and SSE streams
+  // ----------------------------------------------------------------------
+
   _getManualAction() {
     return {
       motor_command: Number(this.manualInputs.motor_command.value || 0),
       dbs_amplitude: Number(this.manualInputs.dbs_amplitude.value || 0),
       dbs_pulse_width: Number(this.manualInputs.dbs_pulse_width.value || 0.06),
       dbs_frequency: Number(this.manualInputs.dbs_frequency.value || 130),
-      task_id: '',
     };
   }
 
@@ -286,7 +578,7 @@ class ViewerController {
     }
     const freq = Number(observation.metadata?.dbs_frequency_hz ?? observation.dbs_frequency_hz ?? 130);
     this.manualInputs.dbs_frequency.value = Number.isFinite(freq) ? String(Math.round(freq)) : '130';
-    if (observation.task_id) {
+    if (observation.task_id && ALL_TASK_IDS.includes(observation.task_id)) {
       this.taskSelect.value = observation.task_id;
       this.manualTaskSelect.value = observation.task_id;
     }
@@ -297,7 +589,7 @@ class ViewerController {
     return {
       type: kind,
       task_id: observation?.task_id || this.manualTaskSelect.value,
-      step: observation?.metadata?.step ?? payload?.step_count ?? 0,
+      step: observation?.metadata?.step ?? payload?.step_count ?? this.wsStepCount,
       observation,
       action,
       derived_visuals: { phase: kind },
@@ -310,88 +602,9 @@ class ViewerController {
     };
   }
 
-  async _requestJson(path, options, fallbackError) {
-    const response = await fetch(path, options);
-    const text = await response.text();
-    let payload = null;
-    try {
-      payload = text ? JSON.parse(text) : {};
-    } catch {
-      payload = { raw: text };
-    }
-    if (!response.ok) {
-      throw new Error(payload?.detail || payload?.message || fallbackError);
-    }
-    return payload;
-  }
-
-  async resetViaApi() {
-    if (this.running) {
-      await this.stop();
-    }
-    try {
-      this.openEnvMeta.textContent = 'Resetting environment...';
-      const payload = await this._requestJson(
-        '/reset',
-        {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ task_id: this.manualTaskSelect.value }),
-        },
-        'Reset failed',
-      );
-      const snapshot = this._buildSnapshotFromApi('reset', payload, null);
-      this._syncManualInputsFromObservation(snapshot.observation);
-      this._applySnapshot(snapshot);
-      this._setJsonOutput(payload);
-      this.openEnvMeta.textContent = `Reset complete | ${snapshot.task_id}`;
-      this._setStatus('Manual reset');
-    } catch (error) {
-      this.openEnvMeta.textContent = `Reset failed | ${error.message}`;
-      console.error(error);
-    }
-  }
-
-  async stepViaApi() {
-    if (this.running) {
-      await this.stop();
-    }
-    const action = this._getManualAction();
-    try {
-      this.openEnvMeta.textContent = 'Stepping environment...';
-      const payload = await this._requestJson(
-        '/step',
-        {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(action),
-        },
-        'Step failed',
-      );
-      const snapshot = this._buildSnapshotFromApi('step', payload, action);
-      this._syncManualInputsFromObservation(snapshot.observation);
-      this._applySnapshot(snapshot);
-      this._setJsonOutput(payload);
-      this.openEnvMeta.textContent = `Step complete | reward ${Number(payload.reward ?? 0).toFixed(3)}`;
-      this._setStatus('Manual step');
-    } catch (error) {
-      this.openEnvMeta.textContent = `Step failed | ${error.message}`;
-      console.error(error);
-    }
-  }
-
-  async getStateViaApi() {
-    try {
-      this.openEnvMeta.textContent = 'Fetching state...';
-      const payload = await this._requestJson('/state', { method: 'GET' }, 'State fetch failed');
-      this._setJsonOutput(payload);
-      this.openEnvMeta.textContent = `Episode ${payload.episode_id || 'n/a'} | step ${payload.step_count ?? 0}`;
-      this._setStatus('State fetched');
-    } catch (error) {
-      this.openEnvMeta.textContent = `Get state failed | ${error.message}`;
-      console.error(error);
-    }
-  }
+  // ----------------------------------------------------------------------
+  // SSE-streamed agent demo
+  // ----------------------------------------------------------------------
 
   async start() {
     if (this.running) { return; }
@@ -409,11 +622,20 @@ class ViewerController {
           step_delay_ms: 450,
         }),
       });
-      const payload = await response.json();
+      const text = await response.text();
+      let payload = null;
+      try {
+        payload = text ? JSON.parse(text) : {};
+      } catch {
+        payload = { raw: text };
+      }
+      if (!response.ok) {
+        throw new Error(describeApiError(payload, 'Demo start failed'));
+      }
       this.sessionId = payload.session_id;
       this._connectStream();
     } catch (error) {
-      this._setStatus('Start failed');
+      this._setStatus(`Start failed: ${error.message}`);
       this._setRunning(false);
       console.error(error);
     }
@@ -459,6 +681,10 @@ class ViewerController {
     this._setStatus('Running');
   }
 
+  // ----------------------------------------------------------------------
+  // Snapshot application — drives brain overlay, body, signal bars, chips
+  // ----------------------------------------------------------------------
+
   _applySnapshot(snapshot) {
     const obs = snapshot.observation || {};
     const action = snapshot.action || {};
@@ -491,7 +717,58 @@ class ViewerController {
       this.scoreLine.textContent = `Step ${snapshot.step || 0} | reward ${reward.toFixed(3)} | ${snapshot.agent_model || 'agent'}`;
     }
 
+    // Active events: surface as chips above the brain panel.
+    //
+    // Sources, in priority order:
+    //   1. snapshot.derived_visuals.active_events (SSE agent_runner adds this)
+    //   2. snapshot.active_events (top-level fallback)
+    //   3. obs.metadata.active_events (raw env metadata, only on /reset path —
+    //      step responses strip metadata on the OpenEnv WS/HTTP channel)
+    //
+    // If none of these are present we leave existing chips alone instead of
+    // clearing, so the OpenEnv dock's manual step doesn't wipe chips set by
+    // the live SSE stream.
+    const meta = obs?.metadata || {};
+    const eventSource =
+      (Array.isArray(snapshot?.derived_visuals?.active_events) && snapshot.derived_visuals.active_events) ||
+      (Array.isArray(snapshot?.active_events) && snapshot.active_events) ||
+      (Array.isArray(meta.active_events) ? meta.active_events : null);
+    if (eventSource !== null) {
+      this.activeEvents = eventSource
+        .map((entry) => {
+          if (typeof entry === 'string') { return { id: entry, intensity: null }; }
+          if (entry && typeof entry === 'object') {
+            return { id: entry.id || entry.name || 'event', intensity: entry.intensity ?? null };
+          }
+          return null;
+        })
+        .filter(Boolean);
+      this._renderEventChips();
+    }
+
     this._syncManualInputsFromObservation(obs);
+  }
+
+  _renderEventChips() {
+    if (!this.eventStrip) { return; }
+    clearChildren(this.eventStrip);
+    if (!this.activeEvents.length) {
+      const empty = el('span', 'event-chip event-chip-quiet', 'no active events');
+      this.eventStrip.appendChild(empty);
+      return;
+    }
+    this.activeEvents.forEach(({ id, intensity }) => {
+      const display = EVENT_DISPLAY[id] || { label: id, tone: 'info', icon: '•', detail: '' };
+      const chip = el('span', `event-chip event-chip-${display.tone}`);
+      const icon = el('span', 'event-chip-icon', display.icon);
+      const labelText = intensity != null
+        ? `${display.label} × ${Number(intensity).toFixed(2)}`
+        : display.label;
+      const label = el('span', 'event-chip-label', labelText);
+      chip.append(icon, label);
+      if (display.detail) { chip.title = display.detail; }
+      this.eventStrip.appendChild(chip);
+    });
   }
 }
 
