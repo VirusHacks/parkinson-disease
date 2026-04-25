@@ -39,6 +39,16 @@ import time
 from pathlib import Path
 from typing import Any, Dict, List, Optional
 
+# Windows consoles default to cp1252; the LLM prompt text and report contain
+# arrows/emojis that would otherwise crash with UnicodeEncodeError on Windows.
+for _stream_name in ("stdout", "stderr"):
+    _stream = getattr(sys, _stream_name, None)
+    if _stream is not None and hasattr(_stream, "reconfigure"):
+        try:
+            _stream.reconfigure(encoding="utf-8", errors="replace")
+        except Exception:
+            pass
+
 from openai import OpenAI
 
 # path setup
@@ -162,16 +172,16 @@ BENCHMARK    = "parkinsons_Motor"
 
 DEFAULT_TASKS = ["easy", "medium", "hard"]
 
+# Per-task max-step caps for cost control. Override via INFERENCE_MAX_STEPS_<TASK>.
+# IMPORTANT: when a cap is < task.n_steps, env.done never fires, so the
+# deterministic grader (`overall_score`) is NOT computed and the reported score
+# falls back to a per-step reward mean. The report flags this with
+# `grader_invoked=False` so you know the score is a soft proxy, not the
+# benchmark grader.
 DEFAULT_MAX_STEPS = {
     "easy": 50,
     "medium": 50,
     "hard": 30,
-}
-
-DEFAULT_SUCCESS_THRESHOLDS = {
-    "easy": 0.75,
-    "medium": 0.65,
-    "hard": 0.55,
 }
 
 
@@ -194,6 +204,12 @@ def _env_int(name: str, default: int) -> int:
 
 
 def _resolve_task_runtime_config(tasks: List[str]) -> tuple[Dict[str, int], Dict[str, float], Dict[str, float]]:
+    """Resolve per-task max_steps, success thresholds, and safety budgets.
+
+    Defaults come from the task definition itself (task.n_steps,
+    task.success_threshold, task.max_side_effect_load) so the LLM context,
+    grader, and pass/fail bar can never silently disagree.
+    """
     max_steps: Dict[str, int] = {}
     success_thresholds: Dict[str, float] = {}
     side_effect_budgets: Dict[str, float] = {}
@@ -203,10 +219,9 @@ def _resolve_task_runtime_config(tasks: List[str]) -> tuple[Dict[str, int], Dict
         env_key = task.task_id.upper()
         default_max_steps = DEFAULT_MAX_STEPS.get(task_id, task.n_steps)
         max_steps[task_id] = _env_int(f"INFERENCE_MAX_STEPS_{env_key}", default_max_steps)
-        default_success_threshold = DEFAULT_SUCCESS_THRESHOLDS.get(task_id, task.success_threshold)
         success_thresholds[task_id] = _env_float(
             f"INFERENCE_SUCCESS_THRESHOLD_{env_key}",
-            default_success_threshold,
+            task.success_threshold,
         )
         side_effect_budgets[task_id] = _env_float(
             f"INFERENCE_SIDE_EFFECT_BUDGET_{env_key}",
@@ -216,8 +231,30 @@ def _resolve_task_runtime_config(tasks: List[str]) -> tuple[Dict[str, int], Dict
     return max_steps, success_thresholds, side_effect_budgets
 
 
+def _resolve_seeds() -> List[Optional[int]]:
+    """Resolve the seed list for repeated rollouts.
+
+    Set INFERENCE_SEEDS=0,1,2,3,4 for a 5-seed sweep. Default = single rollout
+    with whatever seed the env chose (None -> server picks).
+    """
+    raw = os.getenv("INFERENCE_SEEDS")
+    if not raw:
+        return [None]
+    seeds: List[Optional[int]] = []
+    for token in raw.split(","):
+        token = token.strip()
+        if not token:
+            continue
+        try:
+            seeds.append(int(token))
+        except ValueError:
+            print(f"[WARN] Ignoring non-integer seed token: {token!r}", flush=True)
+    return seeds or [None]
+
+
 TASKS = _parse_task_list()
 MAX_STEPS, SUCCESS_THRESHOLD, SIDE_EFFECT_BUDGETS = _resolve_task_runtime_config(TASKS)
+SEEDS = _resolve_seeds()
 TEMPERATURE = _env_float("OPENAI_TEMPERATURE", 0.2)
 MAX_TOKENS = _env_int("OPENAI_MAX_TOKENS", 300)
 REQUEST_TIMEOUT_SECONDS = _env_float("OPENAI_REQUEST_TIMEOUT_SECONDS", 120.0)
@@ -279,26 +316,41 @@ Good controller behavior:
 """).strip()
 
 
-_TASK_CONTEXT = {
+_TASK_CONTEXT_TEMPLATES = {
     "easy": (
         "EASY / Calm Start. Responsive patient early in symptom build-up. "
         "Clinical goal: calm rising beta and mild tremor without creating unnecessary side effects. "
-        "Ceiling: 1.5 mA. Side-effect budget: 0.55. "
+        "Ceiling: {amp_ceiling:.2f} mA. Side-effect budget: {se_budget:.2f}. "
         "Preferred pattern: start in a moderate therapeutic range, stabilize quickly, then taper toward a low maintenance dose."
     ),
     "medium": (
         "MEDIUM / Rescue Phase. Symptoms are already escalating and force is at risk. "
         "Clinical goal: interrupt deterioration, restore usable movement, then step down to maintenance. "
-        "Ceiling: 1.8 mA. Side-effect budget: 0.60. "
+        "Ceiling: {amp_ceiling:.2f} mA. Side-effect budget: {se_budget:.2f}. "
         "Preferred pattern: decisive rescue early, then gradual taper once tremor and beta stop worsening."
     ),
     "hard": (
         "HARD / Full Episode. Long closed-loop management across onset, escalation, peak symptoms, and recovery. "
         "Clinical goal: keep the patient functional through the whole session, not just one short rescue. "
-        "Ceiling: 2.4 mA. Side-effect budget: 0.55. "
+        "Ceiling: {amp_ceiling:.2f} mA. Side-effect budget: {se_budget:.2f}. "
         "Preferred pattern: build entrainment, rescue when needed, then preserve enough budget for late stability."
     ),
 }
+
+
+def _build_task_context(task_id: str) -> str:
+    """Render the task context with the actual task budgets, not stale literals."""
+    template = _TASK_CONTEXT_TEMPLATES.get(task_id, "")
+    if not template:
+        return ""
+    task = get_task(task_id)
+    return template.format(
+        amp_ceiling=task.max_dbs_amplitude,
+        se_budget=SIDE_EFFECT_BUDGETS.get(task_id, task.max_side_effect_load),
+    )
+
+
+_TASK_CONTEXT = {tid: _build_task_context(tid) for tid in TASKS}
 
 
 def _build_user_prompt(step: int, obs: dict, task_id: str, history: list) -> str:
@@ -434,20 +486,49 @@ def log_end(success: bool, steps: int, score: float, rewards: List[float]) -> No
 
 # ── task runner ───────────────────────────────────────────────────────────────
 
-async def run_task(env, client: OpenAI, task_id: str) -> tuple[float, bool]:
+def _amp_from_action_str(action_str: str) -> float:
+    try:
+        return float(json.loads(action_str).get("dbs_amplitude", 0.0))
+    except Exception:
+        return 0.0
+
+
+async def run_task(
+    env,
+    client: OpenAI,
+    task_id: str,
+    seed: Optional[int] = None,
+) -> Dict[str, Any]:
+    """Run a single rollout. Returns a dict with all diagnostics for the report."""
     log_start(task=task_id, env=BENCHMARK, model=MODEL_NAME)
     max_steps = MAX_STEPS[task_id]
+    task = get_task(task_id)
     rewards: List[float] = []
     history: List[str] = []
+    amplitudes: List[float] = []
     steps_taken = 0
     score = 0.0
     success = False
     final_error: Optional[str] = None
+    score_details: Dict[str, Any] = {}
+    event_schedule: List[Dict[str, Any]] = []
+    grader_invoked = False
 
     try:
-        result = await env.reset(task_id=task_id)
+        reset_kwargs: Dict[str, Any] = {"task_id": task_id}
+        if seed is not None:
+            reset_kwargs["seed"] = seed
+        result = await env.reset(**reset_kwargs)
         obs = result.observation
         obs_dict = obs.model_dump() if hasattr(obs, "model_dump") else obs.__dict__
+        # Prefer the typed observation field; fall back to obs.metadata for older
+        # builds. (The OpenEnv server's serialize_observation strips obs.metadata
+        # off the wire, so the typed field is what actually reaches us.)
+        event_schedule = (
+            list(obs_dict.get("event_schedule_summary") or [])
+            or list((obs_dict.get("metadata") or {}).get("event_schedule") or [])
+        )
+        episode_steps_full = (obs_dict.get("metadata") or {}).get("episode_steps", task.n_steps)
 
         for step in range(1, max_steps + 1):
             if result.done:
@@ -462,6 +543,7 @@ async def run_task(env, client: OpenAI, task_id: str) -> tuple[float, bool]:
                 "dbs_pulse_width": round(action.dbs_pulse_width, 3),
                 "dbs_frequency":   round(action.dbs_frequency, 1),
             })
+            amplitudes.append(action.dbs_amplitude)
 
             err_this_step: Optional[str] = None
             try:
@@ -495,9 +577,20 @@ async def run_task(env, client: OpenAI, task_id: str) -> tuple[float, bool]:
                 gs = obs_dict.get("grader_score", -1.0)
                 if gs >= 0:
                     score = gs
+                    grader_invoked = True
+                # grader_components is a typed obs field; metadata.score_details
+                # is the legacy path that gets stripped by the server envelope.
+                score_details = (
+                    dict(obs_dict.get("grader_components") or {})
+                    or dict((obs_dict.get("metadata") or {}).get("score_details") or {})
+                )
+                # If event_schedule wasn't captured at reset (e.g. server never
+                # populated metadata), pick it up from the final step.
+                if not event_schedule:
+                    event_schedule = list(obs_dict.get("event_schedule_summary") or [])
                 break
 
-        if score <= 0 and rewards:
+        if not grader_invoked and rewards:
             score = min(max(sum(rewards) / len(rewards), 0.0), 1.0)
 
         success = final_error is None and score >= SUCCESS_THRESHOLD[task_id]
@@ -505,7 +598,66 @@ async def run_task(env, client: OpenAI, task_id: str) -> tuple[float, bool]:
     finally:
         log_end(success=success, steps=steps_taken, score=score, rewards=rewards)
 
-    return score, success
+    return {
+        "task_id": task_id,
+        "seed": seed,
+        "score": float(score),
+        "success": bool(success),
+        "steps_taken": int(steps_taken),
+        "max_steps": int(max_steps),
+        "episode_steps_full": int(episode_steps_full),
+        "grader_invoked": bool(grader_invoked),
+        "success_threshold": float(SUCCESS_THRESHOLD[task_id]),
+        "side_effect_budget": float(SIDE_EFFECT_BUDGETS[task_id]),
+        "mean_amplitude_ma": float(sum(amplitudes) / len(amplitudes)) if amplitudes else 0.0,
+        "max_amplitude_ma": float(max(amplitudes)) if amplitudes else 0.0,
+        "mean_reward": float(sum(rewards) / len(rewards)) if rewards else 0.0,
+        "rewards": [round(r, 4) for r in rewards],
+        "event_schedule": event_schedule,
+        "score_details": {k: float(v) for k, v in score_details.items()} if score_details else {},
+        "error": final_error,
+    }
+
+
+def _aggregate_per_task(
+    rollouts: List[Dict[str, Any]],
+) -> List[Dict[str, Any]]:
+    """Group rollouts by task and compute mean/std/pass-rate."""
+    by_task: Dict[str, List[Dict[str, Any]]] = {}
+    for r in rollouts:
+        by_task.setdefault(r["task_id"], []).append(r)
+
+    aggregated: List[Dict[str, Any]] = []
+    for task_id, runs in by_task.items():
+        scores = [r["score"] for r in runs]
+        n = len(scores)
+        mean_score = sum(scores) / n
+        var = sum((s - mean_score) ** 2 for s in scores) / n
+        std_score = var ** 0.5
+        successes = sum(1 for r in runs if r["success"])
+        # Component means across seeds (only over rollouts where the grader ran).
+        graded = [r["score_details"] for r in runs if r.get("score_details")]
+        component_means: Dict[str, float] = {}
+        if graded:
+            keys = sorted({k for d in graded for k in d.keys()})
+            for k in keys:
+                vals = [d.get(k, 0.0) for d in graded]
+                component_means[k] = sum(vals) / len(vals)
+        aggregated.append({
+            "task_id": task_id,
+            "n_seeds": n,
+            "score_mean": mean_score,
+            "score_std": std_score,
+            "score_min": min(scores),
+            "score_max": max(scores),
+            "success_rate": successes / n,
+            "successes": successes,
+            "success_threshold": runs[0]["success_threshold"],
+            "any_grader_invoked": any(r["grader_invoked"] for r in runs),
+            "component_means": component_means,
+            "rollouts": runs,
+        })
+    return aggregated
 
 
 def _write_report(summary: Dict[str, Any]) -> None:
@@ -518,19 +670,75 @@ def _write_report(summary: Dict[str, Any]) -> None:
         f"- Model: `{summary['model_name']}`",
         f"- Server: `{summary['server_url']}`",
         f"- Tasks: `{', '.join(summary['tasks'])}`",
+        f"- Seeds per task: `{summary['seeds']}`",
         f"- Request sleep: `{summary['request_sleep_seconds']}` s",
         f"- Inter-task sleep: `{summary['task_sleep_seconds']}` s",
-        f"- Mean score: `{summary['mean_score']:.4f}`",
+        f"- Mean score (all rollouts): `{summary['mean_score']:.4f}`",
         "",
-        "## Task Results",
+        "## Task Results (aggregated across seeds)",
         "",
-        "| Task | Score | Success |",
-        "|---|---:|---:|",
+        "| Task | n | Mean ± Std | Min | Max | Pass | Threshold | Grader ran? |",
+        "|---|---:|---|---:|---:|---:|---:|---:|",
     ]
-    for task in summary["task_results"]:
+    for agg in summary["per_task"]:
         lines.append(
-            f"| `{task['task_id']}` | {task['score']:.4f} | {'PASS' if task['success'] else 'FAIL'} |"
+            f"| `{agg['task_id']}` | {agg['n_seeds']} | "
+            f"{agg['score_mean']:.4f} ± {agg['score_std']:.4f} | "
+            f"{agg['score_min']:.4f} | {agg['score_max']:.4f} | "
+            f"{agg['successes']}/{agg['n_seeds']} | "
+            f"{agg['success_threshold']:.2f} | "
+            f"{'yes' if agg['any_grader_invoked'] else 'NO (mean-reward fallback)'} |"
         )
+
+    # Component-mean breakdown (only for tasks where the grader actually ran).
+    has_components = any(agg["component_means"] for agg in summary["per_task"])
+    if has_components:
+        lines += [
+            "",
+            "## Grader component means (only for tasks where grader ran)",
+            "",
+        ]
+        for agg in summary["per_task"]:
+            cm = agg["component_means"]
+            if not cm:
+                continue
+            lines.append(f"### `{agg['task_id']}`")
+            lines.append("")
+            lines.append("| Component | Value |")
+            lines.append("|---|---:|")
+            for k, v in cm.items():
+                lines.append(f"| `{k}` | {v:.4f} |")
+            lines.append("")
+
+    # Per-seed detail with event timeline so we can see which crises actually fired.
+    lines += [
+        "",
+        "## Per-seed detail",
+        "",
+    ]
+    for agg in summary["per_task"]:
+        lines.append(f"### `{agg['task_id']}`")
+        lines.append("")
+        lines.append("| Seed | Steps | Score | Pass | Mean amp (mA) | Max amp (mA) | Events fired |")
+        lines.append("|---:|---:|---:|---:|---:|---:|---|")
+        for r in agg["rollouts"]:
+            ev_summary = (
+                ", ".join(
+                    f"{e['event_type']}@{e['start_step']}-{e['end_step']}"
+                    for e in r.get("event_schedule", [])
+                )
+                or "—"
+            )
+            lines.append(
+                f"| {r['seed'] if r['seed'] is not None else '·'} | "
+                f"{r['steps_taken']}/{r['episode_steps_full']} | "
+                f"{r['score']:.4f} | "
+                f"{'PASS' if r['success'] else 'FAIL'} | "
+                f"{r['mean_amplitude_ma']:.3f} | "
+                f"{r['max_amplitude_ma']:.3f} | "
+                f"{ev_summary} |"
+            )
+        lines.append("")
 
     OUTPUT_MD.write_text("\n".join(lines) + "\n", encoding="utf-8")
 
@@ -546,57 +754,76 @@ async def main() -> None:
     print(f"Tasks  : {TASKS}", flush=True)
     print(f"Steps  : {MAX_STEPS}", flush=True)
     print(f"Pass@  : {SUCCESS_THRESHOLD}", flush=True)
+    print(f"SE bud : {SIDE_EFFECT_BUDGETS}", flush=True)
+    print(f"Seeds  : {SEEDS}", flush=True)
     print(f"Timeout: {REQUEST_TIMEOUT_SECONDS}s", flush=True)
     print(f"{'='*60}\n", flush=True)
 
+    # Warn if any task is being capped below its full horizon: the deterministic
+    # grader requires done=True (i.e. step == n_steps) to compute overall_score.
+    for tid in TASKS:
+        full = get_task(tid).n_steps
+        if MAX_STEPS[tid] < full:
+            print(
+                f"[WARN] task={tid}: max_steps={MAX_STEPS[tid]} < n_steps={full} → "
+                f"grader will NOT run, score is mean-reward fallback.",
+                flush=True,
+            )
+
     client = OpenAI(base_url=API_BASE_URL, api_key=API_KEY)
 
-    all_scores: dict[str, float] = {}
-    all_success: dict[str, bool] = {}
+    rollouts: List[Dict[str, Any]] = []
 
     for task_id in TASKS:
-        print(f"\n{'-'*50}", flush=True)
-        env = ParkinsonsMotorEnv(base_url=LOCAL_SERVER_URL)
-        await env.__aenter__()
-        try:
-            score, success = await run_task(env, client, task_id)
-            all_scores[task_id] = score
-            all_success[task_id] = success
-            print(f"  -> {task_id}: score={score:.4f} success={success}", flush=True)
-        finally:
-            await env.__aexit__(None, None, None)
+        for seed_idx, seed in enumerate(SEEDS):
+            print(f"\n{'-'*50}", flush=True)
+            print(
+                f"Rollout: task={task_id} seed={seed} ({seed_idx + 1}/{len(SEEDS)})",
+                flush=True,
+            )
+            env = ParkinsonsMotorEnv(base_url=LOCAL_SERVER_URL)
+            await env.__aenter__()
+            try:
+                rollout = await run_task(env, client, task_id, seed=seed)
+                rollouts.append(rollout)
+                print(
+                    f"  -> {task_id} seed={seed}: score={rollout['score']:.4f} "
+                    f"success={rollout['success']} grader_ran={rollout['grader_invoked']}",
+                    flush=True,
+                )
+            finally:
+                await env.__aexit__(None, None, None)
 
-        if task_id != TASKS[-1] and TASK_SLEEP_SECONDS > 0:
-            print(f"  -> sleeping {TASK_SLEEP_SECONDS:.1f}s before next task", flush=True)
-            await asyncio.sleep(TASK_SLEEP_SECONDS)
+            is_last = (task_id == TASKS[-1]) and (seed_idx == len(SEEDS) - 1)
+            if not is_last and TASK_SLEEP_SECONDS > 0:
+                print(f"  -> sleeping {TASK_SLEEP_SECONDS:.1f}s before next rollout", flush=True)
+                await asyncio.sleep(TASK_SLEEP_SECONDS)
+
+    per_task = _aggregate_per_task(rollouts)
+    mean = sum(r["score"] for r in rollouts) / len(rollouts) if rollouts else 0.0
 
     print(f"\n{'='*60}", flush=True)
-    print(f"SUMMARY", flush=True)
-    for tid in TASKS:
-        s = all_scores.get(tid, 0.0)
-        ok = all_success.get(tid, False)
+    print(f"SUMMARY (mean ± std across {len(SEEDS)} seed(s))", flush=True)
+    for agg in per_task:
+        s = agg["score_mean"]
         bar = "#" * int(s * 20) + "-" * (20 - int(s * 20))
-        result_flag = "PASS" if ok else "FAIL"
-        print(f"  {tid:<22} [{bar}] {s:.4f}  {result_flag}", flush=True)
-    mean = sum(all_scores.values()) / len(all_scores) if all_scores else 0.0
-    print(f"\n  Mean score: {mean:.4f}", flush=True)
+        flag = f"{agg['successes']}/{agg['n_seeds']} PASS"
+        print(
+            f"  {agg['task_id']:<10} [{bar}] {s:.4f} ± {agg['score_std']:.4f}  {flag}",
+            flush=True,
+        )
+    print(f"\n  Mean across all rollouts: {mean:.4f}", flush=True)
     print(f"{'='*60}", flush=True)
 
     summary = {
         "model_name": MODEL_NAME,
         "server_url": LOCAL_SERVER_URL,
         "tasks": TASKS,
+        "seeds": SEEDS,
         "request_sleep_seconds": REQUEST_SLEEP_SECONDS,
         "task_sleep_seconds": TASK_SLEEP_SECONDS,
         "mean_score": mean,
-        "task_results": [
-            {
-                "task_id": tid,
-                "score": all_scores.get(tid, 0.0),
-                "success": all_success.get(tid, False),
-            }
-            for tid in TASKS
-        ],
+        "per_task": per_task,
     }
     _write_report(summary)
     print(f"Saved reports to {OUTPUT_JSON} and {OUTPUT_MD}", flush=True)

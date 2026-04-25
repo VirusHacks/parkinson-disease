@@ -4,13 +4,15 @@
 
 ## 1. Summary
 
-Parkinson's disease disrupts the basal ganglia circuit through pathological beta-band synchrony in the subthalamic nucleus (STN). This beta oscillation drives tremor, rigidity, and the progressive loss of voluntary motor function that makes everyday tasks — holding a cup, reaching for a door, writing a signature, fastening a button — increasingly impossible. It is not simply a disease of movement. It is a disease of _lost agency_. Patients describe not being able to do what they mentally intend to do. The signal from the brain to the muscles is scrambled.
+Parkinson's disease breaks the basal ganglia circuit. The clearest signature is pathological beta-band synchrony in the subthalamic nucleus (STN), and that one oscillation is responsible for a lot of what patients actually feel day-to-day: the tremor, the rigidity, and the slow loss of voluntary movement that turns ordinary tasks into hard ones. Holding a cup. Reaching for a door handle. Signing your name. Fastening a button. Over time, all of these become harder than they should be.
 
-Deep Brain Stimulation (DBS) is the gold standard intervention. A surgically implanted electrode delivers high-frequency (>100 Hz) electrical pulses to the STN, disrupting the pathological beta synchrony and partially restoring motor function. The challenge: the DBS device must be tuned continuously, requiring a trained neurologist. Too little amplitude → beta persists, tremor grows, the patient cannot move. Too much → cortical spreading causes dyskinesia, patient discomfort, battery depletion, and long-term tissue damage. The correct settings drift as the disease progresses, as the electrode placement shifts slightly, as the patient ages. Suboptimal programming is not an edge case — it is the norm. Most patients go months between tuning visits.
+It helps to think about Parkinson's as more than a movement disorder. It is, in a real sense, a disease of *lost agency*. Patients describe knowing exactly what they want to do but not being able to make their body do it. The signal from the brain to the muscles is scrambled along the way.
 
-**MotorAssistEnv** frames this as a sequential decision problem for a reinforcement learning agent. The agent acts as an autonomous closed-loop BCI (Brain-Computer Interface) programmer: it observes the patient's real-time brain state at each 20 ms timestep and issues DBS amplitude and pulse width parameters to maximise motor function preservation while managing cumulative side effects.
+Deep Brain Stimulation (DBS) is the gold standard intervention. A surgically implanted electrode delivers high-frequency (>100 Hz) pulses into the STN, which disrupts the pathological beta synchrony and partially restores motor function. The catch is that the device has to be tuned, and tuned continuously, by a trained neurologist. Push the amplitude too low and the beta returns, the tremor grows back, and the patient stops being able to move. Push it too high and the current spreads into nearby cortical regions, which causes dyskinesia, patient discomfort, faster battery drain, and eventually tissue damage. To make things harder, the right settings keep drifting — the disease progresses, the electrode shifts a fraction of a millimetre, the patient ages. Suboptimal programming is not an edge case. It is the default state most patients live in, because they only see their neurologist every few months.
 
-The environment is not a toy simulation. Every observation the agent receives was produced by a peer-reviewed biophysical neural network simulation (Fleming et al. 2023) modelling the exact brain circuits disrupted in Parkinson's disease, at the level of individual neurons and synaptic connections.
+**MotorAssistEnv** turns this into a sequential decision problem for a reinforcement learning agent. The agent plays the role of an autonomous closed-loop BCI (Brain-Computer Interface) programmer: every 20 ms it looks at the patient's current brain state and decides what DBS amplitude and pulse width to deliver, trying to keep motor function intact while staying within a cumulative side-effect budget.
+
+This is not a toy simulation. Every observation the agent receives comes out of a peer-reviewed biophysical neural network model (Fleming et al. 2023) of the exact circuits that Parkinson's disrupts, simulated down to individual neurons and synaptic connections.
 
 ---
 
@@ -18,33 +20,33 @@ The environment is not a toy simulation. Every observation the agent receives wa
 
 ### 2.1 Clinical Reality
 
-This targets a real, unmet clinical need:
+The clinical need behind this is real and unmet:
 
-- **1 million+ patients** in the United States have Parkinson's disease. An estimated 10 million worldwide.
-- **Deep Brain Stimulation** is effective in ~50,000+ patients, and the number is growing as indications expand.
-- **Suboptimal DBS programming** is identified by neurologists as the #1 barrier to better outcomes after successful implantation. The device is there. The battery is charged. But the settings are wrong, and the patient is suffering.
-- A neurologist's clinic visit for DBS programming takes 1–2 hours and can be scheduled only every 3–6 months at most centres. Between visits, the patient lives with whatever settings were last programmed — even if those settings are no longer appropriate.
-- **Adaptive (closed-loop) DBS** is the next frontier of the field. The goal is a device that reads brain signals continuously and adjusts stimulation automatically — in real time, personalized to the patient's current state. RL is a natural fit for learning that policy.
+- More than **1 million patients** in the United States have Parkinson's disease, and an estimated 10 million worldwide.
+- **Deep Brain Stimulation** is already implanted in roughly 50,000+ patients, and the number keeps growing as indications expand.
+- Ask neurologists what the biggest barrier to better outcomes is *after* a successful implant, and the answer is almost always the same: **suboptimal DBS programming**. The hardware works. The battery is charged. The settings are simply wrong, and the patient suffers in the gap.
+- A single DBS programming visit takes one to two hours of clinic time, and most centres can only schedule them every three to six months. Between visits, the patient is stuck with whatever the last programming session left behind, even when those settings have stopped being appropriate.
+- **Adaptive (closed-loop) DBS** is where the field is headed. The vision is a device that listens to the brain continuously and adjusts stimulation on its own, in real time, personalised to the patient's current state. RL is a very natural fit for learning that policy.
 
 ### 2.2 The RL Problem Structure
 
-From a technical perspective, DBS programming is a compelling RL problem because it has all the properties that make RL necessary and feasible:
+DBS programming is also genuinely interesting from a pure RL perspective, because it has all the structural properties that make RL both necessary and tractable:
 
-- **Sequential action:** Each DBS setting choice affects the next state of the brain. Actions compound over time.
-- **Non-stationary disturbances:** Tremor amplitude climbs progressively during an episode. A fixed policy fails. The agent must adapt.
-- **Partial observability:** The agent sees local field potentials (LFP, represented by `beta_arv`) and surface EMG (`semg_arv`), but not individual neuron firing patterns. This matches the reality of what DBS hardware can measure.
-- **Multi-objective trade-off:** The agent must simultaneously maximise motor function, suppress oscillation, and stay within the side-effect budget. No single scalar fully captures clinical success — multiple criteria must be jointly satisfied.
-- **Dense feedback structure:** Unlike many medical environments where outcomes are only observed at discharge, DBS produces measurable physiological signals every 20 ms. This makes dense reward shaping natural and clinically meaningful.
-- **Clear programmatic grading:** Success can be measured objectively as `force_preserved` > threshold and `side_effect_load` < budget — no human rater needed.
+- **Sequential action.** Each setting you choose changes the brain state you'll see next. Actions compound across time.
+- **Non-stationary disturbances.** Tremor amplitude climbs over the course of an episode. A fixed policy will eventually fail; the agent has to keep adapting.
+- **Partial observability.** The agent only sees what real DBS hardware can measure: local field potentials (LFP, surfaced as `beta_arv`) and surface EMG (`semg_arv`). Individual neuron firing patterns are hidden.
+- **Multi-objective trade-off.** The agent has to keep motor force up, suppress oscillation, and stay inside the side-effect budget all at the same time. There isn't a single scalar that captures clinical success cleanly; multiple criteria have to be jointly satisfied.
+- **Dense feedback.** Unlike many medical settings where you only see an outcome at discharge, DBS produces meaningful physiological signals every 20 ms. That makes dense reward shaping both possible and clinically grounded.
+- **Clear programmatic grading.** Success can be checked objectively — `force_preserved` above a threshold, `side_effect_load` below a budget — without needing a human to rate anything.
 
 ### 2.3 Why Not Just Use a Classical Controller
 
-The ground-truth simulation runs a PID (Proportional-Integral-Derivative) closed-loop controller. RL is needed because:
+The Fleming simulation actually ships with a PID (Proportional-Integral-Derivative) closed-loop controller as its ground truth. So the obvious question is: why not just use that? A few reasons:
 
-- PID requires careful manual tuning of gain parameters for each patient. RL can adapt from data.
-- PID cannot handle the multi-objective trade-off between force preservation and side-effect management without explicit engineering of the objective function.
-- PID does not generalize across disease severity levels. An RL agent trained across a distribution of states can potentially transfer.
-- In the real clinical setting, the "reward function" (what the patient actually wants) changes over time and is not fully specified. RL provides a framework for learning it from physiological feedback.
+- PID requires careful manual tuning of gain parameters for each patient. RL can learn that adaptation directly from data.
+- PID does not naturally express the multi-objective trade-off between force preservation and side-effect management. To get there, you have to hand-engineer the objective function.
+- PID does not generalise across disease severity levels. An RL agent trained over a distribution of states has a real shot at transferring.
+- In the actual clinic, the "reward function" — what the patient really wants — shifts over time and is never fully specified up front. RL gives you a framework for inferring it from physiological feedback instead of writing it down.
 
 ---
 
@@ -52,47 +54,48 @@ The ground-truth simulation runs a PID (Proportional-Integral-Derivative) closed
 
 ### 3.1 Why This Model Specifically
 
-The environment is backed by a specific, peer-reviewed biophysical simulation:
+The whole environment is backed by one specific peer-reviewed biophysical simulation:
 
 > **Fleming, J.E., Senneff, S. and Lowery, M.M. (2023)**
 > *Multivariable closed-loop control of deep brain stimulation for Parkinson's disease*
 > Journal of Neural Engineering, 20(5), p.056029.
 
-This model was chosen for three reasons that no other publicly available simulation offers simultaneously:
+We picked this model because no other publicly available simulation gives us all three of the following at once:
 
-1. **It is the only model that connects brain → DBS → muscle force → surface EMG in one integrated pipeline.** Most neural simulations stop at the neuron level or at LFP. This model continues all the way to the musculoskeletal output — the force a patient's hand can exert. That is what patients care about.
+1. **It is the model that connects brain → DBS → muscle force → surface EMG in one integrated pipeline.** Most neural simulations stop at the neuron level, or at the LFP. This one keeps going all the way out to the musculoskeletal output — the actual force a patient's hand can produce. That is the thing patients care about.
 
-2. **It produces real physical units** (mV, mA, mN) validated against real patient data. The beta ARV values, tremor amplitudes, and force outputs in this environment are not scaled arbitrary units. They are clinically measured quantities.
+2. **It produces real physical units** (mV, mA, mN) that have been validated against real patient data. The beta ARV values, tremor amplitudes, and force outputs in this environment are not arbitrary scaled units; they are clinically measured quantities.
 
-3. **It includes a ground-truth optimal controller** — a closed-loop PID/scheduler system published alongside the model. This provides a reference "what the best-known automated controller achieves" for every step of the simulation, allowing us to measure whether the RL agent has learned to beat or match clinical state-of-the-art.
+3. **It comes with a ground-truth optimal controller** — the closed-loop PID/scheduler system published alongside the model. That gives us a concrete reference for "the best automated controller currently known," step by step, so we can actually measure whether the RL agent has learned to match or beat the clinical state of the art.
 
 ### 3.2 What the Simulation Modelled
 
-The simulation ran for ~75 seconds of simulated time and included:
+The simulation runs for roughly 75 seconds of simulated time and includes:
 
-- **Cortical layer:** ~100 pyramidal neurons with full Hodgkin-Huxley dynamics (sodium, potassium, M-current, leak channels), modelled via NEURON (the gold standard single-neuron simulator).
-- **Basal Ganglia:** Subthalamic Nucleus (STN, 100 neurons), GPe (100 neurons), GPi (100 neurons) with biophysical ion channel models.
-- **Thalamus:** Mediodorsal and ventrolateral nuclei modelling the relay of tremor signals to cortex.
-- **Spinal cord:** A depressing spinal motoneuron pool receiving tremor-frequency drive.
-- **Musculoskeletal:** Muscle force computed from motoneuron firing rates using a physiological Hill-type model.
-- **DBS electrode:** Extracellular stimulation modelled with Finite-Element methods for current spread in tissue.
-- **Total connections:** 5+ million individual synaptic connections modelled stochastically.
+- **Cortical layer.** ~100 pyramidal neurons with full Hodgkin-Huxley dynamics (sodium, potassium, M-current, leak channels), simulated in NEURON, the gold-standard single-neuron simulator.
+- **Basal Ganglia.** Subthalamic Nucleus (STN, 100 neurons), GPe (100 neurons), and GPi (100 neurons), all with biophysical ion channel models.
+- **Thalamus.** Mediodorsal and ventrolateral nuclei, modelling how tremor signals are relayed back up to cortex.
+- **Spinal cord.** A depressing spinal motoneuron pool driven at tremor frequency.
+- **Musculoskeletal.** Muscle force computed from motoneuron firing rates using a physiological Hill-type model.
+- **DBS electrode.** Extracellular stimulation modelled with finite-element methods so that current spread through tissue is captured.
+- **Total connections.** More than 5 million individual synaptic connections, modelled stochastically.
 
-The simulation's output (stored in `parkinsons_Motor/fleming-model-based-brain/Model_Results/`) includes:
+The outputs of that simulation (stored under `parkinsons_Motor/fleming-model-based-brain/Model_Results/`) include:
+
 - 102 STN voltage traces (`.mat` files)
 - 102 motoneuron voltage traces and spike times (`.mat` files)
-- 34 CSV files of controller signals, sampled at 100 timesteps (t=10.02–12.00 s)
-- A 12×15 DBS parameter sweep (`Collaterals_Entrained_values.txt`) mapping every combination of amplitude and pulse width to its cortical entrainment fraction.
+- 34 CSV files of controller signals, sampled at 100 timesteps (t = 10.02–12.00 s)
+- A 12×15 DBS parameter sweep (`Collaterals_Entrained_values.txt`) that maps every combination of amplitude and pulse width to its cortical entrainment fraction.
 
 ### 3.3 What "Calibration" Means Here
 
-The `core/calibration.py` module exposes the calibration interface that loads all simulation outputs and builds a `CalibratedBrainState` — a ground-truth 100-step timeline with the following at every timestep:
+The `core/calibration.py` module is the interface that loads all of those simulation outputs and folds them into a `CalibratedBrainState` — a ground-truth 100-step timeline that, at every timestep, contains:
 
-- Normalized neural signals (beta_arv, tremor_arv, semg_arv)
-- Raw muscle force (mN) and force_preserved fraction
-- Ground-truth DBS amplitude and pulse width used by the Fleming controller
-- Physiological baselines (pre-DBS tremor, beta, force levels)
-- The full 12×15 entrainment lookup table for the agent's DBS parameter queries
+- Normalised neural signals (`beta_arv`, `tremor_arv`, `semg_arv`)
+- Raw muscle force in mN, plus the `force_preserved` fraction
+- The ground-truth DBS amplitude and pulse width that the Fleming controller actually used
+- Physiological baselines (pre-DBS tremor, beta, and force levels)
+- The full 12×15 entrainment lookup table that the agent's DBS parameter queries are resolved against
 
 Every observation the RL agent will ever see is a transformation of this calibrated data — not a generative model, not a polynomial approximation. **The ground truth is the ground truth.**
 
@@ -153,47 +156,48 @@ Every observation the RL agent will ever see is a transformation of this calibra
 
 ## 5. What the Agent Must Learn
 
-An agent that achieves high reward on this environment will have learned:
+An agent that does well on this environment will, by the time it converges, have picked up a few specific skills:
 
-1. **Recognise the current disease phase** — `beta_arv` + `tremor_arv` encode where in the episode the patient currently is. Low tremor early means subtle DBS suffices. High tremor late means aggressive intervention is needed.
+1. **Recognise the current disease phase.** `beta_arv` and `tremor_arv` together encode where in the episode the patient currently is. Low tremor early on means a subtle DBS push is enough. High tremor late means the agent needs to intervene aggressively.
 
-2. **Use DBS proportionally and early** — from the ground-truth data we know that the optimal policy front-loads stimulation to slow the tremor ramp-up, rather than reacting after tremor has already grown large.
+2. **Use DBS proportionally and early.** From the ground-truth data we already know that the optimal policy front-loads stimulation to slow the tremor's ramp-up, instead of waiting and reacting after tremor has already grown large.
 
-3. **Navigate the bilinear entrainment surface** — the 12×15 lookup table is not linear. Very low amplitude (0–0.5 mA) produces near-zero entrainment. Going from 1.0 to 1.25 mA jumps entrainment from 36% to 66% at 0.15 ms. The agent must discover this non-linear mapping from experience.
+3. **Navigate the bilinear entrainment surface.** The 12×15 lookup table is far from linear. Very low amplitude (0–0.5 mA) gives near-zero entrainment, but going from 1.0 mA to 1.25 mA at 0.15 ms jumps entrainment from 36% to 66%. The agent has to discover this non-linear mapping the hard way, from experience.
 
-4. **Balance amplitude and pulse width** — a narrow pulse at high amplitude vs a wide pulse at moderate amplitude can produce similar entrainment but different side-effect profiles. The optimal combination is not obvious.
+4. **Balance amplitude and pulse width.** A narrow pulse at high amplitude and a wider pulse at moderate amplitude can produce roughly the same entrainment but very different side-effect profiles. There is no obvious "right" combination — it has to be learned.
 
-5. **Respect the side-effect budget across the episode** — a greedy agent that maximises step-0 force by blasting 3 mA will exhaust its budget before the episode's critical mid-phase. The agent must plan temporally.
+5. **Respect the side-effect budget across the full episode.** A greedy agent that maxes out step-0 force by blasting 3 mA will burn through its budget long before the episode's critical mid-phase. The agent has to plan over time, not just react.
 
-6. **Issue a compensatory motor command** — when the brain state is bad and force is degraded, the agent should also increase `motor_command` to partially compensate through effort what the brain cannot provide through smooth coordination.
+6. **Issue a compensatory motor command.** When the brain state is bad and force is degraded, the agent should also push `motor_command` up, partially compensating through effort for what the brain can no longer provide through smooth coordination.
 
-This mirrors exactly what a trained neurologist or a modern closed-loop DBS programmer does — and it is not achievable by a fixed rule or a simple threshold policy.
+That list is, almost line for line, what a trained neurologist or a modern closed-loop DBS programmer does in the clinic — and it isn't something a fixed rule or a simple threshold policy can pull off.
 
 ---
 
 ## 6. Real-World Trajectory and Impact
 
-**Immediate (this environment):**  
-A trained agent policy that maps {brain state → DBS parameters} is a direct prototype for the inference firmware running on next-generation adaptive DBS implants. Medtronic Percept, Abbott Infinity, and Boston Scientific Vercise all support "sensing-and-stimulation" mode — they can read LFP from the same electrode used for stimulation and adjust parameters accordingly. An RL policy trained in this environment could, with appropriate hardware abstraction, be deployed directly.
+**Immediate (this environment).**
+A trained agent policy that maps {brain state → DBS parameters} is essentially a prototype for the inference firmware that will run on next-generation adaptive DBS implants. Medtronic Percept, Abbott Infinity, and Boston Scientific Vercise already support a "sensing-and-stimulation" mode — they can read LFP off the same electrode they use to stimulate, and adjust parameters accordingly. With the right hardware abstraction, a policy trained in this environment could be deployed directly onto that kind of device.
 
-**Near-term:**  
-The environment serves as a reproducible benchmark for comparing DBS optimisation strategies:
+**Near-term.**
+The environment also doubles as a reproducible benchmark for comparing DBS optimisation strategies against each other:
+
 - RL (this environment) vs PID (the Fleming ground-truth controller)
-- Different RL algorithms: GRPO, PPO, SAC
-- Different model architectures: MLP, Transformer, LSTM for the history window
+- Different RL algorithms — GRPO, PPO, SAC
+- Different model architectures over the history window — MLP, Transformer, LSTM
 
-**Long-term:**  
-Patients with Parkinson's disease regain the ability to perform daily motor tasks — holding utensils, signing names, typing, walking — continuously optimised by AI rather than waiting months between clinic programming visits. The environment's `force_preserved` metric is a direct proxy for this: a 20-percentage-point improvement in mean episode force_preserved translates to a clinically meaningful improvement in the patient's ability to grasp and manipulate objects.
+**Long-term.**
+The end state we are aiming at is patients with Parkinson's disease getting back the ability to do daily motor tasks — holding utensils, signing their name, typing, walking — with stimulation that is being continuously optimised by AI in the background, instead of waiting months at a time for the next clinic programming visit. The `force_preserved` metric in this environment is a fairly direct proxy for that: a 20-percentage-point improvement in mean episode `force_preserved` translates to a clinically meaningful improvement in how well a patient can grasp and manipulate objects.
 
 ---
 
 ## 7. Why OpenEnv Is the Right Platform for This
 
-The OpenEnv framework provides:
+A few things about OpenEnv made it the natural fit:
 
-- A standardised `reset() / step() / state()` API that decouples environment logic from training code, allowing any RL algorithm or LLM agent to be plugged in.
-- A containerised deployment path (Docker + Hugging Face Spaces) that ensures the environment is reproducible across machines and teams.
-- A grader specification that produces deterministic 0.0–1.0 scores, enabling automated benchmarking and head-to-head comparison.
-- A client library that handles WebSocket communication, allowing remote training against a deployed Space.
+- It gives you a standardised `reset() / step() / state()` API, which cleanly separates the environment's logic from the training code. Any RL algorithm, or any LLM agent, can be plugged in on top.
+- It defines a containerised deployment path (Docker + Hugging Face Spaces) so the environment is reproducible across machines and across teams without anyone having to babysit dependencies.
+- It standardises the grader interface around deterministic 0.0–1.0 scores, which makes automated benchmarking and head-to-head comparison straightforward.
+- It ships a client library that handles WebSocket communication, so you can train remotely against a deployed Space without having to build that plumbing yourself.
 
-This environment is one of the few in the OpenEnv ecosystem that is grounded in real peer-reviewed biomedical simulation data, making it uniquely valuable as a benchmark for adaptive medical AI.
+On top of all of that, this is one of the very few environments in the OpenEnv ecosystem that is grounded in real, peer-reviewed biomedical simulation data — which is what makes it valuable as a serious benchmark for adaptive medical AI, rather than just another simulator.
