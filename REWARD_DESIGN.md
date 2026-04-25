@@ -2,11 +2,7 @@
 
 ## 1. Clinical Grounding
 
-The reward function is a computational translation of the clinical objectives that
-neurologists optimise during DBS programming sessions. It is not heuristic — every
-term maps to a published clinical endpoint or a documented failure mode.
-
-**Primary clinical references:**
+Every reward term maps to a published clinical endpoint or documented DBS failure mode. The reward is not heuristic — it is a computational translation of what neurologists optimise during programming sessions.
 
 | Reward component | Clinical basis |
 |---|---|
@@ -14,223 +10,236 @@ term maps to a published clinical endpoint or a documented failure mode.
 | `beta_arv` suppression | Beta-band power as closed-loop DBS feedback target (Little et al. 2013, 2016) |
 | `tremor_arv` suppression | Tremor ARV as secondary biomarker (Tinkhauser et al. 2017) |
 | `side_effect_load` budget | Stimulation-induced dyskinesia threshold (Rosa et al. 2015; Swann et al. 2018) |
-| `efficiency` (min effective amp) | Battery longevity in implanted pulse generators (Priori et al. 2013) |
-| `smoothness_cost` penalty | Abrupt parameter changes cause transient dyskinesia (Velisar et al. 2019) |
+| `efficiency` (minimum effective amplitude) | Battery longevity in implanted pulse generators (Priori et al. 2013); adaptive DBS reduces stimulation time by 56% while matching outcomes (Little et al. 2016) |
+| `smoothness_cost` | Abrupt parameter changes cause transient dyskinesia (Velisar et al. 2019) |
 | `terminal_stability` | Sustained benefit at episode end — prevents early-episode gaming |
-
-**Core insight from Little et al. (2016):** Adaptive DBS using beta power as feedback
-reduced stimulation time by 56% while matching or exceeding continuous DBS outcomes.
-This motivates our efficiency term — maximum amplitude is never the right answer.
 
 ---
 
 ## 2. Per-Step Dense Reward
 
-At every 20 ms timestep the agent receives a dense reward signal:
+At every 20 ms timestep the agent receives:
 
 ```
 r_t = w_force  * force_preserved_t
     + w_track  * tracking_accuracy_t
-    + w_beta   * (1 - beta_arv_t)
-    + w_tremor * (1 - tremor_arv_t)
+    + w_beta   * (1 − beta_arv_t)
+    + w_tremor * (1 − tremor_arv_t)
     + w_safety * safety_t
-    + w_smooth * (1 - smoothness_cost_t)
+    + w_smooth * (1 − smoothness_cost_t)
     + w_eff    * efficiency_t
-    - 0.08     * constraint_violation_t
+    + shaping_t                         ← small phase-aware bonus on hard/medium
+    − 0.08 * constraint_violation_t
 ```
 
-where `safety_t = clamp(1 - side_effect_load_t / budget)` and
-`efficiency_t = 1 - (amp / amp_max)`.
+where:
+- `safety_t = clamp(1 − side_effect_load_t / max_side_effect_load)`
+- `efficiency_t = 0.65 * (1 − amp/amp_max) + 0.35 * (1 − pw_norm)` — gated by therapeutic engagement
+- `shaping_t` — late-episode terminal stability proxy (hard: final 25% only; medium: recovery proxy from step ~50%)
 
-**Weights are task-specific** — the training signal follows the same primary
-objectives as the evaluation grader, and longer-horizon tasks also receive small
-phase-aware shaping for recovery and late-episode stability:
+**Weights are task-specific** so the training signal is aligned with the evaluation grader:
 
-| Weight | beta_suppression | tremor_correction | full_episode |
+| Weight | `easy` | `medium` | `hard` |
 |---|---|---|---|
+| `w_beta` | 0.30 | 0.06 | **0.22** |
+| `w_tremor` | 0.18 | 0.14 | **0.14** |
 | `w_force` | 0.16 | 0.16 | 0.14 |
 | `w_track` | 0.12 | 0.16 | 0.16 |
-| `w_beta` | 0.30 | 0.06 | 0.08 |
-| `w_tremor` | 0.18 | 0.14 | 0.06 |
-| `w_safety` | 0.14 | 0.22 | 0.36 |
-| `w_smooth` | 0.05 | 0.04 | 0.05 |
-| `w_eff` | 0.05 | 0.08 | 0.10 |
+| `w_safety` | 0.14 | **0.22** | 0.18 |
+| `w_smooth` | 0.05 | 0.04 | 0.04 |
+| `w_eff` | 0.05 | 0.08 | 0.04 |
 
-For `tremor_correction` and `full_episode`, the environment adds a small
-task-specific shaping bonus that proxies the episode-end `recovery_score` and/or
-`terminal_stability_score`. This keeps dense reward better aligned with the final
-grader without letting those late-horizon terms dominate per-step learning.
-
-**Design invariant:** weights sum to ~1.0 per task (excluding the violation penalty)
-so reward is interpretable on a per-step [0, 1] scale.
-
-**Range in practice:**
-- Well-calibrated policy: 0.55–0.85 per step
-- Naive zero-stim policy: 0.15–0.45 (collapses as tremor builds)
-- Max-amp constant policy: 0.40–0.65 (safety term drags it down)
+**Why hard's weights changed from the naive design:** The original hard reward had `w_safety = 0.36`. This created a training incentive to stimulate conservatively — a constant 1.0 mA policy (amp_norm = 0.42) accumulated almost no side effects, so `safety_t ≈ 0.90` contributed 0.32 per step. An agent could reach average reward ~0.55 by doing very little, which is clinically meaningless. The current weights make beta and tremor suppression the primary signal, matching the actual goal of DBS.
 
 ---
 
 ## 3. Episode-End Grader Score (Deterministic 0.0–1.0)
 
-The grader is the authoritative benchmark signal. It is computed once at episode end
-from the full trajectory and is deterministic given the same trajectory.
+The grader is the authoritative benchmark signal — computed once at episode end from the full trajectory. It is deterministic given the same trajectory.
 
 ### Score Components
 
-**`force_score`**
-```
-Weighted mean of force_preserved over all steps (early steps weighted ~1.35×
-relative to terminal steps — mirrors clinical priority of immediate function).
-force_score = weighted_mean(force_preserved) / target_force_preserved, clamped [0,1]
-```
-*Basis: force_preserved tracks the muscle output clinicians measure via dynamometry.*
-
 **`beta_score`**
 ```
-beta_score = 0.55 * weighted_mean(1 - beta_arv)
-           + 0.45 * fraction_of_steps(beta_arv <= target_beta_arv)
+beta_score = 0.55 * weighted_mean(1 − beta_arv)
+           + 0.45 * fraction_of_steps(beta_arv ≤ target_beta_arv)
 ```
-*Basis: combines mean suppression depth with time-in-therapeutic-range (TTR),
-mirroring the dual metric used in aDBS trials (Tinkhauser et al. 2017).*
+Combines mean suppression depth with time-in-therapeutic-range (TTR), mirroring the dual metric used in aDBS trials (Tinkhauser et al. 2017). The TTR term (fraction of steps below target) is critical — an agent that briefly dips below the target but averages poorly still scores low.
 
 **`tremor_score`**
 ```
-tremor_score = 0.60 * weighted_mean(1 - tremor_arv)
-             + 0.40 * fraction_of_steps(tremor_arv <= target_tremor_arv)
+tremor_score = 0.60 * weighted_mean(1 − tremor_arv)
+             + 0.40 * fraction_of_steps(tremor_arv ≤ target_tremor_arv)
 ```
+
+**`force_score`**
+```
+force_score = weighted_mean(force_preserved) / target_force_preserved, clamped [0, 1]
+```
+Early steps are weighted ~1.35× relative to terminal steps — mirrors clinical priority of maintaining immediate motor function.
 
 **`tracking_score`**
 ```
-tracking_score = 0.45 * weighted_mean(1 - task_error / target_error)
+tracking_score = 0.45 * weighted_mean(1 − task_error / target_tracking_error)
                + 0.55 * weighted_mean(tracking_accuracy)
 ```
-*Basis: voluntary motor task performance — the patient's ability to execute intended
-movements is the primary reason for DBS implantation (Limousin et al. 1995).*
+Voluntary motor task performance — the patient's ability to execute intended movements is the primary reason for DBS implantation (Limousin et al. 1995).
 
 **`safety_score`**
 ```
-overload_penalty = mean(max(0, (side_effect_load - budget) / (1 - budget)) for each step)
-peak_penalty = max(overload per step)
-safety_score = clamp(1 - (0.45*overload_penalty + 0.35*peak_penalty + 0.20*mean_violation) * 1.8)
+overload_per_step = max(0, (side_effect_load − budget) / (1 − budget))
+safety_score = clamp(1 − (0.45 * mean_overload + 0.35 * peak_overload + 0.20 * mean_violation) * 1.8)
 ```
-*Basis: stimulation-induced dyskinesia emerges as a threshold effect — a single
-brief overload can be as harmful as sustained moderate overload (Swann et al. 2018).
-Hence peak_penalty is weighted separately from mean overload.*
+Peak overload is weighted separately from mean — stimulation-induced dyskinesia emerges as a threshold effect where a single brief overload can be as harmful as sustained moderate overload (Swann et al. 2018).
 
 **`efficiency_score`**
 ```
-efficiency_score = (0.65*(1 - mean_amp/max_amp) + 0.35*(1 - mean_pw_norm))
+efficiency_score = (0.65*(1 − mean_amp/max_amp) + 0.35*(1 − mean_pw_norm))
                  * therapeutic_engagement
 ```
-where `therapeutic_engagement = clamp(0.40*force_score + 0.30*beta_score + 0.30*tremor_score)`.
+where `therapeutic_engagement = 0.40*force_score + 0.30*beta_score + 0.30*tremor_score`.
 
-*Gating by therapeutic_engagement prevents reward for doing nothing — an agent that
-uses zero DBS and thus has perfect efficiency scores zero on efficiency because
-therapeutic_engagement collapses.*
+Gated by therapeutic engagement to prevent reward for doing nothing — zero-DBS has perfect amplitude efficiency but scores zero because force/beta/tremor all collapse.
 
 **`smoothness_score`**
 ```
-smoothness_score = 1 - mean(smoothness_cost_per_step)
+smoothness_score = 1 − mean(smoothness_cost_per_step)
 ```
-*Basis: abrupt amplitude changes cause transient dyskinesia and patient discomfort
-even within safe total dose (Velisar et al. 2019).*
+Abrupt amplitude changes cause transient dyskinesia even within safe total dose (Velisar et al. 2019).
 
 **`terminal_stability_score`**
 ```
 Computed on the final 5 steps only.
-terminal_stability = 0.45*(last_force/target) + 0.30*(1 - last_tremor/target) + 0.25*(1 - last_error/target)
+terminal_stability = 0.45*(last_force/target) + 0.30*(1 − last_tremor/target) + 0.25*(1 − last_error/target)
 ```
-*Prevents strategies that front-load good performance and degrade at episode end.*
+Prevents strategies that front-load good performance then degrade.
 
 **`recovery_score`**
 ```
 Compares first-6-step window vs last-8-step window for force, tremor, and tracking.
 recovery_score = 0.40*force_recovery + 0.40*tremor_recovery + 0.20*tracking_recovery
 ```
-*Key for tremor_correction task: did the agent actually rescue the patient from the
-escalation window, or did it just survive?*
+Key for the medium (rescue) task: did the agent actually rescue the patient from escalation, or just survive?
 
 ---
 
 ## 4. Task-Specific Grader Weights
 
+### easy — Calm Start
 ```
-beta_suppression:
-  0.30 * beta_score + 0.18 * tremor_score + 0.16 * tracking_score
-+ 0.14 * force_score + 0.14 * safety_score + 0.04 * smoothness + 0.04 * efficiency
-
-tremor_correction:
-  0.22 * safety_score + 0.16 * force_score + 0.16 * tracking_score
-+ 0.14 * tremor_score + 0.12 * terminal_stability + 0.06 * beta_score
-+ 0.06 * efficiency + 0.06 * recovery_score + 0.04 * smoothness
-
-full_episode:
-  0.36 * safety_score + 0.16 * tracking_score + 0.14 * force_score
-+ 0.10 * efficiency + 0.08 * beta_score + 0.06 * tremor_score
-+ 0.05 * smoothness + 0.05 * terminal_stability
+0.30 * beta_score + 0.18 * tremor_score + 0.16 * force_score
++ 0.12 * tracking_score + 0.14 * safety_score
++ 0.05 * smoothness_score + 0.05 * efficiency_score
 ```
+Beta suppression dominates because the easy task's primary clinical goal is establishing initial control — the agent must learn that DBS actually suppresses pathological activity.
 
-**Why safety dominates full_episode (36%):** Over 100 steps, a policy that exhausts
-the side-effect budget by step 60 leaves the patient unprotected for the remainder —
-this is the most dangerous clinical outcome. The full-episode grader penalises this
-more heavily than any other failure mode.
+### medium — Rescue Phase
+```
+0.22 * safety_score + 0.16 * force_score + 0.16 * tracking_score
++ 0.14 * tremor_score + 0.08 * terminal_stability_score + 0.08 * efficiency_score
++ 0.06 * beta_score + 0.06 * recovery_score + 0.04 * smoothness_score
+```
+Safety is primary because rescue without managing the dyskinesia risk is clinically unacceptable. Recovery is scored explicitly — the agent must improve the patient state, not just maintain mediocrity.
+
+### hard — Full Episode
+```
+0.22 * beta_score + 0.18 * safety_score + 0.16 * tracking_score
++ 0.14 * tremor_score + 0.14 * force_score + 0.08 * terminal_stability_score
++ 0.04 * smoothness_score + 0.04 * efficiency_score
+```
+Beta and tremor together carry 0.36 weight — this is the task where the agent must demonstrate that DBS is actually working therapeutically. Low-stim coasting can no longer game the safety term into a passing grade.
+
+### expert tasks — scenario graders
+
+| Task | Primary weights |
+|---|---|
+| `fragile_patient` | safety 0.28, tracking 0.18, force 0.18 — therapeutic window precision |
+| `refractory_patient` | force 0.18, tracking 0.14, tremor 0.12 — functional outcome despite weak response |
+| `personalization_generalization` | force 0.18, tracking 0.18, safety 0.18 — balanced across all profiles |
+| `exercise_bout` | force 0.22, tracking 0.22 — motor performance during high-demand bout |
+| `medication_interaction` | safety 0.22, recovery 0.10 — crisis management without over-treatment |
+| `nocturnal_transition` | safety 0.22, terminal_stability 0.12, efficiency 0.12 — sleep-phase stability |
+| `surgical_followup` | safety 0.30 — microlesion window constraint dominates |
 
 ---
 
 ## 5. Hard-Failure Penalties
 
-On top of the weighted score, the grader applies deterministic hard penalties for
-clinically unacceptable outcomes:
+Applied on top of the weighted score. These model clinically unacceptable outcomes that a smooth component score might otherwise undervalue.
+
+### Universal (all tasks)
 
 | Condition | Penalty | Clinical basis |
 |---|---|---|
-| `safety_score < 0.20` | −0.12 | Sustained dyskinesia risk |
+| `safety_score < 0.20` | −0.12 | Sustained dyskinesia risk; unsafe stimulation |
 | `tracking_score < 0.20` | −0.08 | Patient cannot execute voluntary movement |
 | `beta_score < 0.40` | −0.06 | DBS providing no measurable beta suppression |
 | `tremor_score < 0.22` | −0.05 | Active tremor uncontrolled |
 | `force_score < 0.55` | −0.04 | Severe motor function loss |
-| No DBS + symptoms not suppressed (task-specific) | −0.16 to −0.22 | Untreated escalation |
-| Constant max-amp + low efficiency | −0.14 | Battery waste + side-effect risk |
+| `safety_score == 0.0` (medium/hard) | −0.10 | Complete safety budget exhaustion |
+| `mean_constraint_violation > 0.20` (medium/hard) | −0.08 | Repeated device limit violations |
 
-These penalties are **independent of the weighted score** — a policy that scores 0.65
-on all weighted terms but triggers a hard-failure rule will land below the success
-threshold for that task.
+### Task-specific
+
+| Task | Condition | Penalty |
+|---|---|---|
+| easy | zero-stim + poor suppression | −0.20 |
+| easy | constant max-amp + low efficiency | −0.14 |
+| medium | `tremor_score < 0.20` | −0.10 |
+| medium | zero-stim + poor tremor/recovery | −0.14 |
+| **hard** | `beta_score < 0.30` | **−0.10** |
+| **hard** | `tremor_score < 0.25` | **−0.06** |
+| **hard** | `terminal_stability_score < 0.25` | **−0.08** |
+| hard | high mean amp + poor efficiency | −0.08 |
+| exercise_bout | `tracking_score < 0.55` | −0.14 |
+| exercise_bout | `force_score < 0.60` | −0.10 |
+| exercise_bout | zero-stim during exertion | −0.16 |
+| medication_interaction | `recovery_score < 0.40` | −0.12 |
+| medication_interaction | high trailing amp + poor safety | −0.10 |
+| nocturnal_transition | `terminal_stability_score < 0.45` | −0.12 |
+| nocturnal_transition | low efficiency + poor safety | −0.08 |
+| surgical_followup | amplitude violations in first 25% | **−0.20** |
+| surgical_followup | `safety_score < 0.55` | −0.08 |
+| surgical_followup | `recovery_score < 0.30` | −0.06 |
+
+The final grader score is `clamp(weighted_sum − total_penalty, 0.0, 1.0)`.
 
 ---
 
 ## 6. Anti-Hacking Analysis
 
-The environment is explicitly designed to make the following RL shortcuts unprofitable:
+The environment is explicitly designed to block RL shortcuts:
 
 | Exploit strategy | Blocking mechanism |
 |---|---|
-| Max amplitude every step | `efficiency_score` penalises mean amp; side-effect budget depletes safety score |
-| Zero stimulation | `beta_score`, `tremor_score` collapse; hard-failure penalty for no-DBS + symptoms |
-| Front-load good steps, degrade at end | `terminal_stability_score` grades only the final 5 steps |
-| Tune for one task metric only | Multiple independent grader components — improving one at the cost of others is net-negative |
-| Memorise the fixed Fleming trajectory | Per-episode trajectory noise (std=0.08 on beta/tremor, std=0.05 on force) prevents replay |
-| Set motor_command=0 to avoid tracking risk | `tracking_score` measures `|target - effective|` — zero command scores poorly at any nonzero target |
-| Very high frequency for marginal entrainment gain | `_freq_side_effect_factor` scales burden faster at >140 Hz, eating safety budget |
+| Max amplitude every step | `efficiency_score` penalises mean amp; side-effect budget depletes `safety_score`; hard-specific over-treatment penalty |
+| Zero stimulation | `beta_score`, `tremor_score` collapse; hard-failure penalty −0.20 for no-DBS + symptoms |
+| Front-load good steps, degrade at end | `terminal_stability_score` grades only the final 5 steps; −0.08 penalty if below 0.25 on hard |
+| Safety-coast (low amp, never accumulate side effects) | Hard grader: `beta_score` at 0.22 weight — low amp = low entrainment = high beta = low score |
+| Memorise the fixed Fleming trajectory | Per-episode signal noise (std 0.025–0.050) + seeded stochastic events prevent trajectory replay |
+| Set `motor_command = 0` | `tracking_score` measures `|target − effective|` — zero command scores poorly at any nonzero target |
+| High frequency for marginal entrainment gain | `_freq_side_effect_factor` scales burden faster at >140 Hz; safety budget depletes |
+| React only to events (ignore baseline) | Events are stochastic and may not fire every episode; agent must maintain baseline control between events |
 
 ---
 
 ## 7. Validation: Expected Score Ranges
 
-Based on the calibrated Fleming trajectory with episode noise (std=0.08):
+Baseline constant policy (1.0 mA, 0.13 ms, 130 Hz, motor_command = target_output):
 
-| Policy | beta_suppression | tremor_correction | full_episode |
-|---|---|---|---|
-| zero_stim (amp=0) | 0.18–0.28 | 0.10–0.20 | 0.12–0.22 |
-| constant (1.0 mA, 0.13 ms, 130 Hz) | 0.44–0.56 | 0.35–0.48 | 0.30–0.42 |
-| constant (max_amp, max_pw, 130 Hz) | 0.30–0.42 | 0.28–0.38 | 0.20–0.30 |
-| safety_aware (adaptive rule-based) | 0.52–0.64 | 0.42–0.58 | 0.45–0.58 |
-| **success threshold** | **0.50** | **0.36** | **0.66** |
+| Task | Min score | Max score | Threshold | Constant passes? |
+|---|---|---|---|---|
+| easy | 0.72 | 0.80 | 0.55 | Always |
+| medium | 0.47 | 0.52 | 0.52 | Never |
+| hard | 0.23 | 0.36 | 0.68 | Never |
 
-A well-designed LLM agent reading the observation fields and following the action
-description strategy hints should reliably reach 0.52–0.65 on the easy task and
-0.42–0.55 on the medium task. The hard task requires multi-step temporal reasoning
-about side-effect accumulation and is expected to be challenging for zero-shot agents.
+Expected ranges for a good reactive LLM agent (adjusts amplitude based on beta_trend and side_effect_rate):
+
+| Task | Expected score | Passes? |
+|---|---|---|
+| easy | 0.78–0.88 | Yes |
+| medium | 0.58–0.70 | Yes |
+| hard | 0.48–0.62 | Marginal — needs phase-aware crisis management to reliably pass |
 
 ---
 
@@ -246,4 +255,4 @@ about side-effect accumulation and is expected to be challenging for zero-shot a
 - Swann NC et al. (2018). "Adaptive deep brain stimulation for Parkinson's disease using motor cortex sensing." *J Neural Eng* 15(4):046006.
 - Tinkhauser G et al. (2017). "Beta burst dynamics in Parkinson's disease OFF and ON dopaminergic medication." *Brain* 140(11):2968–2981.
 - Velisar A et al. (2019). "Dual threshold neural closed loop deep brain stimulation in Parkinson disease patients." *Brain Stimul* 12(4):868–876.
-- Fleming JE et al. (2020). "Simulation of closed-loop deep brain stimulation control schemes." *PLOS Comput Biol* 16(8):e1008165.
+- Fleming JE et al. (2023). "Multivariable closed-loop control of deep brain stimulation for Parkinson's disease." *J Neural Eng* 20(5):056029.
