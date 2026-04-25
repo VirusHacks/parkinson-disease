@@ -57,7 +57,7 @@ app = create_app(
     ParkinsonsMotorAction,
     ParkinsonsMotorObservation,
     env_name="parkinsons_Motor",
-    max_concurrent_envs=1,  # increase this number to allow more concurrent WebSocket sessions
+    max_concurrent_envs=32,  # increase this number to allow more concurrent WebSocket sessions
 )
 
 # Mount static assets and expose MyoSuite demo at /viewer
