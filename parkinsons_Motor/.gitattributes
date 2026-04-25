@@ -1,0 +1,1 @@
+static/myosuite_demo/examples/scenes/myo_sim/myolegs/*.mjb filter=lfs diff=lfs merge=lfs -text

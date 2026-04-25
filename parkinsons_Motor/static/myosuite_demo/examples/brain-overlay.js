@@ -8,7 +8,11 @@ function makeStat(label, value) {
   val.style.color = '#00ffc8';
   val.textContent = value;
   span.appendChild(val);
-  return span;
+  return { span, val };
+}
+
+function clamp01(value) {
+  return Math.max(0, Math.min(1, Number(value) || 0));
 }
 
 class BrainOverlay {
@@ -20,6 +24,17 @@ class BrainOverlay {
     this._stnMeshes   = [];
     this.eegBuffer    = new Float32Array(240).fill(19);
     this.brainRoot    = null;
+    this.signalState   = {
+      beta_arv: 0.55,
+      tremor_arv: 0.35,
+      dbs_entrainment: 0.0,
+      side_effect_load: 0.0,
+      gamma_arv: 0.0,
+      dbs_amplitude: 0.0,
+      dbs_pulse_width: 0.06,
+      dbs_frequency: 130.0,
+      phase: 'ready',
+    };
 
     this._setupPanel();
     this._setupRenderer();
@@ -106,10 +121,16 @@ class BrainOverlay {
       color:          '#80b8cc',
       letterSpacing:  '0.5px',
     });
-    stats.appendChild(makeStat('Target', 'STN'));
-    stats.appendChild(makeStat('Freq',   '130 Hz'));
-    stats.appendChild(makeStat('Amp',    '2.5 mA'));
-    stats.appendChild(makeStat('PW',     '60 µs'));
+    this.statFields = {
+      target: makeStat('Target', 'STN'),
+      freq: makeStat('Freq', '130 Hz'),
+      amp: makeStat('Amp', '0.0 mA'),
+      pw: makeStat('PW', '60 µs'),
+    };
+    stats.appendChild(this.statFields.target.span);
+    stats.appendChild(this.statFields.freq.span);
+    stats.appendChild(this.statFields.amp.span);
+    stats.appendChild(this.statFields.pw.span);
     this.panel.appendChild(stats);
 
     this.pulseBar = document.createElement('div');
@@ -123,6 +144,40 @@ class BrainOverlay {
       boxShadow:       '0 0 6px rgba(0,255,200,0.5)',
     });
     this.panel.appendChild(this.pulseBar);
+
+    this.phaseLine = document.createElement('div');
+    Object.assign(this.phaseLine.style, {
+      marginTop: '7px',
+      color: '#e5f8ff',
+      fontSize: '10px',
+      textAlign: 'center',
+      letterSpacing: '0.6px',
+    });
+    this.phaseLine.textContent = 'Waiting for agent';
+    this.panel.appendChild(this.phaseLine);
+  }
+
+  applySignalState(snapshot) {
+    const obs = snapshot?.observation || {};
+    const action = snapshot?.action || {};
+    const derived = snapshot?.derived_visuals || {};
+    this.signalState = {
+      beta_arv: clamp01(obs.beta_arv),
+      tremor_arv: clamp01(obs.tremor_arv),
+      dbs_entrainment: clamp01(obs.dbs_entrainment),
+      side_effect_load: clamp01(obs.side_effect_load),
+      gamma_arv: clamp01(obs.gamma_arv),
+      force_preserved: clamp01(obs.force_preserved),
+      tracking_accuracy: clamp01(obs.tracking_accuracy),
+      dbs_amplitude: Number(action.dbs_amplitude ?? obs.dbs_amplitude_ma ?? 0),
+      dbs_pulse_width: Number(action.dbs_pulse_width ?? obs.dbs_pulse_width_ms ?? 0.06),
+      dbs_frequency: Number(action.dbs_frequency ?? 130),
+      phase: derived.phase || snapshot?.type || 'running',
+    };
+    this.statFields.freq.val.textContent = `${Math.round(this.signalState.dbs_frequency)} Hz`;
+    this.statFields.amp.val.textContent = `${this.signalState.dbs_amplitude.toFixed(2)} mA`;
+    this.statFields.pw.val.textContent = `${Math.round(this.signalState.dbs_pulse_width * 1000)} µs`;
+    this.phaseLine.textContent = this.signalState.phase.toUpperCase();
   }
 
   // -------------------------------------------------------------------------
@@ -384,11 +439,15 @@ class BrainOverlay {
     const buf = this.eegBuffer;
     buf.copyWithin(0, 1);
 
-    // Biphasic 130 Hz DBS pulse shape
-    const phase = (t % (1 / 130)) / (1 / 130);
+    const freq = Math.max(60, Math.min(185, this.signalState.dbs_frequency || 130));
+    const dbs = clamp01(this.signalState.dbs_entrainment);
+    const pathology = Math.max(this.signalState.beta_arv, this.signalState.tremor_arv);
+    const phase = (t % (1 / freq)) / (1 / freq);
     let s = 19;
-    if      (phase < 0.06) { s = 19 - Math.sin((phase / 0.06) * Math.PI) * 15; }
-    else if (phase < 0.10) { s = 19 + Math.sin(((phase - 0.06) / 0.04) * Math.PI) * 6; }
+    const amp = 5 + 11 * dbs + 8 * pathology;
+    if      (phase < 0.06) { s = 19 - Math.sin((phase / 0.06) * Math.PI) * amp; }
+    else if (phase < 0.10) { s = 19 + Math.sin(((phase - 0.06) / 0.04) * Math.PI) * amp * 0.38; }
+    else { s = 19 + Math.sin(t * 45) * pathology * 4; }
     buf[239] = s;
 
     const w = 240, h = 38;
@@ -403,7 +462,7 @@ class BrainOverlay {
     }
     ctx.beginPath(); ctx.moveTo(0, 19); ctx.lineTo(w, 19); ctx.stroke();
 
-    ctx.strokeStyle = '#00ffcc';
+    ctx.strokeStyle = dbs > pathology ? '#00ffcc' : '#ff4d3d';
     ctx.lineWidth   = 1.5;
     ctx.shadowBlur  = 4;
     ctx.shadowColor = '#00ffcc';
@@ -416,7 +475,7 @@ class BrainOverlay {
 
     ctx.fillStyle = 'rgba(0,200,160,0.45)';
     ctx.font      = '8px monospace';
-    ctx.fillText('STN LFP  130 Hz', 4, 10);
+    ctx.fillText(`STN LFP  ${Math.round(freq)} Hz`, 4, 10);
   }
 
   // -------------------------------------------------------------------------
@@ -427,27 +486,46 @@ class BrainOverlay {
     this.pivot.rotation.y = t * 0.22;
     this.pivot.rotation.x = Math.sin(t * 0.08) * 0.06;
 
+    const beta = this.signalState.beta_arv;
+    const tremor = this.signalState.tremor_arv;
+    const entrainment = this.signalState.dbs_entrainment;
+    const side = this.signalState.side_effect_load;
+    const warning = Math.max(side, this.signalState.gamma_arv);
+    const pathology = Math.max(beta, tremor);
+    const pulsePower = clamp01(0.2 + entrainment * 0.9 + this.signalState.dbs_amplitude / 2.4);
+
     this.tipMeshes.forEach((tip, i) => {
-      tip.material.emissiveIntensity = 2.2 + Math.sin(t * 6.0 + i * Math.PI) * 1.6;
+      tip.material.emissiveIntensity = 1.1 + pulsePower * 4.0 + Math.sin(t * 7.0 + i * Math.PI) * 1.2;
+      tip.material.color.set(entrainment > pathology ? 0x00ffee : 0xffd447);
+      tip.material.emissive.set(entrainment > pathology ? 0x00ffee : 0xff8a00);
     });
     this._stnMeshes.forEach((m, i) => {
-      m.material.emissiveIntensity = 1.2 + Math.sin(t * 6.0 + i * Math.PI) * 0.9;
+      const controlled = entrainment > pathology * 0.75;
+      const color = warning > 0.55 ? 0xc13cff : (controlled ? 0x00ffc8 : 0xff3d2e);
+      m.material.color.set(color);
+      m.material.emissive.set(color);
+      m.material.emissiveIntensity = 0.9 + pathology * 3.4 + Math.sin(t * 6.0 + i * Math.PI) * 0.7;
     });
-    this.innerGlow.intensity = 0.3 + Math.abs(Math.sin(t * 6.0)) * 1.1;
+    this.innerGlow.color.set(warning > 0.55 ? 0xc13cff : 0x00ffcc);
+    this.innerGlow.intensity = 0.2 + entrainment * 1.8 + pathology * 0.7 + warning * 0.8;
 
     this.pulseGroups.forEach((group) => {
       group.forEach((shell) => {
         const ph = ((t * shell.userData.speed + shell.userData.phase) % (Math.PI * 2)) / (Math.PI * 2);
-        shell.scale.setScalar(0.04 + ph * 0.55);
-        shell.material.opacity = Math.max(0, 0.55 * (1.0 - ph * 1.4));
+        shell.scale.setScalar(0.04 + ph * (0.22 + pulsePower * 0.55));
+        shell.material.color.set(warning > 0.55 ? 0xc13cff : 0x00ffdd);
+        shell.material.opacity = Math.max(0, (0.25 + pulsePower * 0.48) * (1.0 - ph * 1.4));
       });
     });
 
-    this.pulseBar.style.transform = `scaleX(${((t * 1.3) % 1.0).toFixed(3)})`;
+    this.pulseBar.style.transform = `scaleX(${Math.max(0.04, entrainment).toFixed(3)})`;
+    this.pulseBar.style.background = warning > 0.55
+      ? 'linear-gradient(90deg, #ff3ac8, #8b5cff)'
+      : 'linear-gradient(90deg, #003eff, #00ffc8)';
     this._tickEEG(t);
     this.renderer.render(this.scene, this.camera);
     requestAnimationFrame(this._loop);
   }
 }
 
-new BrainOverlay();
+window.motorAssistBrain = new BrainOverlay();

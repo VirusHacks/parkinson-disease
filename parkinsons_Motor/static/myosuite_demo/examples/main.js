@@ -10,7 +10,7 @@ import   load_mujoco        from '../dist/mujoco_wasm.js';
 const mujoco = await load_mujoco();
 
 // Set up Emscripten's Virtual File System
-var initialScene = "myo_sim/hand/myo_hand_combined.xml";
+var initialScene = "myo_sim/elbow/myo_elbow_combined.xml";
 mujoco.FS.mkdir('/working');
 mujoco.FS.mount(mujoco.MEMFS, { root: '.' }, '/working');
 // Download the the examples to MuJoCo's virtual file system
@@ -28,6 +28,7 @@ export class MuJoCoDemo {
     // Define Random State Variables
     this.params = { scene: initialScene, paused: false, help: false, ctrlnoiserate: 0.0, ctrlnoisestd: 0.0, keyframeNumber: 0 };
     this.mujoco_time = 0.0;
+    this.agentMotorState = null;
     this.bodies  = {}, this.lights = {};
     this.tmpVec  = new THREE.Vector3();
     this.tmpQuat = new THREE.Quaternion();
@@ -82,12 +83,58 @@ export class MuJoCoDemo {
 
     this.gui = new GUI();
     setupGUI(this);
+    window.myoDebugGUI = this.gui;
+    if (new URLSearchParams(window.location.search).get('debug') !== '1') {
+      this.gui.domElement.style.display = 'none';
+    }
+  }
+
+  async switchScene(scenePath) {
+    this.params.scene = scenePath;
+    [this.model, this.state, this.simulation, this.bodies, this.lights] =
+      await loadSceneFromURL(this.mujoco, this.params.scene, this);
+    this.simulation.forward();
+    for (let i = 0; i < this.updateGUICallbacks.length; i++) {
+      this.updateGUICallbacks[i](this.model, this.simulation, this.params);
+    }
   }
 
   onWindowResize() {
     this.camera.aspect = window.innerWidth / window.innerHeight;
     this.camera.updateProjectionMatrix();
     this.renderer.setSize( window.innerWidth, window.innerHeight );
+  }
+
+  applyMotorState(snapshot) {
+    const obs = snapshot?.observation || {};
+    this.agentMotorState = {
+      target: Number(obs.target_output ?? 0),
+      effective: Number(obs.effective_motor_output ?? 0),
+      tremor: Math.max(0, Math.min(1, Number(obs.tremor_arv ?? 0))),
+      beta: Math.max(0, Math.min(1, Number(obs.beta_arv ?? 0))),
+      force: Math.max(0, Math.min(1, Number(obs.force_preserved ?? 0))),
+      tracking: Math.max(0, Math.min(1, Number(obs.tracking_accuracy ?? 0))),
+      step: Number(snapshot?.step ?? 0),
+    };
+  }
+
+  _applyAgentMotorControls(timeMS) {
+    if (!this.agentMotorState || !this.simulation || !this.model || !this.simulation.ctrl) { return; }
+    const s = this.agentMotorState;
+    const tremorWave = Math.sin(timeMS * 0.055) * s.tremor * (1.0 - s.tracking * 0.45);
+    const slowWave = Math.sin(timeMS * 0.003 + s.step * 0.12);
+    const movement = (s.effective || s.target || slowWave * 0.35) * (0.35 + s.force * 0.75);
+    const stiffness = 1.0 - s.beta * 0.42;
+    const drive = Math.max(-1, Math.min(1, movement * stiffness + tremorWave * 0.45));
+
+    for (let i = 0; i < this.model.nu; i++) {
+      const lo = this.model.actuator_ctrlrange ? this.model.actuator_ctrlrange[2 * i] : -1;
+      const hi = this.model.actuator_ctrlrange ? this.model.actuator_ctrlrange[2 * i + 1] : 1;
+      const polarity = i % 2 === 0 ? 1 : -0.65;
+      const phase = Math.sin(timeMS * 0.004 + i * 0.8) * 0.18;
+      const value = Math.max(lo, Math.min(hi, (drive + phase * s.force) * polarity));
+      this.simulation.ctrl[i] = value;
+    }
   }
 
   render(timeMS) {
@@ -97,6 +144,7 @@ export class MuJoCoDemo {
       let timestep = this.model.getOptions().timestep;
       if (timeMS - this.mujoco_time > 35.0) { this.mujoco_time = timeMS; }
       while (this.mujoco_time < timeMS) {
+        this._applyAgentMotorControls(timeMS);
 
         // Jitter the control state with gaussian random noise
         if (this.params["ctrlnoisestd"] > 0.0) {
@@ -255,3 +303,4 @@ export class MuJoCoDemo {
 
 let demo = new MuJoCoDemo();
 await demo.init();
+window.myoDemo = demo;

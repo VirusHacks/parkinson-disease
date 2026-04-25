@@ -43,6 +43,7 @@ packages = [
     "parkinsons_Motor.tasks",
     "parkinsons_Motor.graders",
     "parkinsons_Motor.core",
+    "parkinsons_Motor.demo",
     "parkinsons_Motor.evaluation",
     "parkinsons_Motor.tests",
 ]
@@ -53,5 +54,6 @@ packages = [
 "parkinsons_Motor.tasks"   = "tasks"
 "parkinsons_Motor.graders" = "graders"
 "parkinsons_Motor.core"    = "core"
+"parkinsons_Motor.demo"    = "demo"
 "parkinsons_Motor.evaluation" = "evaluation"
 "parkinsons_Motor.tests"   = "tests"

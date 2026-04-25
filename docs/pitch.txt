@@ -1,0 +1,51 @@
+
+Absolutely. Use this exact 3-minute pitch script.
+
+Opening (20-25 sec)
+We are solving a real Parkinson’s care problem: Deep Brain Stimulation is powerful, but today it is mostly programmed manually and updated infrequently. Patient condition changes continuously, but stimulation settings are often static. That creates two risks: under-treatment, where tremor and motor decline continue, and over-treatment, where side effects and stimulation burden increase.
+Our project builds an adaptive closed-loop controller benchmark where an AI agent learns to adjust DBS in real time using physiological signals.
+
+Problem Definition (25-30 sec)
+At each control step, the agent must make a treatment decision under uncertainty:
+Suppress pathological beta and tremor.
+Preserve functional motor output.
+Stay within safety and side-effect limits.
+Maintain performance over time, not just one moment.
+So this is a sequential medical control problem, not a one-shot prediction problem.
+
+What Environment We Built (30-35 sec)
+We built a benchmark grounded in calibrated biophysical Parkinson’s simulation outputs. The environment provides clinically meaningful observations like beta activity, tremor, force-preserved, side-effect load, and DBS state summaries.
+The agent outputs stimulation actions such as amplitude and pulse width, and we evaluate outcomes over full episodes. This creates a realistic control loop: observe, act, update state, repeat.
+
+Task Design (35-40 sec)
+We use a curriculum of tasks with increasing difficulty:
+Beta Suppression:
+Short-horizon stabilization task. Goal is early suppression with tight safety control.
+
+Tremor Correction:
+Rescue-phase task. Goal is active correction when symptoms escalate.
+
+Full Episode:
+Long-horizon pacing task. Goal is sustained control across the entire episode while respecting cumulative side-effect budget.
+
+We also use harder profile-based scenarios like fragile and refractory patients to test generalization.
+
+Reward Design and Grading (40-45 sec)
+Our reward is multi-objective and clinically aligned. It combines:
+Force preservation and tracking quality.
+Beta and tremor suppression.
+Safety behavior.
+Smoothness and efficiency.
+Penalties for constraint violations.
+Importantly, we do not rely only on training reward. We use deterministic episode-end grading from 0 to 1 with task-specific thresholds and hard-failure logic. This prevents reward hacking and makes benchmark results auditable.
+
+Why This Is Innovative (25-30 sec)
+Our innovation is not just another RL loop. It is the combination of:
+Clinically grounded state and action design.
+Multi-objective safety-aware control.
+Task ladder that separates naive, constant, and adaptive behavior.
+Reproducible benchmark artifacts for transparent evaluation.
+So we are moving from static DBS tuning to adaptive, patient-aware, closed-loop control.
+
+Closing (15-20 sec)
+In short: we built a benchmark for intelligent DBS control where success means balancing symptom suppression, motor function, and safety over time. This is the type of control problem AI must solve to be useful in real neurostimulation systems.

@@ -259,6 +259,60 @@ Important grounding choices:
    `- static/myosuite_demo/
 ```
 
+## Interactive viewer
+
+The viewer at `/viewer` now supports a live demo loop:
+
+- choose one of the three public tasks
+- choose an agent mode
+- stream real environment steps into the brain + body visualization
+- watch live signal bars, DBS settings, and a short decision rationale
+
+### What you need to run it
+
+You do need the environment server running, because the viewer streams real `reset()` and `step()` calls from the backend.
+
+For the agent itself:
+
+- `Local Heuristic`: no `.env`, no token required
+- `Auto Agent`: uses server-side API credentials if available, otherwise falls back to the local heuristic
+- `HF Qwen`: requires `HF_TOKEN` on the server; if it is missing, the viewer falls back to the local heuristic and tells you that in the UI
+
+### Minimal local setup
+
+Run the server:
+
+```bash
+cd environment-latest/parkinson-disease
+parkinsons_Motor/.venv/bin/python -m parkinsons_Motor.server.app --host 127.0.0.1 --port 8001
+```
+
+Open:
+
+```text
+http://127.0.0.1:8001/viewer
+```
+
+### Optional `.env` for Hugging Face Qwen
+
+If you want the viewer to use Qwen through the Hugging Face router, add:
+
+```env
+HF_TOKEN=hf_xxx
+MODEL_NAME=Qwen/Qwen2.5-72B-Instruct
+API_BASE_URL=https://router.huggingface.co/v1
+LLM_PROVIDER=hf
+```
+
+If you prefer an OpenAI-compatible endpoint instead, use:
+
+```env
+OPENAI_API_KEY=sk-...
+OPENAI_MODEL=gpt-4o-mini
+OPENAI_BASE_URL=https://api.openai.com/v1
+LLM_PROVIDER=openai
+```
+
 ## Quick start
 
 ### 1. Run the local OpenEnv server

@@ -6,7 +6,7 @@ colorTo: pink
 sdk: docker
 pinned: false
 app_port: 8000
-base_path: /web
+base_path: /viewer
 tags:
   - openenv
 ---
@@ -72,4 +72,4 @@ You can deploy this OpenEnv environment using the `openenv push` command:
 ```bash
 openenv push .\parkinsons_Motor --repo-id your-namespace/parkinsons_Motor
 ```
-This enables the interactive visualization UI (`/web`) via our Gradio MyoSuite arm integration, API Documentation (`/docs`), and Persistent WebSocket evaluation.
+This enables the interactive Three.js visualization UI (`/viewer`), API documentation (`/docs`), and the OpenEnv-compatible HTTP/WebSocket endpoints.

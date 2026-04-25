@@ -28,10 +28,15 @@ Usage:
     python -m server.app
 """
 
+import asyncio
+import json
 import os
 from pathlib import Path
 
+from fastapi import Request
+from pydantic import BaseModel, Field
 from fastapi.responses import HTMLResponse, RedirectResponse
+from fastapi.responses import StreamingResponse
 from fastapi.staticfiles import StaticFiles
 
 try:
@@ -43,9 +48,13 @@ except Exception as e:  # pragma: no cover
 
 try:
     from core.models import ParkinsonsMotorAction, ParkinsonsMotorObservation
+    from demo.agent_runner import DemoConfig, stream_demo_episode
+    from demo.session_manager import DemoSessionManager
     from server.parkinsons_Motor_environment import ParkinsonsMotorEnvironment
 except ImportError:
     from parkinsons_Motor.core.models import ParkinsonsMotorAction, ParkinsonsMotorObservation
+    from parkinsons_Motor.demo.agent_runner import DemoConfig, stream_demo_episode
+    from parkinsons_Motor.demo.session_manager import DemoSessionManager
     from parkinsons_Motor.server.parkinsons_Motor_environment import (
         ParkinsonsMotorEnvironment,
     )
@@ -67,6 +76,66 @@ app.mount("/static", StaticFiles(directory=str(_static_dir)), name="static")
 
 _viewer_html_path = _static_dir / "myosuite_demo" / "index.html"
 _viewer_bundle_path = _static_dir / "myosuite_demo" / "dist" / "mujoco_wasm.js"
+_demo_sessions = DemoSessionManager()
+
+
+@app.middleware("http")
+async def redirect_legacy_space_routes(request: Request, call_next):
+    if request.url.path in {"", "/", "/web"}:
+        return RedirectResponse(url="/viewer", status_code=307)
+    return await call_next(request)
+
+
+class ViewerDemoStartRequest(BaseModel):
+    task_id: str = Field(default="beta_suppression")
+    agent_type: str = Field(default="auto")
+    step_delay_ms: int = Field(default=450, ge=0, le=2500)
+    max_steps: int | None = Field(default=None, ge=1, le=100)
+
+
+@app.post("/viewer/api/demo/start")
+async def start_viewer_demo(payload: ViewerDemoStartRequest):
+    session = _demo_sessions.create(
+        DemoConfig(
+            task_id=payload.task_id,
+            agent_type=payload.agent_type,
+            step_delay_ms=payload.step_delay_ms,
+            max_steps=payload.max_steps,
+        )
+    )
+    return {"session_id": session.session_id}
+
+
+@app.post("/viewer/api/demo/stop/{session_id}")
+async def stop_viewer_demo(session_id: str):
+    return {"stopped": _demo_sessions.stop(session_id)}
+
+
+@app.get("/viewer/api/demo/stream/{session_id}")
+async def stream_viewer_demo(session_id: str, request: Request):
+    session = _demo_sessions.get(session_id)
+    if session is None:
+        async def missing():
+            yield "event: error\ndata: {\"message\":\"unknown session\"}\n\n"
+
+        return StreamingResponse(missing(), media_type="text/event-stream")
+
+    async def events():
+        try:
+            async for event in stream_demo_episode(session.config):
+                if session.stopped or await request.is_disconnected():
+                    break
+                session.events_sent += 1
+                yield f"event: {event.get('type', 'step')}\ndata: {json.dumps(event)}\n\n"
+                await asyncio.sleep(0)
+        finally:
+            _demo_sessions.remove(session_id)
+
+    return StreamingResponse(
+        events(),
+        media_type="text/event-stream",
+        headers={"Cache-Control": "no-cache", "X-Accel-Buffering": "no"},
+    )
 
 
 @app.get("/viewer", response_class=HTMLResponse)
