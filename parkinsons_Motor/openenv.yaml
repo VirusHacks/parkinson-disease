@@ -6,12 +6,36 @@ app: server.app:app
 port: 8000
 
 tasks:
-  - id: beta_suppression
-    description: "Easy: suppress STN beta oscillation in the calm early phase (30 steps)"
+  # ---- Public benchmark ladder --------------------------------------------
+  - id: easy
+    description: "Calm Start: short DBS titration on a responsive patient, mild sensor noise, no major events (36 steps)"
     difficulty: easy
-  - id: tremor_correction
-    description: "Medium: dynamically correct rising tremor while preserving muscle force (48 steps)"
+  - id: medium
+    description: "Rescue Phase: active tremor rescue with possible second deterioration wave and dyskinesia spike (60 steps)"
     difficulty: medium
-  - id: full_episode
-    description: "Hard: optimize full 100-step DBS episode under a strict long-horizon side-effect budget"
+  - id: hard
+    description: "Full Episode: long-horizon DBS management with multiple stochastic events (dyskinesia, tachyphylaxis, off-med crisis, motor surges) over 150 steps"
     difficulty: hard
+
+  # ---- Expert tasks --------------------------------------------------------
+  - id: fragile_patient
+    description: "Tight safety budget (0.26) on a sensitive patient — find and hold a precise therapeutic window (64 steps)"
+    difficulty: expert
+  - id: refractory_patient
+    description: "Drug-resistant patient with weak entrainment, recurring tachyphylaxis, requires pulsed strategies (120 steps)"
+    difficulty: expert
+  - id: personalization_generalization
+    description: "Mixed patient profiles with stochastic events — degrade gracefully across fragile/balanced/responsive/refractory (90 steps)"
+    difficulty: expert
+  - id: exercise_bout
+    description: "Sustained high-motor-demand exercise burst with possible post-exertion dyskinesia spike (70 steps)"
+    difficulty: expert
+  - id: medication_interaction
+    description: "Coupled DBS + L-DOPA dynamics: guaranteed off-med crisis followed by likely dyskinesia spike (100 steps)"
+    difficulty: expert
+  - id: nocturnal_transition
+    description: "Awake → wind-down → sleep with time-varying setpoints; tighter biomarker targets in sleep phase (150 steps)"
+    difficulty: expert
+  - id: surgical_followup
+    description: "First-week post-implant programming with hard amplitude cap during microlesion window and possible impedance surges (120 steps)"
+    difficulty: expert

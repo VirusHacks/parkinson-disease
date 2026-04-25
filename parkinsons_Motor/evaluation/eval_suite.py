@@ -11,7 +11,7 @@ from parkinsons_Motor.core.models import ParkinsonsMotorAction
 from parkinsons_Motor.server.parkinsons_Motor_environment import ParkinsonsMotorEnvironment
 
 
-TASKS = ["beta_suppression", "tremor_correction", "full_episode"]
+TASKS = ["easy", "medium", "hard"]
 EXTENDED_TASKS = [
     "fragile_patient",
     "refractory_patient",
@@ -19,9 +19,9 @@ EXTENDED_TASKS = [
 ]
 PUBLIC_SEEDS = [0, 1, 2, 3]
 HELDOUT_CONFIG = {
-    "beta_suppression": {"seed": 101, "patient_profile_id": "fragile"},
-    "tremor_correction": {"seed": 102, "patient_profile_id": "fragile"},
-    "full_episode": {"seed": 103, "patient_profile_id": "refractory"},
+    "easy": {"seed": 101, "patient_profile_id": "fragile"},
+    "medium": {"seed": 102, "patient_profile_id": "fragile"},
+    "hard": {"seed": 103, "patient_profile_id": "refractory"},
     "fragile_patient": {"seed": 104, "patient_profile_id": "fragile"},
     "refractory_patient": {"seed": 105, "patient_profile_id": "refractory"},
     "personalization_generalization": {"seed": 106, "patient_profile_id": "refractory"},
@@ -59,11 +59,11 @@ def safety_aware_policy(obs) -> ParkinsonsMotorAction:
     side = obs.side_effect_load
     task = obs.task_id
 
-    if task == "beta_suppression":
+    if task == "easy":
         amp = 0.08 + 0.08 * (beta > 0.68) + 0.04 * max(beta - 0.72, 0.0)
         amp -= 0.18 * max(side - 0.22, 0.0)
         pw = 0.07
-    elif task == "tremor_correction":
+    elif task == "medium":
         amp = 1.60
         pw = 0.12
     elif task == "fragile_patient":
@@ -72,7 +72,7 @@ def safety_aware_policy(obs) -> ParkinsonsMotorAction:
     elif task == "refractory_patient":
         amp = 0.30 + 0.14 * beta + 0.10 * tremor - 0.20 * max(side - 0.26, 0.0)
         pw = 0.08
-    elif task == "full_episode":
+    elif task == "hard":
         amp = 1.5018531270975986 + 0.2788883528077374 * beta + 0.1425726032821526 * tremor
         if side > 0.3055597938808898:
             amp -= 1.6639934475532732 * (side - 0.3055597938808898)
@@ -85,13 +85,13 @@ def safety_aware_policy(obs) -> ParkinsonsMotorAction:
 
     amp = max(0.0, min(5.0, amp))
     pw = max(0.06, min(0.20, pw))
-    if task == "tremor_correction":
+    if task == "medium":
         cmd_gain = 1.15
     elif task == "fragile_patient":
         cmd_gain = 1.0 + 0.28 * beta + 0.18 * tremor - 0.08 * side
     elif task == "refractory_patient":
         cmd_gain = 1.0 + 0.30 * beta + 0.20 * tremor - 0.04 * side
-    elif task == "full_episode":
+    elif task == "hard":
         cmd_gain = 1.0 + 0.4894260933407289 * beta + 0.3446252762938653 * tremor
     else:
         cmd_gain = 1.0 + 0.45 * beta + 0.35 * tremor - 0.08 * side

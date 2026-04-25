@@ -1,28 +1,28 @@
 {
-  "model_name": "gpt-4o-mini",
+  "model_name": "Qwen/Qwen2.5-72B-Instruct",
   "server_url": "http://localhost:8000",
   "tasks": [
-    "beta_suppression",
-    "tremor_correction",
-    "full_episode"
+    "easy",
+    "medium",
+    "hard"
   ],
   "request_sleep_seconds": 0.5,
   "task_sleep_seconds": 4.0,
-  "mean_score": 0.6663123332387418,
+  "mean_score": 0.6251830446031891,
   "task_results": [
     {
-      "task_id": "beta_suppression",
-      "score": 0.8365490241420933,
+      "task_id": "easy",
+      "score": 0.7850874219630719,
       "success": true
     },
     {
-      "task_id": "tremor_correction",
-      "score": 0.5894886332312858,
+      "task_id": "medium",
+      "score": 0.5663086220783391,
       "success": true
     },
     {
-      "task_id": "full_episode",
-      "score": 0.5728993423428466,
+      "task_id": "hard",
+      "score": 0.5241530897681563,
       "success": false
     }
   ]

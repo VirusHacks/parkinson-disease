@@ -23,12 +23,14 @@ from openenv.core.env_server.types import State
 
 try:
     from ..core.calibration import CalibratedBrainState, calibrate, get_window_idx, query_dbs_effect
+    from ..core.events import EventEffects, EventScheduler, schedule_overrides
     from ..core.models import ParkinsonsMotorAction, ParkinsonsMotorObservation
     from ..core.patient_profiles import PatientProfile, get_profile
     from ..graders import compute_score_details, is_success
     from ..tasks import DBSTask, get_task
 except ImportError:
     from core.calibration import CalibratedBrainState, calibrate, get_window_idx, query_dbs_effect
+    from core.events import EventEffects, EventScheduler, schedule_overrides
     from core.models import ParkinsonsMotorAction, ParkinsonsMotorObservation
     from core.patient_profiles import PatientProfile, get_profile
     from graders import compute_score_details, is_success
@@ -38,17 +40,17 @@ except ImportError:
 # Task-specific reward weight sets — mirror grader weights so training signal
 # aligns with evaluation. Keys match task_id; "default" is the fallback.
 _REWARD_WEIGHTS: dict = {
-    "beta_suppression": dict(
+    "easy": dict(
         force=0.16, tracking=0.12, beta=0.30, tremor=0.18, safety=0.14,
         smoothness=0.05, efficiency=0.05,
     ),
-    "tremor_correction": dict(
+    "medium": dict(
         force=0.16, tracking=0.16, beta=0.06, tremor=0.14, safety=0.22,
         smoothness=0.04, efficiency=0.08,
     ),
-    "full_episode": dict(
-        force=0.14, tracking=0.16, beta=0.08, tremor=0.06, safety=0.36,
-        smoothness=0.05, efficiency=0.10,
+    "hard": dict(
+        force=0.14, tracking=0.16, beta=0.22, tremor=0.14, safety=0.18,
+        smoothness=0.04, efficiency=0.04,
     ),
     "fragile_patient": dict(
         force=0.18, tracking=0.18, beta=0.10, tremor=0.10, safety=0.28,
@@ -61,6 +63,22 @@ _REWARD_WEIGHTS: dict = {
     "personalization_generalization": dict(
         force=0.18, tracking=0.18, beta=0.08, tremor=0.12, safety=0.18,
         smoothness=0.04, efficiency=0.08,
+    ),
+    "exercise_bout": dict(
+        force=0.22, tracking=0.22, beta=0.08, tremor=0.10, safety=0.20,
+        smoothness=0.04, efficiency=0.06,
+    ),
+    "medication_interaction": dict(
+        force=0.16, tracking=0.14, beta=0.10, tremor=0.12, safety=0.22,
+        smoothness=0.04, efficiency=0.06,
+    ),
+    "nocturnal_transition": dict(
+        force=0.12, tracking=0.10, beta=0.12, tremor=0.14, safety=0.22,
+        smoothness=0.06, efficiency=0.12,
+    ),
+    "surgical_followup": dict(
+        force=0.14, tracking=0.14, beta=0.10, tremor=0.10, safety=0.30,
+        smoothness=0.06, efficiency=0.06,
     ),
     "default": dict(
         force=0.20, tracking=0.18, beta=0.14, tremor=0.12, safety=0.18,
@@ -158,9 +176,15 @@ class ParkinsonsMotorEnvironment(Environment):
         self._medication_phase: float = 0.5  # L-DOPA cycle position
         self._med_phase_offset: float = 0.0  # per-episode phase offset
         self._battery_drain: float = 0.0     # cumulative battery drain proxy
+        self._cumulative_charge: float = 0.0  # mC delivered this episode
         self._initial_force_state: float = 0.0
         self._initial_tremor_state: float = 0.0
         self._initial_tracking_accuracy: float = 0.0
+
+        # Stochastic events + time-varying schedules
+        self._event_scheduler: EventScheduler = EventScheduler(None, 1, self._rng)
+        self._last_event_effects: EventEffects = EventEffects()
+        self._active_event_ids: Tuple[str, ...] = ()
 
     # ------------------------------------------------------------------
     # helpers
@@ -222,7 +246,7 @@ class ParkinsonsMotorEnvironment(Environment):
             + 0.25 * (1.0 - min((2.0 * (1.0 - tracking_accuracy)) / target_error, 1.0))
         )
 
-        if self._task.task_id == "tremor_correction":
+        if self._task.task_id == "medium":
             recovery_force = _clamp((self._force_state - self._initial_force_state + 0.12) / 0.28)
             recovery_tremor = _clamp((self._initial_tremor_state - self._tremor_state + 0.08) / 0.24)
             recovery_tracking = _clamp(
@@ -235,14 +259,17 @@ class ParkinsonsMotorEnvironment(Environment):
             terminal_weight = _clamp((progress - 0.65) / 0.35)
             return 0.03 * recovery_proxy * recovery_weight + 0.02 * terminal_proxy * terminal_weight
 
-        if self._task.task_id == "full_episode":
+        if self._task.task_id == "hard":
             terminal_weight = _clamp((progress - 0.75) / 0.25)
             return 0.03 * terminal_proxy * terminal_weight
 
         return 0.0
 
-    def _clip_action(self, action: ParkinsonsMotorAction) -> Tuple[float, float, float, float]:
-        amp_cap = self._task.max_dbs_amplitude * self._profile.max_amp_scale
+    def _clip_action(
+        self,
+        action: ParkinsonsMotorAction,
+        amp_cap: float,
+    ) -> Tuple[float, float, float, float]:
         pw_cap = self._task.max_dbs_pulse_width
 
         amp = _clamp(action.dbs_amplitude, 0.0, amp_cap)
@@ -266,6 +293,21 @@ class ParkinsonsMotorEnvironment(Environment):
     def _mean_recent(self, values: deque[float], fallback: float) -> float:
         return sum(values) / len(values) if values else fallback
 
+    def _add_sensor_noise(self, value: float) -> float:
+        """Add zero-mean Gaussian sensor noise; clamp to [0, 1]."""
+        std = self._task.sensor_noise_std
+        if std <= 0.0:
+            return _clamp(value)
+        return _clamp(value + self._rng.gauss(0.0, std))
+
+    def _resolve_amplitude_ceiling(self, override: Dict[str, float]) -> float:
+        """Effective per-step amplitude ceiling (mA), considering schedule overrides."""
+        base = self._task.max_dbs_amplitude * self._profile.max_amp_scale
+        absolute = override.get("amplitude_ceiling_abs_ma")
+        if absolute is not None:
+            return min(base, max(0.0, absolute))
+        return base
+
     def _apply_motor_distortion(self, command: float) -> float:
         noise = (
             self._rng.uniform(-1.0, 1.0)
@@ -282,7 +324,15 @@ class ParkinsonsMotorEnvironment(Environment):
         )
         return _clamp(effective, -1.0, 1.0)
 
-    def _update_side_effects(self, amp: float, pw: float, freq: float, smoothness: float, violation: float) -> None:
+    def _update_side_effects(
+        self,
+        amp: float,
+        pw: float,
+        freq: float,
+        smoothness: float,
+        violation: float,
+        burden_mult: float = 1.0,
+    ) -> None:
         amp_cap = max(self._task.max_dbs_amplitude * self._profile.max_amp_scale, 1e-6)
         amp_norm = amp / amp_cap
         pw_norm = (pw - 0.06) / max(self._task.max_dbs_pulse_width - 0.06, 1e-6)
@@ -294,7 +344,7 @@ class ParkinsonsMotorEnvironment(Environment):
         # Frequency modulates side-effect accumulation rate (high frequency → more axonal fatigue)
         freq_se = _freq_side_effect_factor(freq)
         burden = (
-            0.04 * stimulation_burden * self._profile.side_effect_sensitivity * freq_se
+            0.04 * stimulation_burden * self._profile.side_effect_sensitivity * freq_se * burden_mult
             + 0.02 * self._entrainment_state
             + 0.04 * smoothness
             + 0.20 * violation
@@ -342,6 +392,8 @@ class ParkinsonsMotorEnvironment(Environment):
         effective_motor: float,
         tracking_accuracy: float,
         smoothness: float,
+        beta_drive_add: float = 0.0,
+        tremor_drive_add: float = 0.0,
     ) -> None:
         base_beta = _clamp(next_base.beta_arv * self._profile.beta_scale * self._ep_beta_noise)
         base_tremor = _clamp(next_base.tremor_arv * self._profile.tremor_scale * self._ep_tremor_noise)
@@ -360,6 +412,7 @@ class ParkinsonsMotorEnvironment(Environment):
             + under_treated_pressure
             + 0.06 * self._fatigue_state
             + 0.04 * self._side_effect_state
+            + beta_drive_add
             - 0.82 * self._entrainment_state * self._profile.beta_responsiveness
         )
         self._beta_state = _clamp(0.45 * self._beta_state + 0.55 * target_beta)
@@ -370,6 +423,7 @@ class ParkinsonsMotorEnvironment(Environment):
             + 0.24 * self._beta_state
             + 0.08 * under_treated_pressure
             + 0.06 * self._fatigue_state
+            + tremor_drive_add
             - 0.50 * self._entrainment_state * self._profile.tremor_responsiveness
         )
         self._tremor_state = _clamp(0.40 * self._tremor_state + 0.60 * target_tremor)
@@ -476,20 +530,29 @@ class ParkinsonsMotorEnvironment(Environment):
         recent_amp = self._mean_recent(self._recent_amp, amp)
         recent_pw = self._mean_recent(self._recent_pw, pw)
 
-        force_amplitude = self._force_state * self._brain.healthy_force_mn
+        # Sensor-level noise on neural biomarkers (LFP/EMG recordings are noisy
+        # in practice). Latent state remains clean for grading; only what the
+        # agent observes is perturbed. No-op when sensor_noise_std == 0.
+        sensed_beta = self._add_sensor_noise(self._beta_state)
+        sensed_tremor = self._add_sensor_noise(self._tremor_state)
+        sensed_semg = self._add_sensor_noise(self._semg_state)
+        sensed_force = self._add_sensor_noise(self._force_state)
+
+        force_amplitude = sensed_force * self._brain.healthy_force_mn
+        observed_target = metadata.get("target_output", self._target_output)
 
         return ParkinsonsMotorObservation(
-            beta_arv=self._beta_state,
-            tremor_arv=self._tremor_state,
-            semg_arv=self._semg_state,
+            beta_arv=sensed_beta,
+            tremor_arv=sensed_tremor,
+            semg_arv=sensed_semg,
             force_amplitude=force_amplitude,
-            force_preserved=self._force_state,
-            disease_severity=_clamp(0.55 * self._tremor_state + 0.45 * self._beta_state),
-            beta_suppression=_clamp(1.0 - self._beta_state),
+            force_preserved=sensed_force,
+            disease_severity=_clamp(0.55 * sensed_tremor + 0.45 * sensed_beta),
+            beta_suppression=_clamp(1.0 - sensed_beta),
             beta_trend=beta_trend,
             tremor_trend=tremor_trend,
             side_effect_rate=side_effect_rate,
-            target_output=self._target_output,
+            target_output=float(observed_target),
             effective_motor_output=effective_motor,
             task_error=task_error,
             tracking_accuracy=tracking_accuracy,
@@ -545,6 +608,12 @@ class ParkinsonsMotorEnvironment(Environment):
         self._ep_semg_noise = _clamp(1.0 + self._rng.gauss(0.0, 0.06), 0.80, 1.20)
 
         self._init_latent_state()
+        self._cumulative_charge = 0.0
+        self._event_scheduler = EventScheduler(
+            self._task.event_profile, self._task.n_steps, self._rng
+        )
+        self._last_event_effects = EventEffects()
+        self._active_event_ids = ()
 
         base = self._brain_window(self._task.start_step)
         tracking_accuracy = _clamp(1.0 - abs(self._target_output) / 2.0)
@@ -563,6 +632,8 @@ class ParkinsonsMotorEnvironment(Environment):
             violation=0.0,
             metadata={
                 "task_id": self._task.task_id,
+                "task_name": self._task.name,
+                "task_description": self._task.description,
                 "task_difficulty": self._task.difficulty,
                 "episode_steps": self._task.n_steps,
                 "target_output": self._target_output,
@@ -573,6 +644,10 @@ class ParkinsonsMotorEnvironment(Environment):
                 "ground_truth_force": base.force_amplitude,
                 "ground_truth_scheduler_class": base.scheduler_class,
                 "ground_truth_beta_ctrl_error": base.beta_ctrl_error,
+                "event_profile": self._task.event_profile,
+                "event_schedule": self._event_scheduler.schedule_summary(),
+                "schedule_id": self._task.schedule_id,
+                "sensor_noise_std": self._task.sensor_noise_std,
             },
         )
 
@@ -583,42 +658,80 @@ class ParkinsonsMotorEnvironment(Environment):
         next_idx = min(current_idx + 1, self._task.start_step + self._task.n_steps - 1)
         next_base = self._brain_window(next_idx)
 
-        amp, pw, freq, violation = self._clip_action(action)
+        # ---- 1. Resolve time-varying schedule overrides ------------------
+        schedule_override = schedule_overrides(
+            self._task.schedule_id, self._local_step, self._task.n_steps
+        )
+        amp_cap = self._resolve_amplitude_ceiling(schedule_override)
+
+        # ---- 2. Poll stochastic event scheduler --------------------------
+        recent_amp_norm = self._mean_recent(self._recent_amp, 0.0) / max(amp_cap, 1e-6)
+        events = self._event_scheduler.effects(
+            self._local_step,
+            recent_amp_norm=recent_amp_norm,
+            medication_phase=self._medication_phase,
+        )
+        self._last_event_effects = events
+        self._active_event_ids = events.active_event_ids
+
+        # Motor surge events override the trial's target_output for this step.
+        if events.target_output_override is not None:
+            effective_target = events.target_output_override
+        else:
+            effective_target = self._target_output
+
+        # ---- 3. Clip action and compute device-side stats ----------------
+        amp, pw, freq, violation = self._clip_action(action, amp_cap)
+        # Impedance / lead-fault events reduce delivered current.
+        delivered_amp = amp * events.delivered_amp_mult
         smoothness = self._smoothness_cost(amp, pw, freq)
-        self._update_adaptation_state(amp, pw)
+        self._update_adaptation_state(delivered_amp, pw)
         adaptation_penalty = (
             0.45 * self._adaptation_state
-            if self._task.task_id != "beta_suppression"
+            if self._task.task_id != "easy"
             else 0.25 * self._adaptation_state
         )
-        # Frequency modulates beta-suppression efficiency (peak at ~130 Hz)
+
+        # ---- 4. Compute entrainment with frequency + event modulation ----
         freq_beta = _freq_beta_factor(freq)
         target_entrainment = _clamp(
-            query_dbs_effect(self._brain, amp, pw)
+            query_dbs_effect(self._brain, delivered_amp, pw)
             * self._profile.entrainment_scale
             * freq_beta
+            * events.entrainment_mult
             * (1.0 - adaptation_penalty)
         )
         self._entrainment_state = _clamp(0.35 * self._entrainment_state + 0.65 * target_entrainment)
 
-        # motor_command tracks target_output; disease state distorts the signal.
+        # ---- 5. Motor command tracking against effective target ----------
         motor_intent = _clamp(action.motor_command, -1.0, 1.0)
         effective_motor = self._apply_motor_distortion(motor_intent)
-        task_error = abs(self._target_output - effective_motor)
+        task_error = abs(effective_target - effective_motor)
         tracking_accuracy = _clamp(1.0 - task_error / 2.0)
 
-        self._update_side_effects(amp, pw, freq, smoothness, violation)
-        self._update_latent_state(current_base, next_base, effective_motor, tracking_accuracy, smoothness)
+        # ---- 6. Update side effects, latent neural state, charge ---------
+        self._update_side_effects(
+            delivered_amp, pw, freq, smoothness, violation,
+            burden_mult=events.side_effect_burden_mult,
+        )
+        self._update_latent_state(
+            current_base, next_base, effective_motor, tracking_accuracy, smoothness,
+            beta_drive_add=events.beta_drive_add,
+            tremor_drive_add=events.tremor_drive_add,
+        )
+        # Cumulative delivered charge in mC (ampl × pw_s × freq × dt) over a
+        # 20 ms timestep. Used for cumulative-charge penalties.
+        self._cumulative_charge += delivered_amp * (pw * 1e-3) * freq * 0.020
 
         # Advance medication phase (L-DOPA 4–6 hr cycle → ~0.5–1 full cycle per 100-step episode)
         self._medication_phase = _clamp(
             (self._med_phase_offset + self._local_step / max(self._task.n_steps, 1)) % 1.0
         )
 
-        reward = self._build_reward(tracking_accuracy, smoothness, violation, amp, pw)
-        self._record_step(amp, pw, effective_motor, task_error, tracking_accuracy, smoothness, violation)
+        reward = self._build_reward(tracking_accuracy, smoothness, violation, delivered_amp, pw)
+        self._record_step(delivered_amp, pw, effective_motor, task_error, tracking_accuracy, smoothness, violation)
 
-        self._recent_amp.append(amp)
+        self._recent_amp.append(delivered_amp)
         self._recent_pw.append(pw)
         self._local_step += 1
         done = self._local_step >= self._task.n_steps
@@ -631,7 +744,9 @@ class ParkinsonsMotorEnvironment(Environment):
 
         metadata = {
             "task_id": self._task.task_id,
-            "target_output": self._target_output,
+            "task_name": self._task.name,
+            "task_description": self._task.description,
+            "target_output": effective_target,
             "step": self._state.step_count,
             "local_step": self._local_step,
             "episode_steps": self._task.n_steps,
@@ -644,6 +759,10 @@ class ParkinsonsMotorEnvironment(Environment):
             "ground_truth_beta_ctrl_error": next_base.beta_ctrl_error,
             "constraint_violation": violation,
             "dbs_frequency_hz": freq,
+            "delivered_amplitude_ma": delivered_amp,
+            "amplitude_ceiling_ma": amp_cap,
+            "active_events": list(self._active_event_ids),
+            "cumulative_charge_mc": self._cumulative_charge,
             "score_details": score_details or {},
         }
 

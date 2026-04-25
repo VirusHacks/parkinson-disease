@@ -38,6 +38,7 @@ if str(REPO_ROOT) not in sys.path:
     sys.path.insert(0, str(REPO_ROOT))
 
 from parkinsons_Motor import ParkinsonsMotorAction, ParkinsonsMotorEnv  # noqa: E402
+from parkinsons_Motor.tasks import get_task  # noqa: E402
 
 
 # -- env config ---------------------------------------------------------------
@@ -117,70 +118,114 @@ def _resolve_llm_config() -> tuple[str, str, str, str]:
 LLM_PROVIDER, API_KEY, API_BASE_URL, MODEL_NAME = _resolve_llm_config()
 BENCHMARK = "parkinsons_Motor"
 
-DEFAULT_TASKS = ["beta_suppression", "tremor_correction", "full_episode"]
-TASKS = [
-    task.strip()
-    for task in os.getenv("INFERENCE_TASKS", ",".join(DEFAULT_TASKS)).split(",")
-    if task.strip()
-]
-MAX_STEPS_PER_TASK = {"beta_suppression": 30, "tremor_correction": 48, "full_episode": 100}
-SUCCESS_SCORE_THRESHOLD = {"beta_suppression": 0.50, "tremor_correction": 0.36, "full_episode": 0.66}
+DEFAULT_TASKS = ["easy", "medium", "hard"]
 
-TEMPERATURE = float(os.getenv("OPENAI_TEMPERATURE", "0.2"))
-MAX_TOKENS = int(os.getenv("OPENAI_MAX_TOKENS", "300"))
-REQUEST_TIMEOUT_SECONDS = float(os.getenv("OPENAI_REQUEST_TIMEOUT_SECONDS", "120"))
-OPENAI_MAX_RETRIES = int(os.getenv("OPENAI_MAX_RETRIES", "4"))
-REQUEST_SLEEP_SECONDS = float(os.getenv("INFERENCE_REQUEST_SLEEP_SECONDS", "0.5"))
-TASK_SLEEP_SECONDS = float(os.getenv("INFERENCE_TASK_SLEEP_SECONDS", "2.0"))
+
+def _parse_task_list() -> List[str]:
+    raw = os.getenv("INFERENCE_TASKS", ",".join(DEFAULT_TASKS))
+    tasks = [task.strip() for task in raw.split(",") if task.strip()]
+    if not tasks:
+        raise RuntimeError("INFERENCE_TASKS resolved to an empty task list.")
+    return tasks
+
+
+def _env_float(name: str, default: float) -> float:
+    raw = os.getenv(name)
+    return float(raw) if raw is not None and raw != "" else default
+
+
+def _env_int(name: str, default: int) -> int:
+    raw = os.getenv(name)
+    return int(raw) if raw is not None and raw != "" else default
+
+
+def _resolve_task_runtime_config(tasks: List[str]) -> tuple[dict[str, int], dict[str, float], dict[str, float]]:
+    max_steps: dict[str, int] = {}
+    success_thresholds: dict[str, float] = {}
+    side_effect_budgets: dict[str, float] = {}
+
+    for task_id in tasks:
+        task = get_task(task_id)
+        env_key = task.task_id.upper()
+        max_steps[task_id] = _env_int(f"INFERENCE_MAX_STEPS_{env_key}", task.n_steps)
+        success_thresholds[task_id] = _env_float(
+            f"INFERENCE_SUCCESS_THRESHOLD_{env_key}",
+            task.success_threshold,
+        )
+        side_effect_budgets[task_id] = _env_float(
+            f"INFERENCE_SIDE_EFFECT_BUDGET_{env_key}",
+            task.max_side_effect_load,
+        )
+
+    return max_steps, success_thresholds, side_effect_budgets
+
+
+TASKS = _parse_task_list()
+MAX_STEPS_PER_TASK, SUCCESS_SCORE_THRESHOLD, SIDE_EFFECT_BUDGETS = _resolve_task_runtime_config(TASKS)
+
+TEMPERATURE = _env_float("OPENAI_TEMPERATURE", 0.2)
+MAX_TOKENS = _env_int("OPENAI_MAX_TOKENS", 300)
+REQUEST_TIMEOUT_SECONDS = _env_float("OPENAI_REQUEST_TIMEOUT_SECONDS", 120.0)
+OPENAI_MAX_RETRIES = _env_int("OPENAI_MAX_RETRIES", 4)
+REQUEST_SLEEP_SECONDS = _env_float("INFERENCE_REQUEST_SLEEP_SECONDS", 0.5)
+TASK_SLEEP_SECONDS = _env_float("INFERENCE_TASK_SLEEP_SECONDS", 2.0)
 
 
 # -- LLM prompts --------------------------------------------------------------
 
 SYSTEM_PROMPT = textwrap.dedent(
     """
-    You are a closed-loop Deep Brain Stimulation (DBS) controller for a Parkinson's patient.
-    Every 20ms you read the patient's brain state and output DBS settings as JSON.
+    You are an expert closed-loop DBS controller managing Parkinsonian motor symptoms in real time.
+    Every step is a short clinical control decision: suppress pathological activity, preserve movement,
+    avoid overstimulation, and keep enough safety budget for the rest of the episode.
 
-    KEY OBSERVATIONS
-      beta_arv         STN beta oscillation. Lower is better.
-      tremor_arv       Tremor envelope. Lower is better.
-      force_preserved  Fraction of healthy muscle force. Higher is better.
-      side_effect_load Cumulative stimulation burden. Stay inside task budget.
-      beta_trend       Negative means beta is improving.
-      tremor_trend     Negative means tremor is improving.
-      side_effect_rate Positive means burden is rising.
-      gamma_arv        Over-stimulation alarm. If high, reduce amplitude.
-      target_output    Copy this exactly into motor_command every step.
-      dbs_entrainment  How much DBS is currently suppressing beta.
-
-    OUTPUT FORMAT
     Return JSON only:
     {"dbs_amplitude": X, "dbs_pulse_width": X, "dbs_frequency": X}
 
-    RULES
-    - If tremor_arv > 0.55 or beta_arv > 0.60, use at least 1.2 mA until symptoms improve.
-    - If side_effect_load is near budget, reduce amplitude by 20-40%.
-    - If gamma_arv > 0.55, reduce amplitude immediately.
-    - Increase amplitude gradually when symptoms worsen.
-    - Reduce amplitude slowly once both beta and tremor are improving.
-    - Keep pulse width near 0.13 ms and frequency near 130 Hz unless there is a strong reason not to.
-    - Avoid abrupt amplitude jumps larger than 0.3 mA per step.
+    Important:
+    - Do not output explanations.
+    - Do not include motor_command.
+    - Prefer pulse_width = 0.13 and frequency = 130.
+    - Keep amplitude changes smooth unless there is a clear rescue or safety reason.
+
+    Clinical meaning:
+    - beta_arv and tremor_arv should go down.
+    - force_preserved should stay high.
+    - side_effect_load and gamma_arv warn about overstimulation.
+    - positive beta/tremor trends mean worsening.
+    - positive side_effect_rate means the burden is still rising.
+
+    Control priorities:
+    1. Prevent unsafe overstimulation.
+    2. Do not leave symptoms undertreated when clearly elevated.
+    3. Restore useful motor function.
+    4. Taper toward the lowest effective dose once stable.
+
+    Policy:
+    - If gamma_arv is high or side effects are near budget, reduce.
+    - If tremor_arv > 0.55 or beta_arv > 0.60, usually treat actively with at least about 1.2 mA unless unsafe.
+    - If symptoms worsen and safety is acceptable, increase gradually.
+    - If symptoms improve and side effects continue to rise, hold or reduce.
+    - If control is stable, taper slowly instead of staying high forever.
     """
 ).strip()
 
 
 _TASK_CONTEXT = {
-    "beta_suppression": (
-        "EASY. Ceiling: 1.5 mA. Side-effect budget: 0.55. "
-        "Prefer 0.9-1.1 mA early, then taper toward 0.7-0.8 mA once beta and tremor are controlled."
+    "easy": (
+        "EASY / Calm Start. Responsive patient early in symptom build-up. "
+        "Goal: stabilize mild pathology quickly without wasting safety budget. "
+        "Ceiling: 1.5 mA. Side-effect budget: 0.55."
     ),
-    "tremor_correction": (
-        "MEDIUM. Ceiling: 1.8 mA. Side-effect budget: 0.60. "
-        "Rescue tremor quickly with 1.2-1.5 mA, then drop to 0.7-1.0 mA maintenance."
+    "medium": (
+        "MEDIUM / Rescue Phase. Symptoms are worsening and force is at risk. "
+        "Goal: rescue actively, then taper once recovery begins. "
+        "Ceiling: 1.8 mA. Side-effect budget: 0.60."
     ),
-    "full_episode": (
-        "HARD. Ceiling: 2.4 mA. Side-effect budget: 0.55. "
-        "Phase 1 build entrainment, phase 2 rescue symptoms, phase 3 preserve budget for stable maintenance."
+    "hard": (
+        "HARD / Full Episode. Long-horizon management across onset, escalation, peak symptoms, and recovery. "
+        "Goal: keep the patient functional through the whole episode, not just a short rescue. "
+        "Ceiling: 2.4 mA. Side-effect budget: 0.55."
     ),
 }
 
@@ -206,6 +251,12 @@ def _build_user_prompt(step: int, obs: dict, task_id: str, history: list[str]) -
           stim_washout:     {obs.get('stim_washout', 0.0):.4f}
           target_output:    {obs.get('target_output', 0.0):.4f}
           tracking_accuracy:{obs.get('tracking_accuracy', 0.0):.4f}
+
+        Hints:
+        - worsening symptoms + acceptable safety => increase a little
+        - high gamma or high side-effect burden => reduce
+        - improving symptoms + rising burden => hold or taper
+        - stable control => use the lowest effective dose
 
         Recent steps:
         {recent}

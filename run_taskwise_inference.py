@@ -18,7 +18,7 @@ from typing import Any, Dict, List
 
 REPO_ROOT = Path(__file__).resolve().parent
 OUTPUT_DIR = REPO_ROOT / "outputs" / "runs"
-DEFAULT_TASKS = ["beta_suppression", "tremor_correction", "full_episode"]
+DEFAULT_TASKS = ["easy", "medium", "hard"]
 TASKS = [
     task.strip()
     for task in os.getenv("INFERENCE_TASKS", ",".join(DEFAULT_TASKS)).split(",")
@@ -29,6 +29,9 @@ REQUEST_SLEEP_SECONDS = os.getenv("INFERENCE_SLEEP_SECONDS", "2.0")
 INTER_TASK_SLEEP_SECONDS = os.getenv("INFERENCE_TASK_SLEEP_SECONDS", "5.0")
 
 TASK_LABELS = {
+    "easy": "Easy / Calm Start",
+    "medium": "Medium / Rescue Phase",
+    "hard": "Hard / Full Episode",
     "beta_suppression": "Easy / Calm Start",
     "tremor_correction": "Medium / Rescue Phase",
     "full_episode": "Hard / Full Episode",

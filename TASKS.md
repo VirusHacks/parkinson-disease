@@ -2,303 +2,261 @@
 
 ## Overview
 
-MotorAssistEnv defines six tasks across two tiers. The three core public tasks form a
-curriculum ladder from introductory to full clinical benchmark. The three advanced
-extension tasks add scenario complexity for safety sensitivity, weak-response patients,
-and cross-patient generalisation.
+MotorAssistEnv defines 10 tasks across four difficulty tiers. All share the same observation space, action space, and environment dynamics. What changes per task is the clinical scenario:
 
-All tasks share the same 27-field observation space, 4-field action space, and
-environment dynamics. What changes per task is the clinical scenario:
+- **Episode length** — from 36 steps (titration) to 150 steps (full-session management)
+- **Patient profile** — fixed per task; determines baseline entrainment, side-effect sensitivity, recovery rate
+- **Event profile** — seeded stochastic events wired into the physics (tachyphylaxis, off-med crisis, dyskinesia, etc.)
+- **Biomarker targets** — how tightly beta, tremor, and tracking must be controlled
+- **Safety budget** — maximum cumulative side-effect load before safety score collapses
+- **Grader weights** — which clinical objectives matter most for this scenario
+- **Success threshold** — minimum grader score to declare the episode a success
 
-- **Episode window**: which phase of the Fleming 100-step trajectory is active
-- **Episode length**: how many control steps the agent takes
-- **DBS ceiling**: the maximum allowable amplitude and pulse-width
-- **Safety budget**: the maximum cumulative side-effect load before safety score collapses
-- **Clinical targets**: beta, tremor, force, and tracking thresholds used by the grader
-- **Patient profile pool**: which patient types may appear
-- **Success threshold**: minimum grader score to declare the episode a success
-
-**Curriculum design principle (from hackathon guide):** success probability must be
-greater than zero for learning to occur. Easy tasks should be solvable by a thoughtful
-rule-based policy. Hard tasks should require temporal reasoning about cumulative effects.
-The boundary is not "hard enough to look impressive" — it is "hard enough that a
-naive agent fails while a smart agent can succeed."
+**Difficulty ordering guarantee:** The constant 1.0 mA baseline scores easy (0.72–0.80) > medium (0.47–0.52) > hard (0.23–0.36) across all seeds. Hard never passes its threshold with any constant policy.
 
 ---
 
-## Core Public Tasks
+## Public Tasks
 
-### Task 1: `beta_suppression` — Easy
+### `easy` — Calm Start
 
-**Clinical scenario:** Pre-emptive DBS calibration during the early-phase window,
-before tremor escalation. This mirrors the clinical practice of programming a newly
-implanted IPG in a responsive patient who is still in good baseline motor condition.
+**Clinical scenario:** Early DBS titration in a newly programmed patient. Beta activity is rising but tremor is not yet severe. The agent's job is to establish a therapeutic amplitude early and hold it cleanly — the onboarding clinical task.
 
-**Patient population:** Responsive profile only (entrainment_scale=1.08,
-side_effect_sensitivity=0.92, recovery_rate=0.08). The most amenable patient type —
-chosen deliberately so the agent can establish clean control patterns without fighting
-a difficult physiology.
+**Patient:** `responsive` — high beta responsiveness (1.08×), fast recovery rate (0.08), low side-effect sensitivity (0.92×). The most amenable patient type, chosen deliberately so the agent can learn clean control without fighting a difficult physiology.
 
-**Episode parameters:**
+**Events:** None. The environment is deterministic across seeds (only per-episode signal noise varies).
 
-| Parameter | Value | Justification |
+**Parameters:**
+
+| Parameter | Value | Clinical rationale |
 |---|---|---|
-| `start_step` | 5 | Before the first significant beta escalation in the Fleming trajectory |
-| `n_steps` | 30 | Short horizon: 600 ms of closed-loop control (clinically: one programming window) |
-| `max_dbs_amplitude` | 1.5 mA | Below typical therapeutic ceiling; leaves clear headroom without trivialising |
-| `max_dbs_pulse_width` | 0.15 ms | Moderate spatial spread |
+| `n_steps` | 36 | ~720 ms — one programming window |
+| `max_dbs_amplitude` | 1.5 mA | Moderate ceiling; leaves clear headroom |
 | `max_side_effect_load` | 0.55 | Forgiving budget; 1.0 mA sustained stays well within limits |
-| `target_force_preserved` | 0.78 | 78% of healthy force — realistic early-phase preservation target |
-| `target_beta_arv` | 0.26 | Below the clinical suppression threshold (Tinkhauser et al.: <0.30 indicates good suppression) |
-| `target_tremor_arv` | 0.20 | Low tremor target appropriate for early phase |
-| `success_threshold` | **0.50** | Half the maximum score — achievable by a coherent low-amplitude policy |
+| `target_beta_arv` | 0.30 | Achievable suppression target for a responsive patient |
+| `target_tremor_arv` | 0.24 | Low tremor appropriate for early phase |
+| `target_force_preserved` | 0.78 | 78% of healthy force — realistic early-phase goal |
+| `sensor_noise_std` | 0.025 | Mild sensor noise |
+| `success_threshold` | **0.55** | Achievable by any policy that stimulates at all |
 
-**What must happen for success:**
-- Apply DBS (zero-stim fails via hard-failure penalty)
-- Keep amplitude below 1.5 mA ceiling (no constraint violations)
-- Maintain `side_effect_load < 0.40` across 30 steps
-- Keep `beta_arv < 0.26` on most steps
+**Grader emphasis:** Beta suppression (0.30 weight) and tremor (0.18). This task is about establishing control, not managing crises.
 
 **What fails this task:**
-- `amp = 0` throughout (hard penalty: −0.20)
-- Constant max amplitude (efficiency_score collapses, mild safety penalty)
-- Abrupt amplitude changes without beta feedback (smoothness + safety cost)
+- Zero stimulation → hard penalty (−0.20 for no-DBS with poor suppression)
+- Constant maximum amplitude → efficiency collapses, mild safety penalty
+- Abrupt amplitude steps → smoothness penalty
 
-**Expected score distribution:**
+**Expected scores — constant 1.0 mA policy:** 0.72–0.80 (passes). A good reactive agent: 0.78–0.88.
 
-| Policy | Score range | Pass? |
+---
+
+### `medium` — Rescue Phase
+
+**Clinical scenario:** The patient is mid-deterioration. The episode starts during active symptom escalation — beta is rising, force is falling. This mirrors an adaptive DBS system activating during an "off" phase or after medication wears off.
+
+**Patient:** `balanced` — standard entrainment scale (1.0), moderate side-effect sensitivity (1.0), normal recovery rate (0.06). Represents the typical clinical population.
+
+**Events:** `rescue` profile:
+- **Second deterioration wave** (55% probability, intensity 0.10–0.18): additive beta and tremor drive in the second half of the episode — the patient worsens again just as the agent thinks it has stabilised
+- **Mild dyskinesia pressure** (30% probability, intensity 0.08–0.16): modest increase in side-effect burden if the agent over-stimulates
+
+These events are mild — they require the agent to notice and respond, not survive a catastrophe.
+
+**Parameters:**
+
+| Parameter | Value | Clinical rationale |
 |---|---|---|
-| zero_stim | 0.18–0.28 | No |
-| constant 1.0 mA, 130 Hz | 0.44–0.56 | Marginal |
-| adaptive rule-based | 0.52–0.64 | Yes |
+| `n_steps` | 60 | ~1.2 s — long enough to observe a full rescue arc |
+| `max_dbs_amplitude` | 1.8 mA | Higher ceiling for aggressive initial rescue |
+| `max_side_effect_load` | 0.60 | Moderate budget — 1.0 mA is safe, max amplitude is not |
+| `target_beta_arv` | 0.28 | Clinically meaningful suppression |
+| `target_tremor_arv` | 0.32 | Active tremor reduction target |
+| `target_tracking_error` | 0.28 | Moderate motor accuracy requirement |
+| `sensor_noise_std` | 0.040 | Moderate sensor noise |
+| `success_threshold` | **0.52** | Requires measurable rescue — constant passive policy is marginal |
+
+**Grader emphasis:** Safety (0.22) and tracking (0.16) and force (0.16). Recovery is measured explicitly — the grader compares the patient state at the start vs. the end of the episode.
+
+**What fails this task:**
+- Passive low-amplitude strategy → tremor uncontrolled, recovery_score low
+- Constant max amplitude → side effects accumulate by step ~35, safety collapses
+- Missing the second deterioration wave → score drops in final third of episode
+
+**Expected scores — constant 1.0 mA policy:** 0.47–0.52 (fails on most seeds). A good reactive agent: 0.58–0.70.
 
 ---
 
-### Task 2: `tremor_correction` — Medium
+### `hard` — Full Episode
 
-**Clinical scenario:** Acute tremor rescue. The episode begins at step 16 — the point
-in the Fleming trajectory where tremor is actively escalating and force is falling.
-This mirrors an aDBS system activating during a patient's "off" phase or after a
-medication dose has worn off.
+**Clinical scenario:** End-to-end 150-step closed-loop DBS management of a drug-resistant patient through a full session containing multiple overlapping crises. The agent must pace itself across onset, escalation, crisis events, and late-episode stability while managing a tighter safety budget on a patient who responds poorly to stimulation.
 
-**Patient population:** Balanced or responsive (sampled randomly per episode).
-Balanced patients have standard DBS response; responsive patients respond somewhat
-faster. The randomisation forces the agent to track the observation rather than
-memorise a fixed response pattern.
+**Patient:** `refractory` — weak cortical entrainment (0.88×), high progression rate (1.10×), slow recovery (0.04), elevated adaptation gain (1.25×). This patient type requires more amplitude for the same effect and builds tolerance faster.
 
-**Episode parameters:**
+**Events:** `long_horizon` profile with near-guaranteed crises:
 
-| Parameter | Value | Justification |
+| Event | Probability | Duration | Intensity | Mechanical effect |
+|---|---|---|---|---|
+| `tachyphylaxis` | 82% | 12–20 steps | 0.20–0.30 | `entrainment_mult = max(0.40, 1 − 2.0 × intensity)` — up to 60% entrainment loss |
+| `off_med_crisis` | 75% | 10–15 steps | 0.25–0.45 | `beta_drive_add += 0.28 × intensity` per step — genuine beta spike |
+| `dyskinesia_spike` | 80%, up to 2× | 6–11 steps | 0.22–0.40 | `side_effect_burden_mult × (1.0 + 1.65 × intensity)` — accelerates overload |
+| `motor_surge` | 65%, up to 2× | 5–9 steps | 0.60–0.90 | Target output overrides to high-force demand; force floor raised |
+
+**Parameters:**
+
+| Parameter | Value | Clinical rationale |
 |---|---|---|
-| `start_step` | 16 | Peak tremor escalation window in the Fleming trajectory |
-| `n_steps` | 48 | 960 ms — long enough for a full rescue arc to be observed |
-| `max_dbs_amplitude` | 1.8 mA | Higher ceiling to allow aggressive initial rescue |
-| `max_dbs_pulse_width` | 0.18 ms | Near-maximum spatial spread available |
-| `max_side_effect_load` | 0.60 | Moderate budget — 1.0 mA is safe, 1.8 mA (max) unsustainable |
-| `target_force_preserved` | 0.64 | 64% of healthy force — the rescue target after active tremor |
-| `target_tremor_arv` | 0.32 | Meaningful tremor reduction but not full suppression |
-| `success_threshold` | **0.40** | Requires measurable rescue — constant safe-zero policy fails |
+| `n_steps` | 150 | ~3 s simulated — full extended DBS session |
+| `max_dbs_amplitude` | 2.4 mA | Highest available ceiling |
+| `max_side_effect_load` | 0.40 | Tight budget — refractory patient, long session |
+| `target_beta_arv` | 0.21 | Tight suppression target (below therapeutic threshold) |
+| `target_tremor_arv` | 0.27 | Near-full tremor control required |
+| `target_tracking_error` | 0.22 | Precise motor accuracy needed |
+| `sensor_noise_std` | 0.050 | High sensor noise — real LFP/EMG quality |
+| `success_threshold` | **0.68** | Requires multi-crisis management with clean terminal stability |
 
-**The core control challenge:** A constant high-amplitude policy reaches the safety
-budget ceiling around step 30–35, at which point safety_score starts collapsing.
-The agent must increase amplitude rapidly in steps 1–15 to rescue the escalating
-tremor, then pull back to a maintenance level. This temporal modulation — push then
-sustain — is the key behaviour.
+**Grader emphasis:** Beta (0.22) and tremor (0.14) are now the primary weights — DBS that doesn't suppress pathological beta is not doing its job, regardless of how safe it was. Safety (0.18) still matters but cannot be gamed by low-amplitude coasting.
 
-**What the `recovery_score` measures:** The grader explicitly compares the first-6-step
-window (during escalation) to the last-8-step window. An agent that arrives with the
-patient in bad shape and leaves them in good shape scores well on recovery. An agent
-that just sustains a mediocre state throughout does not.
+**Why the hard grader changed from the original design:** An earlier version placed `safety_score` at 0.36 weight. This accidentally rewarded passive low-stimulation agents: a constant 1.0 mA policy (amp_norm = 0.42) never accumulated side effects, so safety ≈ 0.90 contributed 0.32 of the grader score alone — enough to reach 0.55 without ever suppressing beta. That is clinically backwards. Good DBS requires *both* adequate symptom suppression *and* safety. The current weights reflect that.
 
-**Hard-failure rules:**
-- `tremor_score < 0.22`: tremor not meaningfully reduced → −0.10
-- `mean_amp < 0.10` + `tremor_score < 0.28` or `recovery_score < 0.22`: no rescue attempted → −0.16
+**The genuine control dilemmas this task creates:**
 
-**Expected score distribution:**
+1. **Tachyphylaxis trap:** The agent increases amplitude to suppress beta → adaptation builds → after 15+ steps of high amplitude, entrainment drops to 40% of its prior value. The same setting that was working now provides 60% less suppression. The agent must detect this (via rising beta despite constant amplitude) and either back off to allow recovery or switch to a pulsed strategy.
 
-| Policy | Score range | Pass? |
-|---|---|---|
-| zero_stim | 0.10–0.20 | No |
-| constant 1.0 mA, 130 Hz | 0.35–0.48 | Marginal |
-| constant 1.8 mA (max), 130 Hz | 0.28–0.38 | No (side effects) |
-| adaptive: push then sustain | 0.42–0.58 | Yes |
+2. **Off-med crisis vs. safety budget:** L-DOPA trough fires a beta spike that demands higher amplitude to compensate. But the safety budget is already partially depleted from the episode's first half. The agent must decide: increase amplitude (suppress crisis, risk dyskinesia) or hold steady (protect safety, accept beta excursion). There is no free solution.
+
+3. **Motor surge + DBS state:** The target motor output jumps to a high-force demand during a surge. The agent must simultaneously track the new target AND maintain DBS settings appropriate for the underlying neural state — the motor task and the stimulation task compete for the agent's attention.
+
+4. **Refractory physiology:** More amplitude produces less effect than on a responsive patient. Brute-force strategies that work on easy fail here because the same dose causes more side effects and less suppression.
+
+**Expected scores — constant 1.0 mA policy:** 0.23–0.36 (never passes). A good reactive agent: 0.48–0.60. Passing (0.68+) requires adaptive phase-aware control.
 
 ---
 
-### Task 3: `full_episode` — Hard
+## Expert Tasks
 
-**Clinical scenario:** End-to-end closed-loop DBS management over a complete 100-step
-clinical episode (2000 ms of simulated time). The agent must handle the full arc:
-early-phase pre-emption (steps 0–15), peak escalation rescue (steps 16–40),
-mid-episode sustained maintenance (steps 40–70), and terminal stability (steps 70–100).
+### `fragile_patient` — Tight Safety Budget
 
-**Patient population:** Balanced, responsive, or refractory (sampled randomly).
-The refractory patient has reduced entrainment response (0.88×) and faster disease
-progression — appearing in ~1/3 of episodes forces the agent to detect and adapt
-to a patient who simply responds less to the same DBS settings.
+**Clinical scenario:** A safety-constrained patient with elevated side-effect sensitivity (1.40×) — clinically corresponding to patients with lower dyskinesia thresholds due to prior levodopa exposure or neural sensitisation. The therapeutic window is approximately 0.3–0.8 mA.
 
-**Episode parameters:**
+**Patient:** `fragile` — side_effect_sensitivity = 1.40, recovery_rate = 0.05.
 
-| Parameter | Value | Justification |
-|---|---|---|
-| `start_step` | 0 | Full trajectory from onset |
-| `n_steps` | 100 | Complete clinical episode |
-| `max_dbs_amplitude` | 2.4 mA | Highest available ceiling for the hardest scenario |
-| `max_dbs_pulse_width` | 0.20 ms | Full pulse-width range |
-| `max_side_effect_load` | 0.55 | Stricter long-horizon safety budget; sustained high amplitude now exhausts the episode budget faster |
-| `target_force_preserved` | 0.60 | Sustained function across the full episode |
-| `success_threshold` | **0.66** | Stricter high threshold — requires multi-phase adaptive control with cleaner budget management |
+**Key parameters:** `max_side_effect_load = 0.26`, `max_dbs_amplitude = 1.4 mA`, 64 steps.
 
-**Why safety dominates (36% grader weight):** At 100 steps, an agent that runs
-maximum amplitude for the first 60 steps will exhaust the side-effect budget and
-be unable to deliver any safe DBS for the remaining 40 steps. This is the most
-dangerous clinical outcome — the patient is left unprotected during the terminal
-phase when cumulative fatigue and disease pressure are highest.
+**Core challenge:** The usable amplitude range is half that of the medium task. Jitter causes safety violations; timidity leaves symptoms uncontrolled. The agent must find and hold a precise therapeutic window.
 
-**The two failure modes this task is designed to expose:**
-
-1. **Greedy front-loading:** Max amplitude in steps 1–40 → safety budget depleted
-   by step 50 → `side_effect_load > 0.55` → safety_score collapses → episode fails.
-
-2. **Conservative under-treatment:** Low constant amplitude to preserve safety budget
-   → tremor escalates unchecked in steps 16–40 → force collapses → terminal state
-   is bad → `terminal_stability_score` collapses → hard penalty.
-
-**The optimal strategy** uses a three-phase approach: moderate pre-emption (0.8–1.2 mA),
-aggressive rescue (1.5–2.0 mA, reducing when side_effect_rate turns positive),
-sustained maintenance at minimum effective amplitude (0.6–1.0 mA).
-
-**Per-episode stochasticity:** Each reset samples independent noise (std=0.08) on
-beta and tremor baselines. Policies that memorise the exact Fleming trajectory degrade
-across episodes — the agent must react to observed biomarkers, not play back a cached
-control sequence.
-
-**Expected score distribution:**
-
-| Policy | Score range | Pass? |
-|---|---|---|
-| zero_stim | 0.12–0.22 | No |
-| constant 1.0 mA, 130 Hz | 0.30–0.42 | No |
-| constant 2.4 mA (max), 130 Hz | 0.20–0.30 | No (side effects exhaust budget) |
-| safety_aware rule-based | 0.45–0.58 | No (misses threshold) |
-| adaptive multi-phase | 0.66–0.78 | Yes |
+**Success threshold: 0.44** — achievable only by a policy that has found and held the narrow window.
 
 ---
 
-## Advanced Extension Tasks
+### `refractory_patient` — Drug-Resistant
 
-These tasks are intentionally harder and are presented as research benchmarks,
-not the primary public ladder. They add scenario difficulty without changing the
-evaluation framework.
+**Clinical scenario:** A patient whose DBS response is blunted — common after years of stimulation or advanced neurodegeneration. Entrainment scale = 0.88, progression_scale = 1.10. The `long_horizon` event profile fires (same as hard) with recurring tachyphylaxis.
 
----
+**Core challenge:** "More DBS" is not the answer. Brute-force amplitude produces similar entrainment to a moderate policy on a responsive patient, but with 1.25× higher adaptation gain and more side effects. The agent must discover pulsed stimulation — higher amplitude during escalation, genuine rest periods during stability.
 
-### Task 4: `fragile_patient` — Expert
-
-**Clinical scenario:** Safety-constrained programming for a patient with elevated
-side-effect sensitivity (1.40×) — corresponding clinically to patients with lower
-dyskinesia thresholds, possibly due to prior levodopa exposure or neural sensitisation
-(Olanow et al. 2013). The tolerable stimulation range is narrow.
-
-**Key parameters:**
-- `max_side_effect_load = 0.26` (vs 0.40–0.55 in core tasks)
-- `max_dbs_amplitude = 1.4 mA`
-- `patient_profile_ids = ("fragile",)` — side_effect_sensitivity = 1.40, recovery_rate = 0.05
-
-**Core challenge:** The therapeutic window (amplitude range that suppresses symptoms
-without violating side-effect budget) is approximately 0.4–0.9 mA — half the range
-available in the medium task. The agent must find and hold this narrow window with
-precise, smooth adjustments. Jitter causes safety violations; timidity leaves symptoms
-uncontrolled.
-
-**Success threshold: 0.44** — achievable only by a policy that has found the therapeutic
-window and holds it steadily. Success probability for a zero-shot LLM agent: ~20–35%.
+**Success threshold: 0.46** over 120 steps.
 
 ---
 
-### Task 5: `refractory_patient` — Expert
+### `personalization_generalization` — Mixed Profiles
 
-**Clinical scenario:** A patient whose DBS response is blunted — common in patients
-who have had DBS for several years and developed stimulation tolerance, or in patients
-with more advanced neurodegeneration (Castrioto et al. 2011). Entrainment scale = 0.88,
-tremor_responsiveness = 0.88, progression_scale = 1.10.
+**Clinical scenario:** Evaluates whether a policy generalises across patient phenotypes without per-patient prior history. All four profiles (balanced, responsive, fragile, refractory) appear across episodes. The profile ID is visible in reset metadata but the agent has no prior episode history for that patient.
 
-**Key challenge:** Naive brute-force (max amplitude) produces similar entrainment to
-a moderate-amplitude policy in a responsive patient, but with 1.12× higher side effects
-and faster adaptation (the adaptation_gain coefficient is 1.25× for refractory profiles).
-The agent must discover that "more DBS" is not the right answer and instead use pulsed
-stimulation — higher amplitude during escalation phases, genuine rest periods during
-stable phases — to extract therapeutic value while limiting adaptation.
+**Core challenge:** A policy specialised for responsive patients will over-stimulate fragile patients and under-treat refractory ones. Success requires a meta-strategy: read the profile, infer the therapeutic window, and apply profile-appropriate settings from step one.
 
-**Success threshold: 0.42** over 100 steps with a refractory patient is harder than
-0.66 on a mixed-profile full_episode.
+**Success threshold: 0.50** over 90 steps.
 
 ---
 
-### Task 6: `personalization_generalization` — Expert
+### `exercise_bout` — Exercise Burst
 
-**Clinical scenario:** Evaluating whether a policy generalises across patient phenotypes
-without per-patient adaptation. The profile is revealed in the reset metadata
-(`patient_profile_id`) but the agent has no prior episode history for that patient.
-This mirrors the clinical challenge of programming a DBS system for a new patient
-during the first programming visit.
+**Clinical scenario:** A patient performing sustained physical exercise. A `motor_surge` event fires with certainty (100% probability) in the first 30% of the episode — the patient is suddenly demanding high-force output during intense voluntary activity. A post-exertion dyskinesia spike may follow (40% probability) as accumulated DBS + exertion interact.
 
-**Patient pool:** All four profiles (balanced, responsive, fragile, refractory) —
-each appears with equal probability.
+**Key challenge:** The agent must ramp DBS to support the high-force demand during exercise, then rapidly taper when the surge ends before dyskinesia risk accumulates. Zero-stim during exertion is a hard failure (−0.16 penalty).
 
-**Why this is the hardest benchmark:** A policy that specialises for responsive
-patients will over-stimulate fragile patients (side-effect violations) and
-under-treat refractory patients (insufficient suppression). Success requires a
-meta-strategy: read the profile from metadata, infer the therapeutic window,
-and apply profile-appropriate DBS settings from the first step.
+**Grader emphasis:** Force (0.22) and tracking (0.22) — motor performance during the bout is the primary clinical goal.
 
-**Success threshold: 0.45** — the only way to reach this across all profiles is
-a policy that meaningfully reads and uses the patient profile context.
+**Success threshold: 0.55** over 70 steps.
+
+---
+
+### `medication_interaction` — L-DOPA Interaction
+
+**Clinical scenario:** Phase-coupled medication dynamics. A guaranteed off-med crisis fires in the middle of the episode (steps 30–45%) as L-DOPA wears off — beta surges sharply. If the agent over-responds with high amplitude, a dyskinesia spike follows in the second half (65% probability) as the next dose kicks in and DBS interaction accumulates.
+
+**The clinical dilemma:** The correct response to an off-med crisis is to increase DBS. But over-increasing DBS when the next L-DOPA dose is approaching creates dyskinesia. The agent must time its response and taper before the medication rebound.
+
+**Grader emphasis:** Safety (0.22) and recovery (0.10) — the agent must handle the crisis without over-treating.
+
+**Success threshold: 0.50** over 100 steps.
+
+---
+
+### `nocturnal_transition` — Sleep Transition
+
+**Clinical scenario:** The patient transitions from waking activity through wind-down into sleep. The `nocturnal` schedule progressively tightens beta and tremor targets from step 40% onward, peaking in the sleep phase (step 65%+). Targets are tightest during sleep because patient movement is minimal and any residual beta oscillation disrupts sleep quality.
+
+**Time-varying schedule:**
+- 0–40%: full waking demands
+- 40–65%: wind-down (targets tighten by 10–15%)
+- 65–100%: sleep phase (targets tighten by 20–35% from baseline)
+
+**Core challenge:** The agent must progressively reduce stimulation as motor demands drop but maintain biomarker control during sleep — a different operating point than the waking phase.
+
+**Success threshold: 0.55** over 150 steps.
+
+---
+
+### `surgical_followup` — Post-Implant Programming
+
+**Clinical scenario:** First-week post-implant DBS programming during the microlesion window — post-surgical swelling temporarily improves symptoms, meaning the same amplitude delivers more effect and risks over-treatment. An amplitude ceiling of 0.6 mA is enforced for the first 25% of the episode (the `surgical_microlesion` schedule). Impedance surges (70% probability) may fire as the electrode settles, reducing delivered current without warning.
+
+**Hard constraint:** Any amplitude violations during the microlesion window trigger a −0.20 penalty — the clinical equivalent of causing stimulation-induced dyskinesia in a just-implanted patient.
+
+**Grader emphasis:** Safety (0.30) — this task is about disciplined programming under hardware and physiological constraints.
+
+**Success threshold: 0.50** over 120 steps.
 
 ---
 
 ## Task Parameter Summary
 
-| Task | Start | Steps | Max Amp | SE Budget | Profiles | Threshold | Tier |
-|---|---|---|---|---|---|---|---|
-| `beta_suppression` | 5 | 30 | 1.5 mA | 0.55 | responsive | **0.50** | Core/Easy |
-| `tremor_correction` | 16 | 48 | 1.8 mA | 0.60 | balanced, responsive | **0.36** | Core/Medium |
-| `full_episode` | 0 | 100 | 2.4 mA | 0.55 | balanced, responsive, refractory | **0.66** | Core/Hard |
-| `fragile_patient` | 12 | 64 | 1.4 mA | 0.26 | fragile | **0.44** | Expert |
-| `refractory_patient` | 0 | 100 | 2.2 mA | 0.48 | refractory | **0.42** | Expert |
-| `personalization_generalization` | 10 | 72 | 1.9 mA | 0.40 | all four | **0.45** | Expert |
+| Task | Difficulty | Steps | Patient | Events | SE Budget | Threshold |
+|---|---|---:|---|---|---:|---:|
+| `easy` | Easy | 36 | responsive | none | 0.55 | **0.55** |
+| `medium` | Medium | 60 | balanced | rescue (mild) | 0.60 | **0.52** |
+| `hard` | Hard | 150 | refractory | long_horizon (heavy) | 0.40 | **0.68** |
+| `fragile_patient` | Expert | 64 | fragile | none | 0.26 | 0.44 |
+| `refractory_patient` | Expert | 120 | refractory | long_horizon | 0.48 | 0.46 |
+| `personalization_generalization` | Expert | 90 | all four | long_horizon | 0.40 | 0.50 |
+| `exercise_bout` | Expert | 70 | balanced | exercise | 0.55 | 0.55 |
+| `medication_interaction` | Expert | 100 | fragile | medication | 0.52 | 0.50 |
+| `nocturnal_transition` | Expert | 150 | balanced | nocturnal | 0.55 | 0.55 |
+| `surgical_followup` | Expert | 120 | balanced | surgical | 0.55 | 0.50 |
 
 ---
 
-## Difficulty Calibration Rationale
+## Difficulty Calibration Validation
 
-The hackathon guide (helpguide.txt, section 1) states:
+Scores for a constant 1.0 mA / 0.13 ms / 130 Hz / motor_command=target policy across 5 seeds:
 
-> "The task is hard enough to be interesting, but not so hard that the model never succeeds.
-> RL only works if the probability of getting a good answer is greater than zero."
+```
+easy    0.724  0.731  0.804  0.739  0.744   min=0.72   threshold=0.55  → always passes
+medium  0.485  0.470  0.518  0.476  0.509   min=0.47   threshold=0.52  → never passes
+hard    0.358  0.231  0.338  0.252  0.329   min=0.23   threshold=0.68  → never passes
+```
 
-These thresholds are calibrated so that:
-
-- **Easy (0.50):** A thoughtful constant policy (1.0 mA, 130 Hz, motor_command = target_output)
-  scores 0.44–0.56. A zero-shot LLM agent that reads the action description should reliably pass.
-
-- **Medium (0.40):** The same constant policy scores 0.35–0.48 — marginal. The agent must
-  detect the tremor escalation signal and increase amplitude during steps 1–15. One-step
-  reactive control is sufficient. Zero-shot LLM success probability: ~40–60%.
-
-- **Hard (0.66):** No constant policy reaches this. Requires multi-phase temporal reasoning
-  across 100 steps. Zero-shot LLM success probability: ~5–20%. A policy trained with even
-  a few episodes of RL should improve measurably.
-
-- **Expert (0.42–0.45):** Designed for RL-trained policies. Zero-shot success probability:
-  ~5–15% depending on the task. Provides headroom for demonstrating learning gains.
+Strict ordering holds every seed: `easy > medium > hard`. The hard task's minimum (0.23) is well below medium's minimum (0.47). A good reactive LLM agent is expected to score roughly:
+- **easy:** 0.78–0.88 (reliable pass)
+- **medium:** 0.58–0.70 (passes with correct rescue response)
+- **hard:** 0.48–0.62 (struggles; needs phase-aware strategy to reach 0.68)
 
 ---
 
 ## References
 
 - Castrioto A et al. (2011). "Ten-year outcome of subthalamic stimulation in Parkinson disease." *Arch Neurol* 68(12):1550–1556.
-- Fleming JE et al. (2020). "Simulation of closed-loop deep brain stimulation control schemes." *PLOS Comput Biol* 16(8):e1008165.
+- Fleming JE et al. (2023). "Multivariable closed-loop control of deep brain stimulation for Parkinson's disease." *J Neural Eng* 20(5):056029.
 - Little S et al. (2016). "Closed-loop deep brain stimulation: An evolving technology." *Mov Disord* 31(8):1336–1341.
 - Olanow CW et al. (2013). "Levodopa in the treatment of Parkinson's disease: current controversies." *Mov Disord* 19(9):997–1005.
 - Tinkhauser G et al. (2017). "Beta burst dynamics in Parkinson's disease OFF and ON dopaminergic medication." *Brain* 140(11):2968–2981.

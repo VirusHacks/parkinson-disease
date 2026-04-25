@@ -255,6 +255,6 @@ class ParkinsonsMotorObservation(Observation):
 
     # Timing and task info
     sim_time_s: float = Field(default=0.0, ge=0.0, description="Simulation time in seconds (10.02s–12.00s range).")
-    task_id: str = Field(default="full_episode", description="Active task identifier.")
+    task_id: str = Field(default="hard", description="Active task identifier.")
     grader_score: float = Field(default=-1.0, description="Final deterministic score in [0,1]. -1.0 until episode end.")
     episode_success: bool = Field(default=False, description="True if grader_score >= task success_threshold.")
