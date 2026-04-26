@@ -1,4 +1,4 @@
-"""Exercise-bout task — sustained high motor demand.
+"""Exercise-bout task - sustained high motor demand.
 
 Clinical scenario
 -----------------

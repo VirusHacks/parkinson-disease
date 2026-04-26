@@ -1,16 +1,16 @@
-# State and Action Space — MotorAssistEnv
+# State and Action Space - MotorAssistEnv
 
 ## 1. What is the agent looking at, and what can it touch?
 
-At every 20 ms timestep, the agent reads a 30-dimensional observation of the patient and writes back a 4-dimensional action. The four actions shape the brain stimulator — amplitude, pulse width, and pulse frequency — plus the voluntary movement the patient is attempting. The 30 observation fields cover what the patient's brain is doing, what their body is doing, what the device is doing, and where in the episode they are.
+At every 20 ms timestep, the agent reads a 30-dimensional observation of the patient and writes back a 4-dimensional action. The four actions shape the brain stimulator - amplitude, pulse width, and pulse frequency - plus the voluntary movement the patient is attempting. The 30 observation fields cover what the patient's brain is doing, what their body is doing, what the device is doing, and where in the episode they are.
 
-Every observation field corresponds to a real signal a closed-loop DBS system would actually have access to — LFP power bands and impedance from the implanted device (Medtronic RC+S, Abbott Infinity, and Boston Scientific Vercise Genus all expose these), augmented with surface EMG from a wearable patch (Rosa 2015; Swann 2018). Nothing is invented for the benchmark.
+Every observation field corresponds to a real signal a closed-loop DBS system would actually have access to - LFP power bands and impedance from the implanted device (Medtronic RC+S, Abbott Infinity, and Boston Scientific Vercise Genus all expose these), augmented with surface EMG from a wearable patch (Rosa 2015; Swann 2018). Nothing is invented for the benchmark.
 
 ## 2. What four things can the agent control?
 
-Three of the four control the brain stimulator itself — how strong the pulse is, how long each one lasts, and how fast they come — and the fourth represents what the patient is trying to do with their body.
+Three of the four control the brain stimulator itself - how strong the pulse is, how long each one lasts, and how fast they come - and the fourth represents what the patient is trying to do with their body.
 
-**The DBS triad — three knobs on a real implant**
+**The DBS triad - three knobs on a real implant**
 
 | Action field | Range | Role | Clinical meaning |
 |---|---|---|---|
@@ -27,7 +27,7 @@ charge_per_second (mC/s) = charge_per_pulse × frequency
 
 The entrainment lookup table is indexed by `(amplitude, pulse_width)`; frequency then scales the result via `_freq_beta_factor(freq)`, peaking at ~130 Hz (Kühn 2008). Parameters chosen at step *t* affect the brain state at step *t+1*, reflecting the real 15–25 ms neural response delay in LFP recordings.
 
-**The fourth control — voluntary motor intent**
+**The fourth control - voluntary motor intent**
 
 | Action field | Range | Role | Clinical meaning |
 |---|---|---|---|
@@ -39,34 +39,34 @@ A trivially correct strategy is `motor_command = target_output` at every step. T
 
 Thirty numbers across seven groups covering brain oscillation, muscle output, device delivery, 5-step trends, and episode context. All continuous signals are normalised to `[0, 1]` or `[−1, 1]` unless stated.
 
-**A. Brain biomarkers** — what the implanted electrode reads
+**A. Brain biomarkers** - what the implanted electrode reads
 
 | Field | Signal | Clinical meaning |
 |---|---|---|
 | `beta_arv` | Pathological beta level | STN beta-band (13–30 Hz) amplitude, normalised to pre-DBS baseline. Primary aDBS feedback signal (Little 2013). 0 = quiet, 1 = peak pathology. |
 | `tremor_arv` | Tremor intensity | Tremor envelope (3–8 Hz). Grows from ~0.01 to ~0.99 if untreated. |
-| `semg_arv` | Muscle tension level | Surface EMG envelope — downstream motor consequence of STN pathology. |
-| `gamma_arv` | Over-stimulation warning | High-gamma (60–90 Hz) LFP power. Elevated before `side_effect_load` builds — early warning signal (Kühn 2008). |
+| `semg_arv` | Muscle tension level | Surface EMG envelope - downstream motor consequence of STN pathology. |
+| `gamma_arv` | Over-stimulation warning | High-gamma (60–90 Hz) LFP power. Elevated before `side_effect_load` builds - early warning signal (Kühn 2008). |
 
-**B. Motor function** — what the patient's body is doing
+**B. Motor function** - what the patient's body is doing
 
 | Field | Signal | Clinical meaning |
 |---|---|---|
-| `force_amplitude` | Raw muscle force | mN — healthy baseline ~59,752 mN (calibrated from Fleming). |
+| `force_amplitude` | Raw muscle force | mN - healthy baseline ~59,752 mN (calibrated from Fleming). |
 | `force_preserved` | Fraction of normal strength | Primary outcome variable. 1.0 = fully healthy, 0.0 = ability lost. |
 | `target_output` | Intended movement | Task-defined motor target. Set `motor_command` to match this. |
 | `effective_motor_output` | Actual movement achieved | Agent's command after Parkinsonian distortion is applied. |
-| `task_error` | Movement error | `|target − effective|` — how far off the movement was. |
+| `task_error` | Movement error | `|target − effective|` - how far off the movement was. |
 | `tracking_accuracy` | Movement accuracy | `1 − task_error / 2`, normalised to [0, 1]. |
 
-**C. Disease summary** — convenient aggregates
+**C. Disease summary** - convenient aggregates
 
 | Field | Signal | Clinical meaning |
 |---|---|---|
-| `disease_severity` | Combined disease burden | `0.55·tremor + 0.45·beta` — high value means the patient needs more DBS. |
-| `beta_suppression` | DBS effectiveness proxy | `1 − beta_arv` — convenience inverse of pathological beta. |
+| `disease_severity` | Combined disease burden | `0.55·tremor + 0.45·beta` - high value means the patient needs more DBS. |
+| `beta_suppression` | DBS effectiveness proxy | `1 − beta_arv` - convenience inverse of pathological beta. |
 
-**D. Trends** — 5-step deltas
+**D. Trends** - 5-step deltas
 
 | Field | Signal | Clinical meaning |
 |---|---|---|
@@ -74,7 +74,7 @@ Thirty numbers across seven groups covering brain oscillation, muscle output, de
 | `tremor_trend` | Tremor trajectory direction | Positive + high `tremor_arv` → increase amplitude now. |
 | `side_effect_rate` | Side-effect accumulation rate | Positive → reduce dose. Negative → safe to push harder. |
 
-**E. Device state** — what the implant is doing
+**E. Device state** - what the implant is doing
 
 | Field | Signal | Clinical meaning |
 |---|---|---|
@@ -124,7 +124,7 @@ base_beta_t+1   = fleming_beta[t+1] × profile.beta_scale × episode_noise_beta
 target_beta     = base_beta + progressions + pressures − 0.82 × entrainment × profile.beta_responsiveness
 beta_state_t+1  = 0.45 × beta_state_t + 0.55 × target_beta
 ```
-Tremor follows the same form with a 0.50× entrainment coefficient — beta is more robustly suppressed by 130 Hz DBS than tremor (Tinkhauser 2017).
+Tremor follows the same form with a 0.50× entrainment coefficient - beta is more robustly suppressed by 130 Hz DBS than tremor (Tinkhauser 2017).
 
 **c. Motor distortion**
 ```
@@ -134,7 +134,7 @@ effective_motor = motor_command
                 × (1 − 0.10 × side_effect_state)
                 + noise
 ```
-The coefficients are calibrated so that at the Fleming baseline, a patient with moderate disease retains ~65% of voluntary motor ability — consistent with UPDRS-III mild-to-moderate (Deuschl 2006).
+The coefficients are calibrated so that at the Fleming baseline, a patient with moderate disease retains ~65% of voluntary motor ability - consistent with UPDRS-III mild-to-moderate (Deuschl 2006).
 
 **d. Frequency effect on side effects**
 ```
@@ -145,7 +145,7 @@ Higher charge-per-second drives faster axonal fatigue and dyskinesia risk (Prior
 
 ## 5. How does the grader see the patient differently from the agent?
 
-The agent sees noisy readings. The grader sees the true patient state. An agent cannot score well by tricking its own sensors — it has to actually treat the patient. This single design choice blocks the DeepMind grasping-task class of attack by construction.
+The agent sees noisy readings. The grader sees the true patient state. An agent cannot score well by tricking its own sensors - it has to actually treat the patient. This single design choice blocks the DeepMind grasping-task class of attack by construction.
 
 | Aspect | Agent reads | Grader reads |
 |---|---|---|
@@ -158,7 +158,7 @@ The split is also clinically realistic. Real DBS devices read noisy LFP off the 
 
 ## 6. How do different patient types vary?
 
-Four patient templates — easy to treat, average, fragile, and resistant to treatment. Each profile changes how strongly the brain responds to stimulation and how quickly side effects accumulate.
+Four patient templates - easy to treat, average, fragile, and resistant to treatment. Each profile changes how strongly the brain responds to stimulation and how quickly side effects accumulate.
 
 | Profile | Represents | beta_scale | tremor_scale | entrainment_scale | se_sensitivity | recovery_rate |
 |---|---|---:|---:|---:|---:|---:|

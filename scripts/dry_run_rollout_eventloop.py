@@ -8,7 +8,7 @@ Requires (once per machine):
 
   pip install "openenv-core[core]>=0.2.2"
 
-Torch is NOT required — we mock the model, tokenizer, and env.
+Torch is NOT required - we mock the model, tokenizer, and env.
 
 Run from repo root:
 
@@ -83,7 +83,7 @@ def _test_warm_up_skips_without_torch() -> None:
     from parkinsons_Motor.training import llm_eval
 
     if train.torch is not None:
-        print("NOTE: torch installed — _warm_up_generation not validated here (needs real model).")
+        print("NOTE: torch installed - _warm_up_generation not validated here (needs real model).")
         return
     # _warm_up_generation now lives in parkinsons_Motor.training.llm_eval
     # (re-exported from train via sanity_check_rollout). It must still be a
@@ -139,11 +139,11 @@ async def _main_async() -> None:
     assert traj.n_steps == 2, f"expected 2 steps, got {traj.n_steps}"
     assert all(traj.parsed), traj.parsed
     assert ticks[0] >= 20, (
-        f"event loop starved: only {ticks[0]} heartbeat ticks in {elapsed:.1f}s — "
+        f"event loop starved: only {ticks[0]} heartbeat ticks in {elapsed:.1f}s - "
         "asyncio.to_thread may be missing around llm_generate"
     )
-    print(f"OK: event-loop responsiveness — {ticks[0]} heartbeats during ~{elapsed:.1f}s rollout")
-    print(f"OK: trajectory — n_steps={traj.n_steps}, rewards={traj.rewards}, parsed={traj.parsed}")
+    print(f"OK: event-loop responsiveness - {ticks[0]} heartbeats during ~{elapsed:.1f}s rollout")
+    print(f"OK: trajectory - n_steps={traj.n_steps}, rewards={traj.rewards}, parsed={traj.parsed}")
 
 
 def _test_parse_action_last_json() -> None:
@@ -175,7 +175,7 @@ def _test_parse_action_strips_code_fence() -> None:
 def _test_parse_action_handles_only_thinking() -> None:
     import parkinsons_Motor.train as train
 
-    # All content is inside the thinking block — fall back to scanning the
+    # All content is inside the thinking block - fall back to scanning the
     # full text rather than returning None on an empty answer.
     text = (
         "<think>I need to set "
@@ -301,7 +301,7 @@ def _test_train_reexports_plots_and_eval() -> None:
     from parkinsons_Motor.training import llm_eval as _ll
     from parkinsons_Motor.training import plots as _pl
 
-    # Identity check — re-exports must point to the SAME function objects so a
+    # Identity check - re-exports must point to the SAME function objects so a
     # monkeypatch on `train.sanity_check_rollout` can't get out of sync with
     # `training.llm_eval.sanity_check_rollout` and silently diverge.
     assert sanity_check_rollout is _ll.sanity_check_rollout

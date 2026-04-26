@@ -11,7 +11,7 @@
 //     top-level. That returned 422 with detail=[{...}], rendered as
 //     "[object Object]" in the UI.
 //   - Each /step or /reset HTTP call spawns a fresh env factory, so the
-//     dock could never show progressing dynamics — every click was step 0.
+//     dock could never show progressing dynamics - every click was step 0.
 
 const TASK_GROUPS = [
   {
@@ -64,23 +64,23 @@ const PARTS = [
 const TASK_TO_PART = {
   easy: { scene: 'myo_sim/finger/motor_finger_v0.xml', label: 'Finger taps (rest tremor)', motion: 'tap' },
   medium: { scene: 'myo_sim/hand/myo_hand_combined.xml', label: 'Hand posture / pinch', motion: 'pinch' },
-  hard: { scene: 'myo_sim/myolegs/myolegs_v0.5(mj231).mjb', label: 'Gait — full body episode', motion: 'gait' },
+  hard: { scene: 'myo_sim/myolegs/myolegs_v0.5(mj231).mjb', label: 'Gait - full body episode', motion: 'gait' },
   fragile_patient: { scene: 'myo_sim/finger/myo_finger_v0.xml', label: 'Fragile finger window', motion: 'tap' },
-  refractory_patient: { scene: 'myo_sim/hand/myo_hand_combined.xml', label: 'Hand — drug-resistant tremor', motion: 'tremor' },
-  personalization_generalization: { scene: 'myo_sim/elbow/myo_elbow_combined.xml', label: 'Elbow flex — mixed profile', motion: 'flex' },
+  refractory_patient: { scene: 'myo_sim/hand/myo_hand_combined.xml', label: 'Hand - drug-resistant tremor', motion: 'tremor' },
+  personalization_generalization: { scene: 'myo_sim/elbow/myo_elbow_combined.xml', label: 'Elbow flex - mixed profile', motion: 'flex' },
   exercise_bout: { scene: 'myo_sim/myolegs/myolegs_v0.5(mj231).mjb', label: 'Leg cycling burst', motion: 'cycle' },
-  medication_interaction: { scene: 'myo_sim/hand/myo_hand_combined.xml', label: 'Hand — L-DOPA window', motion: 'tap' },
-  nocturnal_transition: { scene: 'myo_sim/hand/myo_hand_combined.xml', label: 'Hand at rest — sleep', motion: 'tremor' },
-  surgical_followup: { scene: 'myo_sim/finger/motor_finger_v0.xml', label: 'Precision finger — post-implant', motion: 'tap' },
+  medication_interaction: { scene: 'myo_sim/hand/myo_hand_combined.xml', label: 'Hand - L-DOPA window', motion: 'tap' },
+  nocturnal_transition: { scene: 'myo_sim/hand/myo_hand_combined.xml', label: 'Hand at rest - sleep', motion: 'tremor' },
+  surgical_followup: { scene: 'myo_sim/finger/motor_finger_v0.xml', label: 'Precision finger - post-implant', motion: 'tap' },
 };
 
 const EVENT_DISPLAY = {
-  tachyphylaxis: { label: 'Tachyphylaxis', tone: 'warn', icon: '⚠', detail: 'tolerance building — entrainment dropping' },
-  off_med_crisis: { label: 'L-DOPA OFF', tone: 'crisis', icon: '💊', detail: 'medication trough — beta surge incoming' },
-  dyskinesia_spike: { label: 'Dyskinesia', tone: 'crisis', icon: '💥', detail: 'over-treatment risk — back off amplitude' },
-  motor_surge: { label: 'Motor Surge', tone: 'info', icon: '🏃', detail: 'high-force demand — track new target' },
-  impedance_surge: { label: 'Impedance Surge', tone: 'warn', icon: '⚡', detail: 'electrode fault — delivered current reduced' },
-  second_deterioration: { label: 'Symptom Wave', tone: 'warn', icon: '🌊', detail: 'second deterioration wave — re-rescue needed' },
+  tachyphylaxis: { label: 'Tachyphylaxis', tone: 'warn', icon: '⚠', detail: 'tolerance building - entrainment dropping' },
+  off_med_crisis: { label: 'L-DOPA OFF', tone: 'crisis', icon: '💊', detail: 'medication trough - beta surge incoming' },
+  dyskinesia_spike: { label: 'Dyskinesia', tone: 'crisis', icon: '💥', detail: 'over-treatment risk - back off amplitude' },
+  motor_surge: { label: 'Motor Surge', tone: 'info', icon: '🏃', detail: 'high-force demand - track new target' },
+  impedance_surge: { label: 'Impedance Surge', tone: 'warn', icon: '⚡', detail: 'electrode fault - delivered current reduced' },
+  second_deterioration: { label: 'Symptom Wave', tone: 'warn', icon: '🌊', detail: 'second deterioration wave - re-rescue needed' },
 };
 
 function el(tag, className, text) {
@@ -154,7 +154,7 @@ class ViewerController {
     this.signalRows = {};
     this.latestObservation = null;
 
-    // WebSocket OpenEnv session — separate from the SSE demo stream so manual
+    // WebSocket OpenEnv session - separate from the SSE demo stream so manual
     // step/reset actually persist state across clicks.
     this.ws = null;
     this.wsReady = false;
@@ -268,7 +268,7 @@ class ViewerController {
     const header = el('div', 'openenv-heading');
     header.append(
       el('div', 'openenv-title', 'OpenEnv Controls'),
-      el('div', 'openenv-subtitle', 'Persistent WebSocket session — step, reset, inspect'),
+      el('div', 'openenv-subtitle', 'Persistent WebSocket session - step, reset, inspect'),
     );
 
     const taskRow = el('div', 'openenv-row');
@@ -320,7 +320,7 @@ class ViewerController {
     buttonRow.append(this.connectApiButton, this.stepApiButton, this.resetApiButton, this.disconnectApiButton);
 
     this.openEnvMeta = el('div', 'openenv-meta', 'Click Connect to open a persistent OpenEnv session.');
-    this.bodyIndicator = el('div', 'openenv-meta body-indicator', 'Body: —');
+    this.bodyIndicator = el('div', 'openenv-meta body-indicator', 'Body: -');
     this.jsonOutput = el('pre', 'openenv-json', '{\n  "status": "ready"\n}');
 
     this.openEnvDock.append(header, taskRow, inputGrid, buttonRow, this.openEnvMeta, this.bodyIndicator, this.jsonOutput);
@@ -342,11 +342,11 @@ class ViewerController {
       return;
     }
     if (this._partSwitchInFlight) {
-      try { await this._partSwitchInFlight; } catch {}
+      try { await this._partSwitchInFlight; } catch { }
     }
     if (!this.body?.switchScene) { return; }
     if (!opts.silent) {
-      this.openEnvMeta.textContent = `Loading body — ${mapping.label}`;
+      this.openEnvMeta.textContent = `Loading body - ${mapping.label}`;
     }
     this._partSwitchInFlight = (async () => {
       try {
@@ -355,7 +355,7 @@ class ViewerController {
         this._activeMotion = mapping.motion;
         this.body.bodyMotionMode = mapping.motion;
         if (!opts.silent) {
-          this.openEnvMeta.textContent = `Body ready — ${mapping.label}`;
+          this.openEnvMeta.textContent = `Body ready - ${mapping.label}`;
         }
       } catch (error) {
         if (!opts.silent) {
@@ -549,7 +549,7 @@ class ViewerController {
 
   async closeSession() {
     if (this.ws && this.ws.readyState === WebSocket.OPEN) {
-      try { this.ws.send(JSON.stringify({ type: 'close' })); } catch {}
+      try { this.ws.send(JSON.stringify({ type: 'close' })); } catch { }
       this.ws.close();
     }
     this.ws = null;
@@ -616,7 +616,7 @@ class ViewerController {
       // Overlay the immediate expected DBS effect on top of the env-reported
       // observation so high amp/PW Steps visibly suppress beta on the EEG
       // and pulse the entrainment trace, even if the env's response is
-      // gradual. Pure-cosmetic blend — the underlying obs is unchanged.
+      // gradual. Pure-cosmetic blend - the underlying obs is unchanged.
       const enhancedObs = this._applyActionExpectedEffect(observation, action);
       const delta = this._computeRewardDeltas(observation);
       const snapshot = this._buildSnapshotFromApi(
@@ -650,11 +650,11 @@ class ViewerController {
     const amp = Math.max(0, Number(action.dbs_amplitude) || 0);
     const pw = Math.max(0, Number(action.dbs_pulse_width) || 0);
     const freq = Math.max(0, Number(action.dbs_frequency) || 0);
-    // Total electrical charge per second proxy — saturates around clinical
+    // Total electrical charge per second proxy - saturates around clinical
     // therapeutic range (~3 mA, 60–90 µs, 130 Hz).
     const dose = clamp01((amp * pw * freq) / (3.0 * 0.13 * 130));
     // Small ramp so two consecutive identical Steps don't both produce the
-    // same instantaneous overlay — env will have moved underneath.
+    // same instantaneous overlay - env will have moved underneath.
     const lift = dose * 0.55;
     const supp = dose * 0.45;
     const obs = { ...observation };
@@ -774,7 +774,7 @@ class ViewerController {
     this.scoreLine.textContent = 'Score pending';
     // Match the body model to the task before the SSE stream lands its
     // first observation, so the viewer never shows the "wrong limb" frame.
-    try { await this._autoSwitchPartForTask(this.taskSelect.value); } catch {}
+    try { await this._autoSwitchPartForTask(this.taskSelect.value); } catch { }
     if (this.body) { this.body.bodyActive = true; }
 
     try {
@@ -812,7 +812,7 @@ class ViewerController {
       this.eventSource = null;
     }
     if (this.sessionId) {
-      await fetch(`/viewer/api/demo/stop/${this.sessionId}`, { method: 'POST' }).catch(() => {});
+      await fetch(`/viewer/api/demo/stop/${this.sessionId}`, { method: 'POST' }).catch(() => { });
     }
     this.sessionId = null;
     this._setRunning(false);
@@ -850,7 +850,7 @@ class ViewerController {
   }
 
   // ----------------------------------------------------------------------
-  // Snapshot application — drives brain overlay, body, signal bars, chips
+  // Snapshot application - drives brain overlay, body, signal bars, chips
   // ----------------------------------------------------------------------
 
   _applySnapshot(snapshot) {
@@ -890,7 +890,7 @@ class ViewerController {
     // Sources, in priority order:
     //   1. snapshot.derived_visuals.active_events (SSE agent_runner adds this)
     //   2. snapshot.active_events (top-level fallback)
-    //   3. obs.metadata.active_events (raw env metadata, only on /reset path —
+    //   3. obs.metadata.active_events (raw env metadata, only on /reset path -
     //      step responses strip metadata on the OpenEnv WS/HTTP channel)
     //
     // If none of these are present we leave existing chips alone instead of

@@ -1,16 +1,16 @@
 """Collect trajectories with direct OpenEnv environment access.
 
-Mirrors the bio-experiment winner's ``training/rollout_collection.py`` —
+Mirrors the bio-experiment winner's ``training/rollout_collection.py`` -
 runs episodes against the live HF Space (or a local env), persists each
 trajectory as JSON, and prints summary metrics. Lets reviewers reproduce
 the policy's behaviour offline without re-running GRPO.
 
 Two policies are built in (no LLM required):
 
-  * ``constant``   — emits the clinical default (1.5 mA, 0.13 ms, 130 Hz)
+  * ``constant``   - emits the clinical default (1.5 mA, 0.13 ms, 130 Hz)
                      every step. Acts as the "always-on cDBS" baseline used
                      by the clinical benchmark.
-  * ``heuristic``  — uses the rule-based policy from
+  * ``heuristic``  - uses the rule-based policy from
                      :func:`parkinsons_Motor.train.heuristic_action`, which
                      is roughly the strategy a clinician trained on the
                      literature would deploy.
@@ -43,7 +43,7 @@ logger = logging.getLogger(__name__)
 
 
 def _clinical_default_action() -> Dict[str, float]:
-    """Always-on continuous-DBS clinical default — ~midpoint of the safe window."""
+    """Always-on continuous-DBS clinical default - ~midpoint of the safe window."""
     return {
         "dbs_amplitude":   1.5,
         "dbs_pulse_width": 0.13,

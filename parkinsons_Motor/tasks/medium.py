@@ -1,4 +1,4 @@
-"""Medium task — active rescue with stochastic second wave.
+"""Medium task - active rescue with stochastic second wave.
 
 Clinical intent: tremor rescue during a worsening episode, plus a real chance
 that the patient deteriorates a second time after the first stabilization.

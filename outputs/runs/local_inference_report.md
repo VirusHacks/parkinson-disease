@@ -46,7 +46,7 @@
 
 | Seed | Steps | Score | Pass | Mean amp (mA) | Max amp (mA) | Events fired |
 |---:|---:|---:|---:|---:|---:|---|
-| · | 36/36 | 0.7951 | PASS | 1.078 | 1.200 | — |
+| · | 36/36 | 0.7951 | PASS | 1.078 | 1.200 | - |
 
 ### `medium`
 

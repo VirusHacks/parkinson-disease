@@ -104,7 +104,7 @@ MyoSuite calculates computationally heavy musculoskeletal physics. Training an R
 
 ### 4.3 Anti-Hacking Mechanisms
 - The simulation timeline advances deterministically. An agent cannot "pause" time.
-- The `side_effect_load` budget ensures the agent cannot simply max out DBS amplitude to force a perfect muscle-force score — over-stimulation depletes the safety budget and the grader penalises it heavily.
+- The `side_effect_load` budget ensures the agent cannot simply max out DBS amplitude to force a perfect muscle-force score - over-stimulation depletes the safety budget and the grader penalises it heavily.
 
 ---
 

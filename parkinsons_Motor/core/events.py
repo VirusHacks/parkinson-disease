@@ -14,7 +14,7 @@ This module defines a small, deterministic-given-seed event scheduler that the
 environment polls each step. Each task can opt into a named *event profile*
 that controls which events can fire and with what probability, intensity and
 duration. The scheduler is rng-driven, so a fixed task+seed pair always yields
-the same event timeline — required for reproducible benchmarking.
+the same event timeline - required for reproducible benchmarking.
 """
 
 from __future__ import annotations
@@ -86,7 +86,7 @@ class EventConfig:
 
 
 _PROFILES: Dict[str, Tuple[EventConfig, ...]] = {
-    # Medium task: rescue phase — a manageable deterioration the agent must reverse.
+    # Medium task: rescue phase - a manageable deterioration the agent must reverse.
     # Clinically this is one problem at a time: either a second deterioration wave
     # OR mild dyskinesia risk from early over-treatment. NOT a multi-crisis overlap.
     "rescue": (
@@ -96,7 +96,7 @@ _PROFILES: Dict[str, Tuple[EventConfig, ...]] = {
             earliest_step_frac=0.55,
             latest_step_frac=0.80,
             duration_steps_range=(5, 8),
-            intensity_range=(0.10, 0.18),  # mild — manageable with correct response
+            intensity_range=(0.10, 0.18),  # mild - manageable with correct response
         ),
         EventConfig(
             event_type=EVENT_DYSKINESIA_SPIKE,
@@ -104,10 +104,10 @@ _PROFILES: Dict[str, Tuple[EventConfig, ...]] = {
             earliest_step_frac=0.40,
             latest_step_frac=0.85,
             duration_steps_range=(3, 6),
-            intensity_range=(0.08, 0.16),  # mild — medium is not a full dyskinesia crisis
+            intensity_range=(0.08, 0.16),  # mild - medium is not a full dyskinesia crisis
         ),
     ),
-    # Hard task: long horizon — events are near-guaranteed and stronger, forcing
+    # Hard task: long horizon - events are near-guaranteed and stronger, forcing
     # the agent to manage overlapping crises across a 150-step episode.
     "long_horizon": (
         EventConfig(
@@ -323,7 +323,7 @@ class EventScheduler:
         medication_phase: float,
     ) -> None:
         if ev.event_type == EVENT_DYSKINESIA_SPIKE:
-            # Dyskinesia is a genuine overtreatment emergency — side-effect burden
+            # Dyskinesia is a genuine overtreatment emergency - side-effect burden
             # increases sharply; the agent cannot simply push through with more amplitude.
             agg.side_effect_burden_mult *= 1.0 + 1.65 * ev.intensity
             agg.beta_drive_add += -0.04 * ev.intensity
@@ -382,10 +382,10 @@ def schedule_overrides(
     """Return per-step setpoint overrides for time-varying tasks.
 
     Returned keys are optional and only set when this schedule modifies them:
-      * target_force_floor  — minimum acceptable force_preserved
-      * tremor_target_mult  — multiplier on task.target_tremor_arv
-      * beta_target_mult    — multiplier on task.target_beta_arv
-      * amplitude_ceiling_mult — extra amplitude ceiling beyond task max
+      * target_force_floor  - minimum acceptable force_preserved
+      * tremor_target_mult  - multiplier on task.target_tremor_arv
+      * beta_target_mult    - multiplier on task.target_beta_arv
+      * amplitude_ceiling_mult - extra amplitude ceiling beyond task max
                                   (used during e.g. surgical microlesion window)
     """
     if not schedule_id or n_steps <= 0:

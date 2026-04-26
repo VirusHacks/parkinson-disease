@@ -1,4 +1,4 @@
-# Research and References — MotorAssistEnv
+# Research and References - MotorAssistEnv
 
 Everything MotorAssistEnv is built on: the biophysical models we calibrated against, the clinical literature behind every reward term, the prior RL-for-DBS work we position ourselves next to, and the AI-safety material that shaped the reward design.
 
@@ -6,11 +6,11 @@ Everything MotorAssistEnv is built on: the biophysical models we calibrated agai
 
 | Source | Role in this project |
 |---|---|
-| [Fleming et al. 2023 — Motor Network Model](https://github.com/John-E-Fleming/Parkinsons_Motor_Network_Model) | **Primary calibration source.** Force, tremor, sEMG, beta, and stimulation relationships in MotorAssistEnv trace back to this work. The 12×15 DBS entrainment surface the agent navigates was published in the companion paper. |
-| [Fleming et al. 2020 — Cortical–BG Model](https://github.com/John-E-Fleming/Parkinsons_Cortical_Basal_Ganglia_Network_Model) | Establishes the closed-loop DBS modeling lineage. Motivates beta-band suppression as the primary control target. |
+| [Fleming et al. 2023 - Motor Network Model](https://github.com/John-E-Fleming/Parkinsons_Motor_Network_Model) | **Primary calibration source.** Force, tremor, sEMG, beta, and stimulation relationships in MotorAssistEnv trace back to this work. The 12×15 DBS entrainment surface the agent navigates was published in the companion paper. |
+| [Fleming et al. 2020 - Cortical–BG Model](https://github.com/John-E-Fleming/Parkinsons_Cortical_Basal_Ganglia_Network_Model) | Establishes the closed-loop DBS modeling lineage. Motivates beta-band suppression as the primary control target. |
 | [cviaai/RL-DBS](https://github.com/cviaai/RL-DBS) | Closest prior art for RL-based DBS control. Grounds the framing that RL-for-DBS is a legitimate research direction, not a speculative one. |
-| [MyoHub/myosuite_demo](https://github.com/MyoHub/myosuite_demo) + [MuJoCo-WASM](https://github.com/stillonearth/MuJoCo-WASM) | The 3D visualisation layer. When a judge visits `/viewer`, they see a real arm model jitter with tremor and stabilise as the agent applies DBS — the demo is bundled directly into the repo and driven live by `tremor_arv` from the OpenEnv backend. |
-| [DeepMind — Specification gaming](https://deepmind.google/blog/specification-gaming-the-flip-side-of-ai-ingenuity/) | Single biggest influence on the reward-hacking audit and the 15-attack adversarial table in `REWARD_DESIGN.md`. |
+| [MyoHub/myosuite_demo](https://github.com/MyoHub/myosuite_demo) + [MuJoCo-WASM](https://github.com/stillonearth/MuJoCo-WASM) | The 3D visualisation layer. When a judge visits `/viewer`, they see a real arm model jitter with tremor and stabilise as the agent applies DBS - the demo is bundled directly into the repo and driven live by `tremor_arv` from the OpenEnv backend. |
+| [DeepMind - Specification gaming](https://deepmind.google/blog/specification-gaming-the-flip-side-of-ai-ingenuity/) | Single biggest influence on the reward-hacking audit and the 15-attack adversarial table in `REWARD_DESIGN.md`. |
 | [meta-pytorch/OpenEnv](https://github.com/meta-pytorch/OpenEnv) | The hackathon's required interface. Everything in this repo is built around its `reset` / `step` contract. |
 
 ## 2. Where each source grounds the codebase
@@ -19,10 +19,10 @@ Everything MotorAssistEnv is built on: the biophysical models we calibrated agai
 The Fleming 2023 model provides the 100-step physiological anchor (t = 10.02–12.02 s), normalisation bounds, and the 12×15 DBS entrainment surface. The 2020 model establishes why beta-band suppression is the right primary target.
 
 **3D viewer** (`static/myosuite_demo/`, `server/app.py`)
-The MyoSuite demo is a WebAssembly-based 3D musculoskeletal arm that runs in the browser with no plugins. We ship it directly inside the repo, mount it at `GET /viewer`, and connect it live to the OpenEnv backend — so every tick, `tremor_arv` from the running environment gets translated into proportional arm jitter. When the agent applies good DBS and tremor drops, the arm visibly steadies. It is a direct window into what the numbers mean for a real patient.
+The MyoSuite demo is a WebAssembly-based 3D musculoskeletal arm that runs in the browser with no plugins. We ship it directly inside the repo, mount it at `GET /viewer`, and connect it live to the OpenEnv backend - so every tick, `tremor_arv` from the running environment gets translated into proportional arm jitter. When the agent applies good DBS and tremor drops, the arm visibly steadies. It is a direct window into what the numbers mean for a real patient.
 
 **Clinical reward terms** (`graders/`, `REWARD_DESIGN.md`)
-Every weight and formula in the grader cites a specific clinical paper — force weighting from Limousin 1995, 130 Hz optimum from Kühn 2008, beta time-in-range from Tinkhauser 2017, safety threshold from Swann 2018, smoothness penalty from Velisar 2019.
+Every weight and formula in the grader cites a specific clinical paper - force weighting from Limousin 1995, 130 Hz optimum from Kühn 2008, beta time-in-range from Tinkhauser 2017, safety threshold from Swann 2018, smoothness penalty from Velisar 2019.
 
 **Anti-hacking design** (`REWARD_DESIGN.md §6–8`)
 The DeepMind specification-gaming post directly shaped the 15-attack audit table and the principle "exploiting without solving should not score high."
@@ -31,13 +31,13 @@ The DeepMind specification-gaming post directly shaped the 15-attack audit table
 
 **Software**
 
-1. John-E-Fleming. *Parkinsons_Motor_Network_Model* — https://github.com/John-E-Fleming/Parkinsons_Motor_Network_Model
-2. John-E-Fleming. *Parkinsons_Cortical_Basal_Ganglia_Network_Model* — https://github.com/John-E-Fleming/Parkinsons_Cortical_Basal_Ganglia_Network_Model
-3. cviaai. *RL-DBS* — https://github.com/cviaai/RL-DBS
-4. MyoHub. *myosuite* — https://github.com/MyoHub/myosuite
-5. MyoHub. *myosuite_demo* — https://github.com/MyoHub/myosuite_demo
-6. stillonearth. *MuJoCo-WASM* — https://github.com/stillonearth/MuJoCo-WASM
-7. meta-pytorch. *OpenEnv* — https://github.com/meta-pytorch/OpenEnv
+1. John-E-Fleming. *Parkinsons_Motor_Network_Model* - https://github.com/John-E-Fleming/Parkinsons_Motor_Network_Model
+2. John-E-Fleming. *Parkinsons_Cortical_Basal_Ganglia_Network_Model* - https://github.com/John-E-Fleming/Parkinsons_Cortical_Basal_Ganglia_Network_Model
+3. cviaai. *RL-DBS* - https://github.com/cviaai/RL-DBS
+4. MyoHub. *myosuite* - https://github.com/MyoHub/myosuite
+5. MyoHub. *myosuite_demo* - https://github.com/MyoHub/myosuite_demo
+6. stillonearth. *MuJoCo-WASM* - https://github.com/stillonearth/MuJoCo-WASM
+7. meta-pytorch. *OpenEnv* - https://github.com/meta-pytorch/OpenEnv
 
 **Computational modeling and RL-for-DBS**
 

@@ -1,13 +1,13 @@
 """
-Model Benchmark Runner — MotorAssistEnv
+Model Benchmark Runner - MotorAssistEnv
 =======================================
 Runs Qwen2.5-7B, Qwen2.5-72B, and Mistral-7B-Instruct as zero-shot baseline
 agents against the easy / medium / hard tasks via the HF Router API.
 
 Results are written to:
-  outputs/benchmark/<model_slug>/  — one JSON per task
-  outputs/benchmark/summary.json   — all models × tasks
-  outputs/benchmark/summary.csv    — spreadsheet-friendly view
+  outputs/benchmark/<model_slug>/  - one JSON per task
+  outputs/benchmark/summary.json   - all models × tasks
+  outputs/benchmark/summary.csv    - spreadsheet-friendly view
 
 Usage:
   python run_model_benchmark.py
@@ -124,11 +124,11 @@ Ranges:
   dbs_frequency:   60 – 185 Hz    (default 130)
 
 Key signals:
-  beta_arv        pathological beta oscillation — lower is better
-  tremor_arv      tremor severity — lower is better
-  force_preserved motor function — keep high
-  side_effect_load  cumulative stimulation burden — stay below budget
-  gamma_arv       overstimulation marker — if >0.55 reduce amplitude fast
+  beta_arv        pathological beta oscillation - lower is better
+  tremor_arv      tremor severity - lower is better
+  force_preserved motor function - keep high
+  side_effect_load  cumulative stimulation burden - stay below budget
+  gamma_arv       overstimulation marker - if >0.55 reduce amplitude fast
   beta_trend / tremor_trend  positive = worsening, negative = improving
   side_effect_rate  positive = burden still rising
 
@@ -141,9 +141,9 @@ Rules:
 """).strip()
 
 _TASK_CONTEXT = {
-    "easy":   "EASY — Calm Start. Responsive patient, mild early symptoms. Ceiling 1.5 mA. Budget 0.55.",
-    "medium": "MEDIUM — Rescue Phase. Active deterioration; rescue without triggering dyskinesia. Ceiling 1.8 mA. Budget 0.60.",
-    "hard":   "HARD — Full Episode. Four overlapping crises. Refractory patient. Ceiling 2.4 mA. Budget 0.40.",
+    "easy":   "EASY - Calm Start. Responsive patient, mild early symptoms. Ceiling 1.5 mA. Budget 0.55.",
+    "medium": "MEDIUM - Rescue Phase. Active deterioration; rescue without triggering dyskinesia. Ceiling 1.8 mA. Budget 0.60.",
+    "hard":   "HARD - Full Episode. Four overlapping crises. Refractory patient. Ceiling 2.4 mA. Budget 0.40.",
 }
 
 
@@ -463,7 +463,7 @@ def _write_summary(all_model_results: List[Dict[str, Any]]) -> None:
     json_path.write_text(json.dumps(all_model_results, indent=2), encoding="utf-8")
     print(f"\nSaved summary JSON: {json_path}", flush=True)
 
-    # CSV — one row per (model, task)
+    # CSV - one row per (model, task)
     csv_path = OUTPUT_DIR / "summary.csv"
     rows: List[Dict[str, Any]] = []
     for mr in all_model_results:
@@ -521,7 +521,7 @@ def _write_summary(all_model_results: List[Dict[str, Any]]) -> None:
 # ── Entry point ───────────────────────────────────────────────────────────────
 
 async def main() -> None:
-    print("\nMotorAssistEnv — Multi-Model Baseline Benchmark", flush=True)
+    print("\nMotorAssistEnv - Multi-Model Baseline Benchmark", flush=True)
     print(f"  Env URL : {ENV_URL}", flush=True)
     print(f"  Models  : {[m[0] for m in MODELS]}", flush=True)
     print(f"  Tasks   : {TASKS}", flush=True)

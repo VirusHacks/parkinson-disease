@@ -20,11 +20,11 @@ tags:
 license: mit
 ---
 
-# MotorAssist — Qwen3-4B LoRA for Adaptive Deep Brain Stimulation Control
+# MotorAssist - Qwen3-4B LoRA for Adaptive Deep Brain Stimulation Control
 
 **Qwen3-4B + LoRA · SFT → GRPO · MotorAssistEnv · OpenEnv Hackathon India 2026**
 
-This is a LoRA adapter fine-tuned on **Qwen3-4B** (4-bit quantised via Unsloth) to act as a real-time adaptive Deep Brain Stimulation (DBS) controller for Parkinson's disease patients. The model was trained using a two-stage pipeline — Supervised Fine-Tuning (SFT) followed by GRPO reinforcement learning — inside **MotorAssistEnv**, the first RL benchmark for closed-loop DBS control with language models.
+This is a LoRA adapter fine-tuned on **Qwen3-4B** (4-bit quantised via Unsloth) to act as a real-time adaptive Deep Brain Stimulation (DBS) controller for Parkinson's disease patients. The model was trained using a two-stage pipeline - Supervised Fine-Tuning (SFT) followed by GRPO reinforcement learning - inside **MotorAssistEnv**, the first RL benchmark for closed-loop DBS control with language models.
 
 The trained model **passes all three core clinical tasks** (easy, medium, hard) and **outperforms zero-shot Qwen2.5-7B on every task** despite having 43% fewer parameters.
 
@@ -36,12 +36,12 @@ The trained model **passes all three core clinical tasks** (easy, medium, hard) 
 
 The model acts as a closed-loop DBS policy. At every 20 ms timestep (the same cadence as real DBS hardware), it receives 30 sensor readings from a simulated Parkinson's patient and outputs four stimulation parameters:
 
-- `dbs_amplitude` (mA) — stimulation strength
-- `dbs_pulse_width` (µs) — pulse duration
-- `dbs_frequency` (Hz) — pulse rate
-- `motor_command` — voluntary motor intent
+- `dbs_amplitude` (mA) - stimulation strength
+- `dbs_pulse_width` (µs) - pulse duration
+- `dbs_frequency` (Hz) - pulse rate
+- `motor_command` - voluntary motor intent
 
-Its goal: suppress pathological beta oscillations and tremor, preserve voluntary motor function, and stay within the side-effect budget — simultaneously, across a 36–150 step episode.
+Its goal: suppress pathological beta oscillations and tremor, preserve voluntary motor function, and stay within the side-effect budget - simultaneously, across a 36–150 step episode.
 
 ### Model Description
 
@@ -142,9 +142,9 @@ python scripts/run_model_benchmark.py --model virustechhacks/dbs-grpo-qwen3-4b
 
 ### The Problem
 
-Standard DBS devices are open-loop: a neurologist sets amplitude, pulse width, and frequency once, and the device fires at those fixed settings for months. Meanwhile, the patient's brain changes every day — medication wears off, stress spikes oscillations, disease progresses. Adaptive DBS (closed-loop, real-time adjustment) is proven to improve outcomes, but the policy that drives it does not exist. This model is a trained candidate for that policy.
+Standard DBS devices are open-loop: a neurologist sets amplitude, pulse width, and frequency once, and the device fires at those fixed settings for months. Meanwhile, the patient's brain changes every day - medication wears off, stress spikes oscillations, disease progresses. Adaptive DBS (closed-loop, real-time adjustment) is proven to improve outcomes, but the policy that drives it does not exist. This model is a trained candidate for that policy.
 
-### Training Data — Stage 1: SFT
+### Training Data - Stage 1: SFT
 
 **Source:** Reference heuristic adaptive controller (rule-based) rolled out against the live MotorAssistEnv environment across multiple episodes. Every 20 ms timestep produced one training example:
 
@@ -153,7 +153,7 @@ Standard DBS devices are open-loop: a neurologist sets amplitude, pulse width, a
 
 The SFT data teaches the model what a clinically valid DBS response looks like before GRPO begins, eliminating cold-start format failures and allowing GRPO to focus entirely on policy quality rather than schema compliance.
 
-### Training Procedure — Stage 2: GRPO
+### Training Procedure - Stage 2: GRPO
 
 **Algorithm:** Group Relative Policy Optimisation (GRPO) via TRL `GRPOTrainer`
 
@@ -203,7 +203,7 @@ The SFT data teaches the model what a clinically valid DBS response looks like b
 
 ### Environment
 
-**MotorAssistEnv** — a peer-reviewed biophysical RL environment for adaptive DBS control, calibrated against Fleming et al. (2023, *J Neural Eng* 20(5):056029). Grader is deterministic math; no LLM-as-judge.
+**MotorAssistEnv** - a peer-reviewed biophysical RL environment for adaptive DBS control, calibrated against Fleming et al. (2023, *J Neural Eng* 20(5):056029). Grader is deterministic math; no LLM-as-judge.
 
 ### Tasks
 
@@ -224,7 +224,7 @@ The SFT data teaches the model what a clinically valid DBS response looks like b
 | Constant 1.0 mA baseline | 0.72–0.80 ✅ | 0.47–0.52 ❌ | 0.23–0.36 ❌ |
 
 **Key findings:**
-- Our trained 4B model passes all three tasks. Zero-shot 7B scores **0.019 on hard** — near-total collapse. Our trained model scores **0.480** on the same task.
+- Our trained 4B model passes all three tasks. Zero-shot 7B scores **0.019 on hard** - near-total collapse. Our trained model scores **0.480** on the same task.
 - On medium, trained 4B (0.610) matches zero-shot 72B (0.615) using **18× fewer parameters**.
 - The gap from zero-shot 7B to trained 4B on hard (0.019 → 0.480) is the entire argument for why RL training exists.
 
@@ -246,7 +246,7 @@ The SFT data teaches the model what a clinically valid DBS response looks like b
 | **Hardware** | Kaggle T4 GPU (free tier, 16GB VRAM) |
 | **Training time** | ~116 minutes total (79 + 37) |
 | **Framework** | PyTorch · Transformers · TRL · Unsloth · PEFT |
-| **Estimated CO₂** | Minimal — free T4, ~2h, datacenter renewable fraction unknown |
+| **Estimated CO₂** | Minimal - free T4, ~2h, datacenter renewable fraction unknown |
 
 ---
 

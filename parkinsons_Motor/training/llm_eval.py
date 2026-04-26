@@ -11,7 +11,7 @@ so the runtime training module stays focused on rollout + reward + GRPO
 glue. The LLM-evaluation surface is separate from the offline-trajectory
 :class:`~parkinsons_Motor.training.evaluation.EvaluationSuite` because:
 
-  * :class:`EvaluationSuite` is **policy-agnostic** — it takes a
+  * :class:`EvaluationSuite` is **policy-agnostic** - it takes a
     :class:`~parkinsons_Motor.training.trajectory.DBSTrajectory` dataset and
     computes metrics on the recorded actions/observations.
   * The functions here actually **drive an LLM through the env** to produce
@@ -40,7 +40,7 @@ logger = logging.getLogger("parkinsons_Motor.training.llm_eval")
 def _amp_from_history(line: str) -> Optional[float]:
     """Recover the DBS amplitude from a ``Trajectory.history`` line.
 
-    History lines have the shape ``"step=3 amp=1.42 => beta=0.31 ..."`` —
+    History lines have the shape ``"step=3 amp=1.42 => beta=0.31 ..."`` -
     we just slice out the ``amp=<float>`` substring.
     """
     if "amp=" not in line:
@@ -81,7 +81,7 @@ def _warm_up_generation(
 
 
 # ─────────────────────────────────────────────────────────────────────────────
-# 2. eval_with_adapter_disabled  — base-model evaluation on the same seeds
+# 2. eval_with_adapter_disabled  - base-model evaluation on the same seeds
 # ─────────────────────────────────────────────────────────────────────────────
 
 def eval_with_adapter_disabled(
@@ -110,7 +110,7 @@ def eval_with_adapter_disabled(
 
 
 # ─────────────────────────────────────────────────────────────────────────────
-# 3. sanity_check_rollout — pre-flight check before training
+# 3. sanity_check_rollout - pre-flight check before training
 # ─────────────────────────────────────────────────────────────────────────────
 
 def sanity_check_rollout(
@@ -137,7 +137,7 @@ def sanity_check_rollout(
       3. all rollouts emit identical actions (no reward variance => GRPO can't learn)
       4. env errors silently (ENVIRONMENT_ERROR_PENALTY appears in every step)
       5. **WebSocket keepalive timeouts during long generations** (sync call
-         in async coroutine — fixed in ``rollout_episode_async`` via
+         in async coroutine - fixed in ``rollout_episode_async`` via
          ``asyncio.to_thread``; this check verifies the fix actually landed)
 
     Prints raw completion + parsed action + per-step env reward + final grader,
@@ -215,11 +215,11 @@ def sanity_check_rollout(
                       "Check for code fences, smart quotes, trailing commas, or comments.")
             elif not _has_json_brace:
                 print("    * Model emitted prose with no JSON object at all. "
-                      "Check the chat template / SYSTEM_PROMPT — the model isn't following the format.")
+                      "Check the chat template / SYSTEM_PROMPT - the model isn't following the format.")
             else:
-                print("    * Unclear — inspect the preview above.")
+                print("    * Unclear - inspect the preview above.")
     except Exception as exc:
-        print(f"  [trace] generation crashed: {exc!r}  — falling through to env rollout anyway")
+        print(f"  [trace] generation crashed: {exc!r}  - falling through to env rollout anyway")
 
     traj = rollout_episode(
         model, tokenizer, env_url,
@@ -271,12 +271,12 @@ def sanity_check_rollout(
         failures.append("zero env steps completed")
     if parseable_pct < 50.0:
         failures.append(
-            f"only {parseable_pct:.0f}% of completions parsed as JSON — "
+            f"only {parseable_pct:.0f}% of completions parsed as JSON - "
             "increase max_new_tokens, tighten SYSTEM_PROMPT, or check the chat template"
         )
     if n_steps > 0 and rewards_nonzero == 0:
         failures.append(
-            "every env step returned reward=0 — the env may be broken, the seed may be invalid, "
+            "every env step returned reward=0 - the env may be broken, the seed may be invalid, "
             "or the task_id may not be registered server-side"
         )
 
@@ -286,7 +286,7 @@ def sanity_check_rollout(
         if raise_on_failure:
             raise RuntimeError(msg)
     else:
-        print("\nSANITY CHECK PASSED — LLM produces parseable JSON, env returns rewards, no errors.")
+        print("\nSANITY CHECK PASSED - LLM produces parseable JSON, env returns rewards, no errors.")
 
     return {
         "n_steps":         n_steps,

@@ -8,16 +8,16 @@
 
 This module is the simple, honest path:
 
-    1. **Before training** — roll out the deterministic heuristic policy against
+    1. **Before training** - roll out the deterministic heuristic policy against
        an *in-process* :class:`ParkinsonsMotorEnvironment` for a few episodes
        per training task. For each step we record the *exact* prompt the LLM
        would see (system + per-step user block, chat-templated with thinking
        OFF) plus the JSON-serialised history of heuristic actions taken so far,
        the task id, and the episode seed. The result is a dataset whose rows
-       cover the **full distribution of states** a real episode visits — first
-       step, mid-crisis, late-episode taper — not just a synthetic toy prompt.
+       cover the **full distribution of states** a real episode visits - first
+       step, mid-crisis, late-episode taper - not just a synthetic toy prompt.
 
-    2. **During GRPO** — TRL's standard generation path produces ``num_generations``
+    2. **During GRPO** - TRL's standard generation path produces ``num_generations``
        completions per prompt (group). For every completion we
 
          a. parse the JSON action,
@@ -34,7 +34,7 @@ This module is the simple, honest path:
        WebSocket keepalives, no cursor scheduling, no kwarg plumbing.
 
 The env code being replayed is the same ``ParkinsonsMotorEnvironment`` we
-deploy on the HF Space — so this is the same env, just called in-process for
+deploy on the HF Space - so this is the same env, just called in-process for
 speed. Evaluation still goes against the *remote* Space so the demo end-to-end
 is real.
 
@@ -83,7 +83,7 @@ logger = logging.getLogger("parkinsons_Motor.training.replay_grpo")
 
 
 # ---------------------------------------------------------------------------
-# Reward weights — tuned so a typical group of 6 completions sees rewards in
+# Reward weights - tuned so a typical group of 6 completions sees rewards in
 # roughly [-0.2, +1.2] and a 4B policy can drive variance up reliably.
 # ---------------------------------------------------------------------------
 
@@ -118,7 +118,7 @@ _REWARD_MAX_RAW: float = (
 class LocalEnvFactory:
     """No-arg callable that builds a fresh :class:`ParkinsonsMotorEnvironment`.
 
-    Stored as a dataclass so it's trivially picklable — TRL may serialise the
+    Stored as a dataclass so it's trivially picklable - TRL may serialise the
     reward function across worker processes when ``dataloader_num_workers > 0``,
     and a closure over an env instance would die at pickle time.
 
@@ -136,7 +136,7 @@ class LocalEnvFactory:
 
 
 # ---------------------------------------------------------------------------
-# 2. Dataset collection — heuristic rollouts → (prompt, history, task, seed)
+# 2. Dataset collection - heuristic rollouts → (prompt, history, task, seed)
 # ---------------------------------------------------------------------------
 
 def _serialise_actions(actions: Sequence[ParkinsonsMotorAction]) -> str:
@@ -163,7 +163,7 @@ def _deserialise_actions(blob: str) -> List[ParkinsonsMotorAction]:
             try:
                 out.append(ParkinsonsMotorAction(**it))
             except (TypeError, ValueError):
-                # Skip malformed entries — the replay just gets one fewer step.
+                # Skip malformed entries - the replay just gets one fewer step.
                 continue
     return out
 
@@ -191,7 +191,7 @@ def collect_prompt_dataset(
     ``prompt`` (str)
         The chat-templated string the model will be conditioned on. This is
         what TRL feeds straight into ``model.generate``. Pre-rendering means
-        TRL does **not** apply its own chat template — we control the
+        TRL does **not** apply its own chat template - we control the
         ``enable_thinking`` flag exactly.
 
     ``task_id`` (str), ``seed`` (int), ``step_idx`` (int)
@@ -199,7 +199,7 @@ def collect_prompt_dataset(
         computation.
 
     ``history_actions`` (str, JSON)
-        ``json.dumps([action.model_dump(), …])`` — the heuristic actions taken
+        ``json.dumps([action.model_dump(), …])`` - the heuristic actions taken
         on this episode *before* this step. The reward function replays them
         to recreate the exact observation the LLM saw.
 
@@ -217,12 +217,12 @@ def collect_prompt_dataset(
             sweet spot the hackathon winners used.
         max_steps_per_episode: Hard cap on per-episode length. Real episodes
             may end earlier via ``obs.done``. Keeping this small (≤ 20) keeps
-            replay cost bounded — the reward function replays at most this many
+            replay cost bounded - the reward function replays at most this many
             steps per completion.
         seed: Deterministic seed for the per-episode seed sampler. Same seed
             ⇒ same dataset every time.
         tokenizer: A Hugging Face-style tokenizer with ``apply_chat_template``.
-            Required — we render prompts ahead of time so TRL doesn't second
+            Required - we render prompts ahead of time so TRL doesn't second
             guess us.
         enable_thinking: Whether to leave Qwen3's ``<think>`` block on at
             train-time. Keep this **False** for training; flip on only for
@@ -288,7 +288,7 @@ def collect_prompt_dataset(
 
 
 # ---------------------------------------------------------------------------
-# 3. Reward function factory — replay env, score LLM action, return scalar
+# 3. Reward function factory - replay env, score LLM action, return scalar
 # ---------------------------------------------------------------------------
 
 def _completion_text(completion: Any) -> str:
@@ -297,8 +297,8 @@ def _completion_text(completion: Any) -> str:
     TRL hands reward functions completions in one of two shapes depending on
     the dataset / version:
 
-      * ``str`` — the raw decoded completion text.
-      * ``list[dict]`` — a single-message chat list, ``[{"role": "assistant",
+      * ``str`` - the raw decoded completion text.
+      * ``list[dict]`` - a single-message chat list, ``[{"role": "assistant",
         "content": "..."}]``.
 
     Be defensive about both so we don't silently zero out rewards if TRL
@@ -354,7 +354,7 @@ def make_replay_reward_fn(
     Args:
         env_factory: Same factory used by :func:`collect_prompt_dataset`. The
             reward function holds a *reference* and creates a fresh env per
-            completion (cheap — just python-object construction, not a process).
+            completion (cheap - just python-object construction, not a process).
         weights: Override :data:`DEFAULT_REPLAY_REWARD_WEIGHTS`. Only the keys
             you supply are overridden.
         log_every: Throttle factor for the per-step INFO log. ``log_every=5``
@@ -422,7 +422,7 @@ def make_replay_reward_fn(
         n = len(completions)
         # All these dataset-derived kwargs should be parallel to ``completions``.
         # If any are missing it means somebody called this function without the
-        # dataset wiring (e.g. a unit test) — fail loudly rather than silently
+        # dataset wiring (e.g. a unit test) - fail loudly rather than silently
         # returning zeros (which is exactly the bug we're fixing).
         if task_id is None or seed is None or history_actions is None:
             raise ValueError(

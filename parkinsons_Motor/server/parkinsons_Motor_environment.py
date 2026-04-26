@@ -1,5 +1,5 @@
 """
-Parkinson's Motor Environment — upgraded causal control loop.
+Parkinson's Motor Environment - upgraded causal control loop.
 
 This environment keeps the Fleming et al. (2023) trajectory as a physiological
 anchor, but the online state is no longer a direct replay. Each step now uses:
@@ -37,7 +37,7 @@ except ImportError:
     from tasks import DBSTask, get_task
 
 
-# Task-specific reward weight sets — mirror grader weights so training signal
+# Task-specific reward weight sets - mirror grader weights so training signal
 # aligns with evaluation. Keys match task_id; "default" is the fallback.
 _REWARD_WEIGHTS: dict = {
     "easy": dict(
@@ -217,7 +217,7 @@ class ParkinsonsMotorEnvironment(Environment):
         self._entrainment_state = 0.0
         self._adaptation_state = 0.0
 
-        # Extended physiological state — reset per episode
+        # Extended physiological state - reset per episode
         self._gamma_state = 0.0
         self._stim_washout = 0.0
         self._battery_drain = 0.0
@@ -355,7 +355,7 @@ class ParkinsonsMotorEnvironment(Environment):
         recovery = self._profile.recovery_rate * (1.10 - 0.55 * amp_norm)
         self._side_effect_state = _clamp(self._side_effect_state * (1.0 - recovery) + burden)
 
-        # Gamma ARV: over-stimulation biomarker — rises when side effects accumulate fast
+        # Gamma ARV: over-stimulation biomarker - rises when side effects accumulate fast
         gamma_target = _clamp(
             0.60 * self._side_effect_state
             + 0.25 * (amp_norm ** 1.5)

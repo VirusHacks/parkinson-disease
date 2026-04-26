@@ -185,7 +185,7 @@ def _mean_trace(rollouts: list[dict], key: str = "rewards", n: int | None = None
 
 
 # =============================================================================
-# 10 — Score bar chart: models × tasks
+# 10 - Score bar chart: models × tasks
 # =============================================================================
 def plot_score_bars(data: list[dict]) -> None:
     tasks   = ["easy", "medium", "hard"]
@@ -233,7 +233,7 @@ def plot_score_bars(data: list[dict]) -> None:
 
 
 # =============================================================================
-# 11 — Per-step reward curves: one panel per task
+# 11 - Per-step reward curves: one panel per task
 # =============================================================================
 def plot_reward_curves(data: list[dict]) -> None:
     tasks = ["easy", "medium", "hard"]
@@ -271,7 +271,7 @@ def plot_reward_curves(data: list[dict]) -> None:
 
 
 # =============================================================================
-# 12 — Pass / fail heatmap
+# 12 - Pass / fail heatmap
 # =============================================================================
 def plot_pass_rate_heatmap(data: list[dict]) -> None:
     tasks  = ["easy", "medium", "hard"]
@@ -303,7 +303,7 @@ def plot_pass_rate_heatmap(data: list[dict]) -> None:
 
 
 # =============================================================================
-# 13 — Beta & Tremor suppression comparison
+# 13 - Beta & Tremor suppression comparison
 # =============================================================================
 def plot_biomarker_comparison(data: list[dict]) -> None:
     tasks  = ["easy", "medium", "hard"]
@@ -347,7 +347,7 @@ def plot_biomarker_comparison(data: list[dict]) -> None:
 
 
 # =============================================================================
-# 14 — Amplitude traces: one panel per task
+# 14 - Amplitude traces: one panel per task
 # =============================================================================
 def plot_amplitude_traces(data: list[dict]) -> None:
     tasks = ["easy", "medium", "hard"]
@@ -378,7 +378,7 @@ def plot_amplitude_traces(data: list[dict]) -> None:
 
 
 # =============================================================================
-# 15 — Overall score ranking (horizontal bar)
+# 15 - Overall score ranking (horizontal bar)
 # =============================================================================
 def plot_overall_ranking(data: list[dict]) -> None:
     models = [mr["model_display_name"] for mr in data]
@@ -404,7 +404,7 @@ def plot_overall_ranking(data: list[dict]) -> None:
 
 
 # =============================================================================
-# 16 — Side-effect load comparison
+# 16 - Side-effect load comparison
 # =============================================================================
 def plot_se_load(data: list[dict]) -> None:
     tasks   = ["easy", "medium", "hard"]
@@ -440,7 +440,7 @@ def plot_se_load(data: list[dict]) -> None:
 
 
 # =============================================================================
-# 17 — Score distribution violin / box per model
+# 17 - Score distribution violin / box per model
 # =============================================================================
 def plot_score_distribution(data: list[dict]) -> None:
     tasks = ["easy", "medium", "hard"]

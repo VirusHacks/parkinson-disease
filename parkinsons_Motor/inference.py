@@ -1,5 +1,5 @@
 """
-Inference Script — Parkinson's Motor (DBS) Environment.
+Inference Script - Parkinson's Motor (DBS) Environment.
 
 Runs an LLM agent against the public tasks via the live OpenEnv-compatible
 environment server (Hugging Face Space or local URL).  No Docker required.
@@ -154,15 +154,15 @@ SYSTEM_PROMPT = textwrap.dedent("""
     Every step is a short clinical control decision: suppress pathological beta activity, preserve
     movement, avoid overstimulation, and maintain enough safety budget for the rest of the episode.
 
-    Return JSON only — no explanations, no markdown:
+    Return JSON only - no explanations, no markdown:
     {"dbs_amplitude": X, "dbs_pulse_width": X, "dbs_frequency": X}
 
     Clinical meaning of key signals:
-    - beta_arv / tremor_arv: pathological activity — lower is better.
-    - force_preserved: motor function — keep high.
-    - side_effect_load / gamma_arv: overstimulation risk — watch carefully.
-    - positive beta_trend / tremor_trend: symptoms worsening — act.
-    - positive side_effect_rate: burden still rising — consider reducing.
+    - beta_arv / tremor_arv: pathological activity - lower is better.
+    - force_preserved: motor function - keep high.
+    - side_effect_load / gamma_arv: overstimulation risk - watch carefully.
+    - positive beta_trend / tremor_trend: symptoms worsening - act.
+    - positive side_effect_rate: burden still rising - consider reducing.
 
     Control priorities (in order):
     1. Prevent unsafe overstimulation (gamma_arv high → reduce amplitude).
@@ -372,7 +372,7 @@ async def main() -> None:
 
     client = OpenAI(base_url=API_BASE_URL, api_key=API_KEY)
 
-    # Connect directly to the live HF Space (or local server) — no Docker needed.
+    # Connect directly to the live HF Space (or local server) - no Docker needed.
     env = ParkinsonsMotorEnv(base_url=ENV_URL)
     await env.connect()
 

@@ -374,19 +374,19 @@ def _build_user_prompt(step: int, obs: dict, task_id: str, history: list) -> str
     # Urgency flags to help agent prioritise
     flags = []
     if tremor > 0.55 or beta > 0.60:
-        flags.append("⚠ EMERGENCY: symptoms high — Priority 2 applies, maintain >= 1.2 mA")
+        flags.append("⚠ EMERGENCY: symptoms high - Priority 2 applies, maintain >= 1.2 mA")
     if se_load > se_crit:
-        flags.append(f"⚠ SAFETY CRITICAL: side_effect_load={se_load:.3f} > {se_crit} — reduce amp 40%")
+        flags.append(f"⚠ SAFETY CRITICAL: side_effect_load={se_load:.3f} > {se_crit} - reduce amp 40%")
     elif se_load > se_warn:
-        flags.append(f"⚠ SAFETY WARNING: side_effect_load={se_load:.3f} > {se_warn} — reduce amp 20-30%")
+        flags.append(f"⚠ SAFETY WARNING: side_effect_load={se_load:.3f} > {se_warn} - reduce amp 20-30%")
     if gamma > 0.55:
-        flags.append(f"⚠ GAMMA HIGH ({gamma:.3f}): over-stimulation detected — reduce amplitude")
+        flags.append(f"⚠ GAMMA HIGH ({gamma:.3f}): over-stimulation detected - reduce amplitude")
     if tremor_trend > 0.015 and tremor > 0.35:
-        flags.append("↑ Tremor escalating — increase amplitude (Priority 4)")
+        flags.append("↑ Tremor escalating - increase amplitude (Priority 4)")
     if beta_trend < -0.010 and tremor_trend < -0.010:
-        flags.append("↓ Both signals improving — hold or very slowly reduce (Priority 5)")
+        flags.append("↓ Both signals improving - hold or very slowly reduce (Priority 5)")
 
-    flag_str = "\n  ".join(flags) if flags else "No alerts — normal adaptive control (Priority 4)"
+    flag_str = "\n  ".join(flags) if flags else "No alerts - normal adaptive control (Priority 4)"
 
     return textwrap.dedent(f"""
     TASK: {task_id} | STEP: {step}
@@ -457,7 +457,7 @@ def _parse_action(text: str) -> Optional[dict]:
 
 
 def _make_action(d: Optional[dict], target_output: float = 0.0) -> ParkinsonsMotorAction:
-    # motor_command is always target_output — LLM only decides DBS settings
+    # motor_command is always target_output - LLM only decides DBS settings
     if not d:
         return ParkinsonsMotorAction(motor_command=target_output, dbs_amplitude=1.0, dbs_pulse_width=0.13, dbs_frequency=130.0)
     return ParkinsonsMotorAction(
@@ -727,7 +727,7 @@ def _write_report(summary: Dict[str, Any]) -> None:
                     f"{e['event_type']}@{e['start_step']}-{e['end_step']}"
                     for e in r.get("event_schedule", [])
                 )
-                or "—"
+                or "-"
             )
             lines.append(
                 f"| {r['seed'] if r['seed'] is not None else '·'} | "

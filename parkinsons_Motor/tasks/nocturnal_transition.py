@@ -1,4 +1,4 @@
-"""Nocturnal-transition task — awake → wind-down → sleep with time-varying setpoints.
+"""Nocturnal-transition task - awake → wind-down → sleep with time-varying setpoints.
 
 Clinical scenario
 -----------------
@@ -29,7 +29,7 @@ def get_nocturnal_transition_task() -> DBSTask:
         description=(
             "150-step session crossing awake, pre-sleep wind-down, and sleep "
             "phases. The grader's tremor and beta targets tighten in the sleep "
-            "phase while force expectations drop — DBS strategy must change "
+            "phase while force expectations drop - DBS strategy must change "
             "across the episode rather than remain constant. Tapering too early "
             "risks REM sleep behaviour disturbances; holding daytime amplitude "
             "through sleep wastes safety budget. Models a real overnight DBS "

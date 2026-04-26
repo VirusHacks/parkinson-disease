@@ -1,7 +1,7 @@
 """
 Trained Model vs Baseline Comparison Chart
 ===========================================
-Generates plots/trained_vs_baseline.png — the single most important
+Generates plots/trained_vs_baseline.png - the single most important
 plot for the "Showing Improvement" judging criterion.
 
 Usage:
@@ -11,8 +11,8 @@ Usage:
 
 Projected scores (SFT + 337 steps GRPO on Qwen3-4B):
   - Easy:   0.83  (above 7B baseline, SFT gives head start)
-  - Medium: 0.61  (clears threshold 0.52 — GRPO optimised for this)
-  - Hard:   0.48  (clears threshold 0.42 — above 7B, below 72B)
+  - Medium: 0.61  (clears threshold 0.52 - GRPO optimised for this)
+  - Hard:   0.48  (clears threshold 0.42 - above 7B, below 72B)
 """
 
 import argparse
@@ -55,7 +55,7 @@ COLORS = {
     "Qwen2.5-7B\n(zero-shot)":  "#4C72B0",
     "Mistral-7B\n(zero-shot)":  "#55A868",
     "Qwen2.5-72B\n(zero-shot)": "#DD8452",
-    TRAINED_KEY:                "#C44E52",   # red — stands out
+    TRAINED_KEY:                "#C44E52",   # red - stands out
 }
 THRESHOLD_COLORS = {"easy": "#2CA02C", "medium": "#FF7F0E", "hard": "#D62728"}
 
