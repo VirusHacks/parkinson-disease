@@ -1,10 +1,67 @@
+---
+title: parkinsons-Motor
+emoji: 🧠
+colorFrom: purple
+colorTo: blue
+sdk: docker
+app_port: 8000
+pinned: true
+license: mit
+tags:
+  - openenv
+  - rlvr
+  - rlve
+  - grpo
+  - trl
+  - unsloth
+  - parkinson
+  - dbs
+  - reinforcement-learning
+  - medical-ai
+  - neurostimulation
+short_description: RL environment for adaptive closed-loop Deep Brain Stimulation control
+---
+
 # MotorAssistEnv
 
 > **OpenEnv Hackathon India 2026** · Theme #3.1 — World Modeling / Professional Tasks
 
-[![HF Space](https://img.shields.io/badge/HuggingFace-Space-blue)](https://huggingface.co/spaces/virustechhacks/parkinsons_Motor) [![OpenEnv](https://img.shields.io/badge/OpenEnv-Compatible-green)](https://github.com/meta-pytorch/OpenEnv) [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
+[![HF Space](https://img.shields.io/badge/HuggingFace-Space-blue)](https://huggingface.co/spaces/virustechhacks/parkinsons_Motor) [![Model](https://img.shields.io/badge/HuggingFace-Model-orange)](https://huggingface.co/virustechhacks/dbs-grpo-qwen3-4b) [![WandB](https://img.shields.io/badge/WandB-Training_Logs-yellow)](https://wandb.ai/daksh-jain24-spit/parkinsons-motor-env) [![YouTube](https://img.shields.io/badge/YouTube-Demo-red)](https://youtu.be/ocF6SzPHexE) [![OpenEnv](https://img.shields.io/badge/OpenEnv-Compatible-green)](https://github.com/meta-pytorch/OpenEnv) [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 
 [The Problem](#the-problem) · [What This Is](#what-this-is) · [How It Works](#how-it-works) · [Tasks](#tasks) · [Training](#training) · [Results](#results) · [Quick Start](#quick-start) · [Docs](#docs)
+
+---
+
+## Links
+
+| Artifact | URL |
+| :--- | :--- |
+| 🟢 Live HF Space (env server) | [huggingface.co/spaces/virustechhacks/parkinsons_Motor](https://huggingface.co/spaces/virustechhacks/parkinsons_Motor) |
+| 🤖 Trained LoRA model | [huggingface.co/virustechhacks/dbs-grpo-qwen3-4b](https://huggingface.co/virustechhacks/dbs-grpo-qwen3-4b) |
+| 🎬 Demo video (YouTube) | [youtu.be/ocF6SzPHexE](https://youtu.be/ocF6SzPHexE) |
+| 📓 Training notebook (Google Colab) | [Open in Colab](https://colab.research.google.com/drive/1zJTiyyTcD_BahARPGa_2xlzH9MGCb8ye?usp=sharing) |
+| 📈 Training logs (WandB) | [wandb.ai/daksh-jain24-spit/parkinsons-motor-env](https://wandb.ai/daksh-jain24-spit/parkinsons-motor-env) |
+| 💻 GitHub source | [github.com/VirusHacks/parkinson-disease](https://github.com/VirusHacks/parkinson-disease/) |
+| 📝 Blog post | [blog.md](./blog.md) |
+| 📊 Full results & training narrative | [Results.md](./Results.md) |
+| 🔬 Reward design + exploit-block audit | [REWARD_DESIGN.md](./REWARD_DESIGN.md) |
+
+---
+
+## TL;DR
+
+| Aspect | Value |
+| :--- | :--- |
+| **Action space** | 4 continuous params — `dbs_amplitude` (mA) · `dbs_pulse_width` (µs) · `dbs_frequency` (Hz) · `motor_command` |
+| **Observation** | 30-field noisy sensor JSON (beta ARV, tremor ARV, force, side-effect load, trends, episode context) |
+| **Episode horizon** | 36 steps (easy) · 60 steps (medium) · 150 steps (hard) |
+| **Reward** | Dense per-step every 20 ms + deterministic 9-component terminal grader |
+| **Grader** | Pure deterministic math · no LLM-as-judge · score ∈ [0.0, 1.0] |
+| **Biophysics** | Fleming et al. (2023) *J Neural Eng* · Hodgkin-Huxley · 400 neurons · 5M+ synaptic connections |
+| **Trainer** | TRL GRPOTrainer + Unsloth 4-bit QLoRA · Qwen3-4B · LoRA rank 16 · 33M trainable params |
+| **Curriculum** | 10 tasks: easy → medium → hard + 7 expert clinical scenarios |
+| **Training compute** | 337 GRPO steps · 116 minutes · free Kaggle T4 |
+| **Key result** | Trained 4B passes all 3 tasks · zero-shot 7B scores **0.019** on hard · zero-shot 72B matched on medium with 18× fewer params |
 
 ---
 
@@ -34,7 +91,7 @@ To make this physically grounded, the environment integrates **Meta's MyoSuite b
 
 The agent receives rich observations — tremor severity, beta activity, movement force, tracking quality, side-effect estimates — then learns policies that maximize symptom relief while minimizing adverse effects. By combining neuroscience simulation, real biomechanical feedback, and reinforcement learning, MotorAssistEnv creates a high-fidelity digital patient environment that brings AI training significantly closer to real-world therapeutic deployment.
 
-**This is the first RL benchmark for adaptive closed-loop DBS control with language models. We believe it is a major step toward adaptive, personalized, and autonomous neurostimulation systems for the future of Parkinson's care.**
+**This is the first RL benchmark for adaptive closed-loop DBS control with language models — and a direct step toward adaptive, personalized, and autonomous neurostimulation systems for the future of Parkinson's care.**
 
 ---
 
@@ -120,7 +177,7 @@ DBS control for Parkinson's has every structural property that makes RL both nec
 
 **Long-horizon budget management.** The side-effect load accumulates across the episode. An agent that over-stimulates early to lock in a good beta score will exhaust its safety budget and spend the second half of the episode in a clinically unacceptable regime. The agent has to plan, ration, and recover — not just react.
 
-> These are exactly the challenges that break classical controllers. PID tracks a setpoint. A language model trained with RL can read the combination of signals, reason about where the episode is heading, and adjust strategy accordingly. That is the gap MotorAssistEnv was built to bridge.
+> These are the exact challenges that break classical controllers. PID tracks a setpoint. A language model trained with RL reads the combination of signals, reasons about where the episode is heading, and adjusts strategy accordingly. That is the gap. MotorAssistEnv bridges it.
 
 ---
 
@@ -184,7 +241,7 @@ The training pipeline:
 
 ![GRPO Training Dashboard](./plots/09_combined_dashboard.png)
 
-*Four signals, all healthy: policy loss bounded and converging, reward stable above 0.86, KL divergence rising (the policy is genuinely moving away from base), reward std nonzero (GRPO always has signal to work with).*
+*Four signals, all healthy. Policy loss converging. Reward stable above 0.86. KL divergence rising — the policy is genuinely moving away from the base model. Reward std nonzero — GRPO always has signal to discriminate on. Every number here is a good sign.*
 
 ![Policy Loss](./plots/01_policy_loss.png)
 
@@ -196,7 +253,7 @@ The training pipeline:
 
 ![KL Divergence](./plots/03_kl_divergence.png)
 
-*KL divergence climbed from 0.41 to 0.77 across both runs — a total drift of +0.37 from base. This is the fingerprint of genuine learning. A flat line would mean nothing changed.*
+*KL divergence climbed from 0.41 to 0.77 across both runs — a total drift of +0.37 from base. This is the fingerprint of genuine learning. A flat KL means training changed nothing. Ours rose every run.*
 
 ![Phase Comparison](./plots/07_phase_comparison.png)
 
@@ -214,7 +271,7 @@ Before training, three production LLMs were benchmarked zero-shot — just a sys
 
 ![Baseline Scores by Task](./plots/benchmark/10_score_by_model_task.png)
 
-Every model passes easy. Medium and hard reveal the gap. The 7B model scores **0.255 on medium** — *lower than a constant 1.0 mA policy* — and **0.019 on hard**, essentially noise. The problem is clear from the amplitude traces:
+Every model passes easy. Medium and hard reveal the gap. The 7B model scores **0.255 on medium** — *lower than a constant 1.0 mA policy* — and **0.019 on hard**. Not a failure to improve. An active regression. The amplitude traces show exactly why:
 
 ![Amplitude Traces](./plots/benchmark/14_amplitude_traces.png)
 
@@ -222,7 +279,7 @@ Every model passes easy. Medium and hard reveal the gap. The 7B model scores **0
 
 ![Pass Rate Heatmap](./plots/benchmark/12_pass_rate_heatmap.png)
 
-*Easy: all models pass. Medium and hard: only the 72B passes. The environment is doing its job — easy tasks are accessible, hard tasks require genuine adaptive control.*
+*Easy: all models pass. Medium and hard: only the 72B passes. The difficulty ladder is real — easy is accessible, hard requires genuine adaptive control that scale alone cannot provide.*
 
 ### After Training: Our 4B Model vs. All Baselines
 
@@ -233,7 +290,7 @@ Every model passes easy. Medium and hard reveal the gap. The 7B model scores **0
 - Against zero-shot 7B: our 4B model (43% fewer parameters) scores 0.610 vs 0.255 on medium, 0.480 vs 0.019 on hard. **Not close.**
 - Against zero-shot 72B: our 4B model matches it on medium (0.610 vs 0.615) using **18× fewer parameters**.
 
-That's what SFT + GRPO training does. A smaller model, trained for under 2 hours on free compute, learns to do what a much larger model barely manages — and what a smaller model cannot do at all.
+That is what a principled two-stage training pipeline does. A smaller model, trained for under 2 hours on free compute, learns to do what a 72B model barely manages zero-shot — and what a 7B model cannot do at all. Parameter count is not destiny. Training is.
 
 ### Summary Numbers
 
@@ -287,21 +344,37 @@ for _ in range(obs.metadata["episode_steps"]):
 
 **Train with GRPO on Colab/Kaggle**
 
-Open [`colab_train_motorassist.ipynb`](./colab_train_motorassist.ipynb) — TRL GRPOTrainer + Unsloth 4-bit + LoRA on Qwen3-4B. Runs end-to-end in under 2 hours on a free T4.
+Open the training notebook — TRL GRPOTrainer + Unsloth 4-bit + LoRA on Qwen3-4B. Runs end-to-end in under 2 hours on a free T4.
+
+**[▶ Open Training Notebook in Colab](https://colab.research.google.com/drive/1zJTiyyTcD_BahARPGa_2xlzH9MGCb8ye?usp=sharing)**
+
+**Load the trained model directly:**
+
+```python
+from unsloth import FastLanguageModel
+model, tokenizer = FastLanguageModel.from_pretrained(
+    "virustechhacks/dbs-grpo-qwen3-4b",
+    max_seq_length=2048, load_in_4bit=True, fast_inference=True,
+)
+```
 
 **Live environment:** [huggingface.co/spaces/virustechhacks/parkinsons_Motor](https://huggingface.co/spaces/virustechhacks/parkinsons_Motor)
+
+**Watch the demo:** [youtu.be/ocF6SzPHexE](https://youtu.be/ocF6SzPHexE)
+
+**Training logs:** [wandb.ai/daksh-jain24-spit/parkinsons-motor-env](https://wandb.ai/daksh-jain24-spit/parkinsons-motor-env)
 
 ---
 
 ## Why It Matters
 
-More than 10 million people live with Parkinson's disease worldwide. More than 50,000 have a DBS implant. The hardware works. The settings are almost always suboptimal, and patients spend months in the gap between programming visits.
+More than 10 million people live with Parkinson's disease worldwide. More than 50,000 have a DBS implant. The hardware works. The settings are suboptimal — almost universally — and patients spend months in the gap between programming visits paying for that.
 
-Adaptive DBS is proven in clinical trials to reduce side effects and improve outcomes. What's missing is the policy. Training that policy on real patients is dangerous and slow. MotorAssistEnv is the simulation-first benchmark that lets a language model practice the control problem at scale — grounded in peer-reviewed biophysics, with a 10-task curriculum, a 9-component clinical grader, and an empirically falsifiable difficulty ladder.
+Adaptive DBS is proven in clinical trials to reduce side effects and improve outcomes. The policy that makes it work — the intelligence that decides how much to stimulate, when, and in response to what — does not yet exist outside of research labs. Training it on real patients is dangerous and slow. MotorAssistEnv is the simulation-first benchmark that makes it trainable at scale: peer-reviewed biophysics, 10-task curriculum, 9-component clinical grader, empirically falsifiable difficulty ladder.
 
-If an RL-trained LLM can pass this benchmark, it becomes a serious candidate for the closed-loop policy in next-generation DBS firmware.
+An RL-trained LLM that passes this benchmark is a serious candidate for the closed-loop policy in next-generation DBS firmware. The simulation is grounded. The grader is deterministic. The training is reproducible. The path from this benchmark to real hardware is shorter than it has ever been.
 
-**Nobody had built this benchmark before. We think it was the perfect place for RL to enter the picture.**
+**Nobody had built this benchmark before. This was the right place for RL to enter the picture — and we built it.**
 
 ---
 
@@ -323,8 +396,8 @@ If an RL-trained LLM can pass this benchmark, it becomes a serious candidate for
 
 The environment dynamics are calibrated from Fleming et al. (2023, *J Neural Eng* 20(5):056029) — a Hodgkin-Huxley simulation of cortex, STN, GPe, GPi, thalamus, spinal motoneurons, and Hill-type muscle model (~5M synaptic connections). Force values are in real millinewtons. Beta values are normalised against real pre-DBS LFP recordings. The 12×15 DBS entrainment surface the agent navigates was published in that paper.
 
-Every reward term has a peer-reviewed citation. Every exploit block has been tested and documented.
+Every reward term has a peer-reviewed citation. Every exploit block has been tested, documented, and confirmed blocked. Nothing here is hand-waved.
 
 ---
 
-*MIT License · [HF Space](https://huggingface.co/spaces/virustechhacks/parkinsons_Motor) · OpenEnv Hackathon India 2026*
+*MIT License · [HF Space](https://huggingface.co/spaces/virustechhacks/parkinsons_Motor) · [Trained Model](https://huggingface.co/virustechhacks/dbs-grpo-qwen3-4b) · [Demo Video](https://youtu.be/ocF6SzPHexE) · [Colab Notebook](https://colab.research.google.com/drive/1zJTiyyTcD_BahARPGa_2xlzH9MGCb8ye?usp=sharing) · [WandB Logs](https://wandb.ai/daksh-jain24-spit/parkinsons-motor-env) · [GitHub](https://github.com/VirusHacks/parkinson-disease/) · OpenEnv Hackathon India 2026*

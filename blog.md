@@ -1,4 +1,4 @@
-# We Built the First RL Benchmark for Brain Implant Control — And a 4B Model Just Passed It
+# We Built the First RL Benchmark for Brain Implant Control 
 
 *OpenEnv Hackathon India 2026 · MotorAssistEnv · Qwen3-4B + LoRA + GRPO*
 
@@ -167,14 +167,23 @@ We built this in a weekend on free compute. No proprietary data. No hospital acc
 
 ## Run It Yourself
 
-**Live environment:** [huggingface.co/spaces/virustechhacks/parkinsons_Motor](https://huggingface.co/spaces/virustechhacks/parkinsons_Motor)
+Everything is live and open.
 
-**Training notebook** (runs end-to-end on free Kaggle/Colab T4, under 2 hours): [colab_train_motorassist.ipynb](./colab_train_motorassist.ipynb)
+| | |
+| :--- | :--- |
+| 🟢 **Live environment** | [huggingface.co/spaces/virustechhacks/parkinsons_Motor](https://huggingface.co/spaces/virustechhacks/parkinsons_Motor) |
+| 🤖 **Trained model** | [huggingface.co/virustechhacks/dbs-grpo-qwen3-4b](https://huggingface.co/virustechhacks/dbs-grpo-qwen3-4b) |
+| 🎬 **Demo video** | [youtu.be/ocF6SzPHexE](https://youtu.be/ocF6SzPHexE) |
+| 📓 **Training notebook** | [Open in Colab](https://colab.research.google.com/drive/1zJTiyyTcD_BahARPGa_2xlzH9MGCb8ye?usp=sharing) — runs end-to-end on a free T4 in under 2 hours |
+| 📈 **Training logs** | [wandb.ai/daksh-jain24-spit/parkinsons-motor-env](https://wandb.ai/daksh-jain24-spit/parkinsons-motor-env) |
+| 💻 **GitHub** | [github.com/VirusHacks/parkinson-disease](https://github.com/VirusHacks/parkinson-disease/) |
+| 📊 **Full results** | [Results.md](./Results.md) |
+| 🔬 **Reward design** | [REWARD_DESIGN.md](./REWARD_DESIGN.md) |
 
-**Full results and training narrative:** [Results.md](./Results.md)
-
-**Every reward term, every exploit-block, every clinical citation:** [REWARD_DESIGN.md](./REWARD_DESIGN.md)
+You can run the benchmark against your own model with a single script. You can extend the environment with new patient profiles, new crisis events, or new task objectives. The full documentation covers every reward term, every exploit-block, every state variable.
 
 ---
 
 *Built for the OpenEnv Hackathon India 2026 — on the conviction that the most important frontier for AI in medicine is not diagnosis or image reading, but real-time adaptive control of the devices that are already inside patients.*
+
+*[HF Space](https://huggingface.co/spaces/virustechhacks/parkinsons_Motor) · [Model](https://huggingface.co/virustechhacks/dbs-grpo-qwen3-4b) · [Video](https://youtu.be/ocF6SzPHexE) · [Colab](https://colab.research.google.com/drive/1zJTiyyTcD_BahARPGa_2xlzH9MGCb8ye?usp=sharing) · [WandB](https://wandb.ai/daksh-jain24-spit/parkinsons-motor-env) · [GitHub](https://github.com/VirusHacks/parkinson-disease/)*
