@@ -31,7 +31,7 @@ Next-generation medical implants (like the Medtronic Percept) actively stream th
 Instead of arbitrary difficulty scaling, we sliced the true biological timeline into escalating physiological constraints:
 1. **Easy (`beta_suppression`)**: Time *t=10.02s*. Early-phase oscillation. The strict goal is gentleness—intervene with sub-1.0mA amplitudes before symptoms spiral.
 2. **Medium (`tremor_correction`)**: Dynamic tremor onset. Tremor variables aggressively ramp up from 0.17 to 0.80. The agent must intercept this dynamic ramp without collapsing force functionality.
-3. **Hard (`full_episode`)**: The 100-step marathon. Extreme baseline symptom deterioration. The agent battles escalating non-stationary parameters, forcing the LLM to budget side-effect limits over a long horizon.
+3. **Hard (`full_episode`)**: The 150-step marathon. Extreme baseline symptom deterioration across four overlapping crises — tachyphylaxis, off-medication emergency, dyskinesia spikes, and motor surges — forcing the LLM to budget side-effect limits over a long horizon with a refractory patient.
 
 The deterministic graders return continuous matrices in `[0.0, 1.0]`, combining efficiency multipliers, penalty deductions for exceeding side effects, and final-state "motor collapse" bonuses. 
 
