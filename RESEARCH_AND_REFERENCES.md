@@ -13,8 +13,9 @@ All links and citation details below were checked on April 24, 2026 against the 
 | [John-E-Fleming/Parkinsons_Motor_Network_Model](https://github.com/John-E-Fleming/Parkinsons_Motor_Network_Model) | Code + companion paper | Closest scientific parent — provides the motor-network outputs we calibrated the environment from | Cite the companion 2023 *J Neural Eng* paper |
 | [John-E-Fleming/Parkinsons_Cortical_Basal_Ganglia_Network_Model](https://github.com/John-E-Fleming/Parkinsons_Cortical_Basal_Ganglia_Network_Model) | Code + companion paper | Earlier cortico-basal-ganglia closed-loop DBS model that the motor work extended | Cite the companion 2020 *Frontiers in Neuroscience* paper |
 | [cviaai/RL-DBS](https://github.com/cviaai/RL-DBS) | RL-DBS research repo + papers | Establishes RL-for-DBS as a legitimate research direction; informs reward and controller comparison framing | Cite the IJCAI 2020 paper and the *Chaos* 2020 paper |
-| [MyoHub/myosuite](https://github.com/MyoHub/myosuite) | Software framework + paper | Reference point for benchmark-style musculoskeletal control environments | Cite the MyoSuite 2022 arXiv paper |
-| [MyoHub/myosuite_demo](https://github.com/MyoHub/myosuite_demo) | Visualization/demo repo | Inspired our browser visualization layer and the choice to keep visualization separate from training-time physics | Reference the repo as software/demo inspiration |
+| [MyoHub/myosuite](https://github.com/MyoHub/myosuite) | Software framework + paper | Reference point for benchmark-style musculoskeletal control environments; source of the `myo_sim` musculoskeletal models we render | Cite the MyoSuite 2022 arXiv paper |
+| [MyoHub/myosuite_demo](https://github.com/MyoHub/myosuite_demo) | WebAssembly visualization demo | **Bundled and shipped** under `parkinsons_Motor/static/myosuite_demo/` and served at `GET /viewer`; live-driven by `tremor_arv` from the OpenEnv backend so judges can *see* the policy in action | Acknowledge the repo and credit the upstream MuJoCo-WASM authors |
+| [stillonearth/MuJoCo-WASM](https://github.com/stillonearth/MuJoCo-WASM) | Upstream WebAssembly port of MuJoCo | What makes the in-browser musculoskeletal viewer possible at all; myosuite_demo is forked from this | Acknowledge as upstream software dependency |
 | [DeepMind — *Specification gaming*](https://deepmind.google/blog/specification-gaming-the-flip-side-of-ai-ingenuity/) | AI-safety blog post | Single biggest influence on the reward-hacking audit and the integrity-layer defenses | Cite the blog post directly |
 | [meta-pytorch/OpenEnv](https://github.com/meta-pytorch/OpenEnv) | RL environment framework | The hackathon's required interface; everything in this repo is built around its `reset` / `step` contract | Reference the framework directly |
 
@@ -99,32 +100,57 @@ Krylov, D., Dylov, D. V., & Rosenblum, M. (2020). *Reinforcement learning for su
 
 ## 5. What do MyoSuite and the MyoSuite demo contribute?
 
-**Repositories:** [MyoHub/myosuite](https://github.com/MyoHub/myosuite) · [MyoHub/myosuite_demo](https://github.com/MyoHub/myosuite_demo)
+**Repositories**
 
-MyoSuite is a collection of musculoskeletal RL environments built on MuJoCo and wrapped in the OpenAI Gym API. The companion demo repo is a browser-based interactive demonstration of the same musculoskeletal models.
+- [MyoHub/myosuite](https://github.com/MyoHub/myosuite) — the musculoskeletal RL framework (originally Facebook AI Research / Meta AI, now maintained at MyoHub)
+- [MyoHub/myosuite_demo](https://github.com/MyoHub/myosuite_demo) — the in-browser WebAssembly visualization demo
+- [stillonearth/MuJoCo-WASM](https://github.com/stillonearth/MuJoCo-WASM) — the upstream WebAssembly port of MuJoCo that the demo is forked from
 
-Why both matter here:
+This is the layer that lets a judge open `http://localhost:8000/viewer` and *see* a Parkinsonian arm jitter and stabilize in real time as the agent acts — not just a reward number going up.
 
-- MyoSuite informed how we frame `MotorAssistEnv` as a *benchmark* rather than a one-off simulator, with grader-driven comparability across runs.
-- The demo repo informed the choice to ship a separate web visualization layer that is *visualization for communication*, not training-time physics. Judges and reviewers can see arm motion stabilize without it slowing down the RL loop.
+### How MyoSuite is actually integrated in this codebase
 
-The MyoSuite project asks users to cite its arXiv paper. The demo repo does not have its own paper citation request, so we acknowledge it as software.
+This is not "inspiration" — the MyoSuite demo is bundled, served, and live-driven by the OpenEnv backend.
 
-**Recommended citation**
+| Where | What it does |
+|---|---|
+| `parkinsons_Motor/static/myosuite_demo/` | Full bundled fork of the MyoSuite WebAssembly demo (HTML, JS, MuJoCo WASM bundle, and the complete `myo_sim` musculoskeletal mesh library — humerus, radius, ulna, all hand and finger bones included) |
+| `parkinsons_Motor/server/app.py` (lines 63–137) | Mounts `/static/` and exposes the demo at the `GET /viewer` endpoint with a base-href injection so MuJoCo's relative asset paths resolve correctly. Falls back to a build-instructions page if `dist/mujoco_wasm.js` hasn't been compiled yet |
+| `parkinsons_Motor/static/myosuite_demo/examples/scenes/myo_sim/elbow/` | The specific musculoskeletal models we render — `myo_elbow_1dof6muscles_1dofexo` (1-DOF elbow, 6 muscles, soft exoskeleton), `myo_elbow_2dof6muscles`, plus the full `myo_hand` model for finer demonstrations |
+| `ARCHITECTURE.md` §3.6 and §4.2 | Documents the live data flow: the viewer reads `tremor_arv` from the OpenEnv backend over the API and applies proportional jitter to the 3D arm in real time, so the visualization tracks the same patient state the agent is acting on |
+
+### Why MyoSuite for visualization, but Fleming math for the RL backend?
+
+This is a deliberate, documented architectural decision (`ARCHITECTURE.md` §4.2). MyoSuite's full contact-rich musculoskeletal physics is computationally heavy enough that an RL training loop running inside it would take days per run. The Fleming biophysical motor-network model already gives us deterministic, ground-truth `muscle_force` and `tremor_arv` instantaneously. So `MotorAssistEnv` does the unusual thing of using MyoSuite *only* as a visual puppet — the RL backend runs Fleming math at full speed, while the browser viewer renders MyoSuite muscles tracking the live signals streamed from the OpenEnv server.
+
+This is the design idea the demo repo's existence directly enabled: **visualization is for human communication, not for training-time physics**. It's why a judge can watch a Parkinsonian arm stabilize during the same episode that the policy is being graded, without the visualization ever slowing the agent down.
+
+### Provenance chain we are crediting
+
+There are three layers of work behind the viewer, and all three deserve attribution:
+
+1. **MyoSuite framework** — the musculoskeletal RL benchmarking project. Originally released by the Facebook AI Research / Meta AI team and now maintained at MyoHub. Cite Caggiano et al. (2022).
+2. **MyoSuite demo** — the browser-renderable version of the same musculoskeletal models. Maintained at MyoHub, forked from MuJoCo-WASM, and developed with support from [zalo](https://github.com/zalo/mujoco_wasm) and [Kevin Zakka](https://twitter.com/kevin_zakka). Per the demo's own README.
+3. **MuJoCo-WASM** — the upstream WebAssembly port of the MuJoCo physics engine, by [stillonearth](https://github.com/stillonearth/MuJoCo-WASM). Without this, no in-browser musculoskeletal viewer would exist.
+
+### Recommended citation
 
 Caggiano, V., Wang, H., Durandau, G., Sartori, M., & Kumar, V. (2022). *MyoSuite: A contact-rich simulation suite for musculoskeletal motor control*. arXiv. https://doi.org/10.48550/arXiv.2205.13600
 
-**Suggested software acknowledgements**
+### Suggested software acknowledgements
 
 - MyoHub. *myosuite* [software repository]. GitHub. https://github.com/MyoHub/myosuite
 - MyoHub. *myosuite_demo* [software repository]. GitHub. https://github.com/MyoHub/myosuite_demo
+- stillonearth. *MuJoCo-WASM* [software repository]. GitHub. https://github.com/stillonearth/MuJoCo-WASM
+- Additional contributors: [zalo/mujoco_wasm](https://github.com/zalo/mujoco_wasm), Kevin Zakka
 
-**Reference links**
+### Reference links
 
 - MyoSuite repo: https://github.com/MyoHub/myosuite
 - MyoSuite docs: https://myosuite.readthedocs.io/en/stable/
 - MyoSuite paper: https://arxiv.org/abs/2205.13600
-- Demo repo: https://github.com/MyoHub/myosuite_demo
+- MyoSuite demo repo: https://github.com/MyoHub/myosuite_demo
+- MuJoCo-WASM upstream: https://github.com/stillonearth/MuJoCo-WASM
 
 ## 6. What clinical literature grounds every parameter and reward term?
 
@@ -175,7 +201,9 @@ The combination of these four sources is what justifies the *style* of the rewar
 | Curriculum / task-difficulty design | Clinical refs C3, C5, C6, C10, C11, C16 |
 | RL-for-DBS prior art and benchmark framing | [§4](#4-what-does-rl-dbs-contribute) RL-DBS repo + IJCAI 2020 + *Chaos* 2020 papers |
 | Musculoskeletal benchmark framing | [§5](#5-what-do-myosuite-and-the-myosuite-demo-contribute) MyoSuite repo + 2022 arXiv paper |
-| Web visualization layer | [§5](#5-what-do-myosuite-and-the-myosuite-demo-contribute) MyoSuite demo repo |
+| `myo_sim` musculoskeletal mesh library (humerus, radius, ulna, hand, fingers) | MyoSuite via the bundled demo |
+| Live in-browser 3D viewer at `GET /viewer`, driven by `tremor_arv` | MyoSuite demo + MuJoCo-WASM (stillonearth, zalo, Kevin Zakka) |
+| Architectural decision to keep visualization off the RL training loop | Demo repo as enabler — see `ARCHITECTURE.md` §4.2 |
 | Reward-hacking audit and integrity layer | [§7](#7-what-ai-safety-and-methodology-references-shaped-the-reward-design) DeepMind specification-gaming post |
 | Environment interface and deterministic grading contract | [§7](#7-what-ai-safety-and-methodology-references-shaped-the-reward-design) OpenEnv project + hackathon docs |
 
@@ -183,11 +211,11 @@ The combination of these four sources is what justifies the *style* of the rewar
 
 ### Short version (one-paragraph credit)
 
-> MotorAssistEnv is scientifically grounded in the Parkinsonian DBS modeling line developed by John E. Fleming and collaborators — particularly the 2023 motor-network model. It draws on a body of clinical literature on adaptive DBS (Little 2013/2016, Priori 2013, Rosa 2015, Tinkhauser 2017, Swann 2018, Velisar 2019) for parameter calibration and reward-component design. It positions itself relative to RL-DBS as prior art for reinforcement-learning-based DBS control, and to MyoSuite for benchmark-style musculoskeletal environment framing. The reward design is explicitly stress-tested against DeepMind's *Specification gaming* analysis, and the entire interface conforms to the OpenEnv standard.
+> MotorAssistEnv is scientifically grounded in the Parkinsonian DBS modeling line developed by John E. Fleming and collaborators — particularly the 2023 motor-network model. It draws on a body of clinical literature on adaptive DBS (Little 2013/2016, Priori 2013, Rosa 2015, Tinkhauser 2017, Swann 2018, Velisar 2019) for parameter calibration and reward-component design. The in-browser viewer at `/viewer` ships the MyoHub MyoSuite musculoskeletal demo (Caggiano et al. 2022), forked from MuJoCo-WASM by stillonearth (with contributions from zalo and Kevin Zakka), live-driven by `tremor_arv` from the OpenEnv backend. It positions itself relative to RL-DBS as prior art for reinforcement-learning-based DBS control, and the reward design is stress-tested against DeepMind's *Specification gaming* analysis. The entire interface conforms to the OpenEnv standard.
 
 ### README-length version
 
-> MotorAssistEnv is calibrated from the Fleming et al. (2023) biophysical motor-network model of Parkinsonian basal ganglia and motoneuron coupling. Reward components and patient-profile parameters are anchored in published clinical evidence on adaptive DBS — including Limousin (1995), Deuschl (2006), Kühn (2008), Little (2013, 2016), Priori (2013), Rosa (2015), Tinkhauser (2017), Swann (2018), and Velisar (2019). The reward design is audited against DeepMind's *Specification gaming: the flip side of AI ingenuity*, and the environment exposes a strictly OpenEnv-compliant `reset` / `step` interface with a deterministic episode-end grader. Visualization framing is inspired by MyoSuite and MyoSuite Demo; reinforcement-learning-for-DBS positioning follows the RL-DBS line.
+> MotorAssistEnv is calibrated from the Fleming et al. (2023) biophysical motor-network model of Parkinsonian basal ganglia and motoneuron coupling. Reward components and patient-profile parameters are anchored in published clinical evidence on adaptive DBS — including Limousin (1995), Deuschl (2006), Kühn (2008), Little (2013, 2016), Priori (2013), Rosa (2015), Tinkhauser (2017), Swann (2018), and Velisar (2019). The interactive viewer at `GET /viewer` bundles and serves the MyoHub MyoSuite musculoskeletal demo (Caggiano et al. 2022) — including the full `myo_sim` mesh library and the `myo_elbow` and `myo_hand` models — forked from stillonearth's MuJoCo-WASM with contributions from zalo and Kevin Zakka. The viewer is live-driven by signals streamed from the OpenEnv backend, deliberately decoupled from the RL training loop so musculoskeletal physics never blocks training. The reward design is audited against DeepMind's *Specification gaming: the flip side of AI ingenuity*, and the environment exposes a strictly OpenEnv-compliant `reset` / `step` interface with a deterministic episode-end grader. Reinforcement-learning-for-DBS positioning follows the RL-DBS line.
 
 ## 10. What's the canonical citation block for this repo?
 
@@ -200,35 +228,36 @@ If you only need one compact "References" section for a README, Devpost page, pa
 3. cviaai. *RL-DBS* [software repository]. GitHub. https://github.com/cviaai/RL-DBS
 4. MyoHub. *myosuite* [software repository]. GitHub. https://github.com/MyoHub/myosuite
 5. MyoHub. *myosuite_demo* [software repository]. GitHub. https://github.com/MyoHub/myosuite_demo
-6. meta-pytorch. *OpenEnv* [software repository]. GitHub. https://github.com/meta-pytorch/OpenEnv
+6. stillonearth. *MuJoCo-WASM* [software repository]. GitHub. https://github.com/stillonearth/MuJoCo-WASM (with additional contributions by [zalo](https://github.com/zalo/mujoco_wasm) and Kevin Zakka)
+7. meta-pytorch. *OpenEnv* [software repository]. GitHub. https://github.com/meta-pytorch/OpenEnv
 
 **Computational modeling and RL-for-DBS papers**
 
-7. Fleming, J. E., Senneff, S., & Lowery, M. M. (2023). *Multivariable closed-loop control of deep brain stimulation for Parkinson's disease*. Journal of Neural Engineering, 20(5), 056029. https://doi.org/10.1088/1741-2552/acfbfa
-8. Fleming, J. E., Dunn, E., & Lowery, M. M. (2020). *Simulation of closed-loop deep brain stimulation control schemes for suppression of pathological beta oscillations in Parkinson's disease*. Frontiers in Neuroscience, 14, 166. https://doi.org/10.3389/fnins.2020.00166
-9. Krylov, D., des Combes, R., Laroche, R., Rosenblum, M., & Dylov, D. V. (2020). *Reinforcement Learning Framework for Deep Brain Stimulation Study*. IJCAI-20. https://doi.org/10.24963/ijcai.2020/394
-10. Krylov, D., Dylov, D. V., & Rosenblum, M. (2020). *Reinforcement learning for suppression of collective activity in oscillatory ensembles*. Chaos, 30(3), 033126. https://doi.org/10.1063/1.5128909
-11. Caggiano, V., Wang, H., Durandau, G., Sartori, M., & Kumar, V. (2022). *MyoSuite: A contact-rich simulation suite for musculoskeletal motor control*. arXiv. https://doi.org/10.48550/arXiv.2205.13600
+8. Fleming, J. E., Senneff, S., & Lowery, M. M. (2023). *Multivariable closed-loop control of deep brain stimulation for Parkinson's disease*. Journal of Neural Engineering, 20(5), 056029. https://doi.org/10.1088/1741-2552/acfbfa
+9. Fleming, J. E., Dunn, E., & Lowery, M. M. (2020). *Simulation of closed-loop deep brain stimulation control schemes for suppression of pathological beta oscillations in Parkinson's disease*. Frontiers in Neuroscience, 14, 166. https://doi.org/10.3389/fnins.2020.00166
+10. Krylov, D., des Combes, R., Laroche, R., Rosenblum, M., & Dylov, D. V. (2020). *Reinforcement Learning Framework for Deep Brain Stimulation Study*. IJCAI-20. https://doi.org/10.24963/ijcai.2020/394
+11. Krylov, D., Dylov, D. V., & Rosenblum, M. (2020). *Reinforcement learning for suppression of collective activity in oscillatory ensembles*. Chaos, 30(3), 033126. https://doi.org/10.1063/1.5128909
+12. Caggiano, V., Wang, H., Durandau, G., Sartori, M., & Kumar, V. (2022). *MyoSuite: A contact-rich simulation suite for musculoskeletal motor control*. arXiv. https://doi.org/10.48550/arXiv.2205.13600
 
 **Clinical literature behind reward terms and patient calibration**
 
-12. Limousin, P. et al. (1995). *Effect of parkinsonian signs and symptoms of bilateral subthalamic nucleus stimulation*. Lancet, 345(8942), 91–95.
-13. Nutt, J. G., & Holford, N. H. G. (1996). *The response to levodopa in Parkinson's disease: imposing pharmacological law and order*. Annals of Neurology, 39(5), 561–573.
-14. Deuschl, G. et al. (2006). *A randomized trial of deep-brain stimulation for Parkinson's disease*. New England Journal of Medicine, 355(9), 896–908.
-15. Kühn, A. A. et al. (2008). *High-frequency stimulation of the subthalamic nucleus suppresses oscillatory β activity in patients with Parkinson's disease in parallel with improvement in motor performance*. NeuroImage, 36(2), 379–387.
-16. Castrioto, A. et al. (2011). *Ten-year outcome of subthalamic stimulation in Parkinson disease*. Archives of Neurology, 68(12), 1550–1556.
-17. Olanow, C. W. et al. (2013). *Continuous intrajejunal infusion of levodopa-carbidopa intestinal gel for patients with advanced Parkinson's disease*. Movement Disorders.
-18. Little, S. et al. (2013). *Adaptive deep brain stimulation in advanced Parkinson disease*. Annals of Neurology, 74(3), 449–457.
-19. Priori, A. et al. (2013). *Adaptive deep brain stimulation (aDBS) controlled by local field potential oscillations*. Experimental Neurology, 245, 77–86.
-20. Rosa, M. et al. (2015). *Adaptive deep brain stimulation in a freely moving Parkinsonian patient*. Movement Disorders, 30(7), 1003–1005.
-21. Little, S. et al. (2016). *Bilateral adaptive deep brain stimulation is effective in Parkinson's disease*. Movement Disorders, 31(8), 1336–1341.
-22. Tinkhauser, G. et al. (2017). *Beta burst dynamics in Parkinson's disease OFF and ON dopaminergic medication*. Brain, 140(11), 2968–2981.
-23. Swann, N. C. et al. (2018). *Adaptive deep brain stimulation for Parkinson's disease using motor cortex sensing*. Journal of Neural Engineering, 15(4), 046006.
-24. Velisar, A. et al. (2019). *Dual threshold neural closed loop deep brain stimulation in Parkinson disease patients*. Brain Stimulation, 12(4), 868–876.
+13. Limousin, P. et al. (1995). *Effect of parkinsonian signs and symptoms of bilateral subthalamic nucleus stimulation*. Lancet, 345(8942), 91–95.
+14. Nutt, J. G., & Holford, N. H. G. (1996). *The response to levodopa in Parkinson's disease: imposing pharmacological law and order*. Annals of Neurology, 39(5), 561–573.
+15. Deuschl, G. et al. (2006). *A randomized trial of deep-brain stimulation for Parkinson's disease*. New England Journal of Medicine, 355(9), 896–908.
+16. Kühn, A. A. et al. (2008). *High-frequency stimulation of the subthalamic nucleus suppresses oscillatory β activity in patients with Parkinson's disease in parallel with improvement in motor performance*. NeuroImage, 36(2), 379–387.
+17. Castrioto, A. et al. (2011). *Ten-year outcome of subthalamic stimulation in Parkinson disease*. Archives of Neurology, 68(12), 1550–1556.
+18. Olanow, C. W. et al. (2013). *Continuous intrajejunal infusion of levodopa-carbidopa intestinal gel for patients with advanced Parkinson's disease*. Movement Disorders.
+19. Little, S. et al. (2013). *Adaptive deep brain stimulation in advanced Parkinson disease*. Annals of Neurology, 74(3), 449–457.
+20. Priori, A. et al. (2013). *Adaptive deep brain stimulation (aDBS) controlled by local field potential oscillations*. Experimental Neurology, 245, 77–86.
+21. Rosa, M. et al. (2015). *Adaptive deep brain stimulation in a freely moving Parkinsonian patient*. Movement Disorders, 30(7), 1003–1005.
+22. Little, S. et al. (2016). *Bilateral adaptive deep brain stimulation is effective in Parkinson's disease*. Movement Disorders, 31(8), 1336–1341.
+23. Tinkhauser, G. et al. (2017). *Beta burst dynamics in Parkinson's disease OFF and ON dopaminergic medication*. Brain, 140(11), 2968–2981.
+24. Swann, N. C. et al. (2018). *Adaptive deep brain stimulation for Parkinson's disease using motor cortex sensing*. Journal of Neural Engineering, 15(4), 046006.
+25. Velisar, A. et al. (2019). *Dual threshold neural closed loop deep brain stimulation in Parkinson disease patients*. Brain Stimulation, 12(4), 868–876.
 
 **AI safety and methodology**
 
-25. Krakovna, V., Uesato, J., Mikulik, V., Rahtz, M., Everitt, T., Kumar, R., Kenton, Z., Leike, J., & Legg, S. (2020). *Specification gaming: the flip side of AI ingenuity*. DeepMind blog. https://deepmind.google/blog/specification-gaming-the-flip-side-of-ai-ingenuity/
+26. Krakovna, V., Uesato, J., Mikulik, V., Rahtz, M., Everitt, T., Kumar, R., Kenton, Z., Leike, J., & Legg, S. (2020). *Specification gaming: the flip side of AI ingenuity*. DeepMind blog. https://deepmind.google/blog/specification-gaming-the-flip-side-of-ai-ingenuity/
 
 ## 11. Where else are these references used inside the repo?
 
@@ -245,7 +274,9 @@ If you only need one compact "References" section for a README, Devpost page, pa
 | Nutt & Holford 1996 (C2) | `STATE_ACTION_SPACE.md` |
 | Kühn 2008 (C4), Priori 2013 (C8), Rosa 2015 (C9), Swann 2018 (C12) | `REWARD_DESIGN.md`, `STATE_ACTION_SPACE.md` |
 | RL-DBS (Krylov 2020 ×2) | `REWARD_DESIGN.md` (anti-hacking framing), this doc |
-| MyoSuite (Caggiano 2022) | `ARCHITECTURE.md`, `docs/JUDGE_PITCH.md`, this doc |
+| MyoSuite (Caggiano 2022) | `ARCHITECTURE.md` §3.6 + §4.2, `README.md`, `parkinsons_Motor/README.md`, `docs/JUDGE_PITCH.md`, this doc |
+| MyoSuite demo (bundled at `parkinsons_Motor/static/myosuite_demo/`) | `parkinsons_Motor/server/app.py` (`GET /viewer` route), `ARCHITECTURE.md`, this doc |
+| MuJoCo-WASM (stillonearth) + zalo + Kevin Zakka | This doc; transitively present everywhere the bundled `myosuite_demo` ships |
 | DeepMind *Specification gaming* | `REWARD_DESIGN.md` §5 (anti-hacking table), §6 (integrity layer) |
 | OpenEnv project | `README.md`, `PROBLEM.md`, `ARCHITECTURE.md`, `parkinsons_Motor/README.md`, `docs/JUDGE_PITCH.md`, this doc |
 
@@ -257,6 +288,8 @@ If you only need one compact "References" section for a README, Devpost page, pa
 - MyoSuite repo: https://github.com/MyoHub/myosuite
 - MyoSuite docs: https://myosuite.readthedocs.io/en/stable/
 - MyoSuite demo repo: https://github.com/MyoHub/myosuite_demo
+- MuJoCo-WASM upstream: https://github.com/stillonearth/MuJoCo-WASM
+- zalo's MuJoCo-WASM contributions: https://github.com/zalo/mujoco_wasm
 - OpenEnv project: https://github.com/meta-pytorch/OpenEnv
 - DeepMind *Specification gaming* blog: https://deepmind.google/blog/specification-gaming-the-flip-side-of-ai-ingenuity/
 - Internal repo docs: `docs/Bible.txt`, `docs/helpguide.txt`, `docs/judging_criteria.txt`, `docs/judges.txt`, `REWARD_DESIGN.md`, `TASKS.md`, `STATE_ACTION_SPACE.md`, `PROBLEM.md`, `README.md`
