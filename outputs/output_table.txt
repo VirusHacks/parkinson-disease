@@ -1,0 +1,1302 @@
+ Starting GRPO training ...
+  tasks       : ['easy', 'medium', 'hard']
+  episodes    : 48
+  generations : 6 per prompt (group size)
+  env URL     : https://virustechhacks-parkinsons-motor.hf.space
+
+==((====))==  Unsloth - 2x faster free finetuning | Num GPUs used = 1
+   \\   /|    Num examples = 270 | Num Epochs = 1 | Total steps = 67
+O^O/ \_/ \    Batch size per device = 6 | Gradient accumulation steps = 4
+\        /    Data Parallel GPUs = 1 | Total batch size (6 x 4 x 1) = 24
+ "-____-"     Trainable parameters = 33,030,144 of 4,055,498,240 (0.81% trained)
+Both `max_new_tokens` (=256) and `max_length`(=40960) seem to have been set. `max_new_tokens` will take precedence. Please refer to the documentation for more information. (https://huggingface.co/docs/transformers/main/en/main_classes/text_generation)
+/usr/local/lib/python3.12/dist-packages/transformers/modeling_attn_mask_utils.py:172: FutureWarning: The attention mask API under `transformers.modeling_attn_mask_utils` (`AttentionMaskConverter`) is deprecated and will be removed in Transformers v5.10. Please use the new API in `transformers.masking_utils`.
+  warnings.warn(DEPRECATION_MESSAGE, FutureWarning)
+/usr/local/lib/python3.12/dist-packages/transformers/modeling_attn_mask_utils.py:202: FutureWarning: The attention mask API under `transformers.modeling_attn_mask_utils` (`AttentionMaskConverter`) is deprecated and will be removed in Transformers v5.10. Please use the new API in `transformers.masking_utils`.
+  warnings.warn(DEPRECATION_MESSAGE, FutureWarning)
+/usr/local/lib/python3.12/dist-packages/transformers/modeling_attn_mask_utils.py:254: FutureWarning: The attention mask API under `transformers.modeling_attn_mask_utils` (`AttentionMaskConverter`) is deprecated and will be removed in Transformers v5.10. Please use the new API in `transformers.masking_utils`.
+  warnings.warn(DEPRECATION_MESSAGE, FutureWarning)
+
+    
+      
+      
+      [67/67 1:19:44, Epoch 1/1]
+    
+    
+  
+ 
+      Step
+      Training Loss
+      reward
+      reward_std
+      completions / mean_length
+      completions / min_length
+      completions / max_length
+      completions / clipped_ratio
+      completions / mean_terminated_length
+      completions / min_terminated_length
+      completions / max_terminated_length
+      kl
+      rewards / replay_env_reward / mean
+      rewards / replay_env_reward / std
+    
+  
+  
+    
+      1
+      0.006835
+      0.849057
+      0.002024
+      36.041668
+      36.000000
+      37.000000
+      0.000000
+      36.041668
+      36.000000
+      37.000000
+      0.412803
+      0.849057
+      0.097354
+    
+    
+      2
+      0.007277
+      0.815834
+      0.001422
+      36.208336
+      36.000000
+      37.000000
+      0.000000
+      36.208336
+      36.000000
+      37.000000
+      0.401537
+      0.815834
+      0.055910
+    
+    
+      3
+      0.012405
+      0.852226
+      0.010213
+      36.250000
+      36.000000
+      37.000000
+      0.000000
+      36.250000
+      36.000000
+      37.000000
+      0.524075
+      0.852226
+      0.069543
+    
+    
+      4
+      0.015156
+      0.865717
+      0.003491
+      36.291668
+      36.000000
+      37.000000
+      0.000000
+      36.291668
+      36.000000
+      37.000000
+      0.485867
+      0.865717
+      0.095787
+    
+    
+      5
+      0.007962
+      0.874087
+      0.007282
+      36.291668
+      36.000000
+      37.000000
+      0.000000
+      36.291668
+      36.000000
+      37.000000
+      0.468141
+      0.874087
+      0.101071
+    
+    
+      6
+      0.008577
+      0.786245
+      0.005472
+      36.250000
+      36.000000
+      37.000000
+      0.000000
+      36.250000
+      36.000000
+      37.000000
+      0.394193
+      0.786245
+      0.038558
+    
+    
+      7
+      0.009643
+      0.950397
+      0.004317
+      36.083336
+      36.000000
+      37.000000
+      0.000000
+      36.083336
+      36.000000
+      37.000000
+      0.439149
+      0.950397
+      0.112830
+    
+    
+      8
+      0.013441
+      0.796803
+      0.005893
+      36.166668
+      36.000000
+      37.000000
+      0.000000
+      36.166668
+      36.000000
+      37.000000
+      0.447055
+      0.796803
+      0.037383
+    
+    
+      9
+      0.011547
+      0.985467
+      0.001023
+      36.083336
+      36.000000
+      37.000000
+      0.000000
+      36.083336
+      36.000000
+      37.000000
+      0.423510
+      0.985467
+      0.087427
+    
+    
+      10
+      0.008746
+      0.834454
+      0.002334
+      36.083336
+      36.000000
+      37.000000
+      0.000000
+      36.083336
+      36.000000
+      37.000000
+      0.414478
+      0.834454
+      0.084387
+    
+    
+      11
+      0.008094
+      0.950191
+      0.001152
+      36.000000
+      36.000000
+      36.000000
+      0.000000
+      36.000000
+      36.000000
+      36.000000
+      0.402926
+      0.950191
+      0.090868
+    
+    
+      12
+      0.012011
+      0.859299
+      0.001038
+      36.166668
+      36.000000
+      37.000000
+      0.000000
+      36.166668
+      36.000000
+      37.000000
+      0.396644
+      0.859299
+      0.098864
+    
+    
+      13
+      0.009959
+      0.924280
+      0.001767
+      36.083336
+      36.000000
+      37.000000
+      0.000000
+      36.083336
+      36.000000
+      37.000000
+      0.412446
+      0.924280
+      0.081514
+    
+    
+      14
+      0.009701
+      0.867693
+      0.001322
+      36.125000
+      36.000000
+      37.000000
+      0.000000
+      36.125000
+      36.000000
+      37.000000
+      0.466727
+      0.867693
+      0.075593
+    
+    
+      15
+      0.008340
+      0.849495
+      0.000932
+      36.041668
+      36.000000
+      37.000000
+      0.000000
+      36.041668
+      36.000000
+      37.000000
+      0.411006
+      0.849495
+      0.110765
+    
+    
+      16
+      0.009804
+      0.859937
+      0.002999
+      36.041668
+      36.000000
+      37.000000
+      0.000000
+      36.041668
+      36.000000
+      37.000000
+      0.400000
+      0.859937
+      0.102229
+    
+    
+      17
+      0.009844
+      0.898781
+      0.001135
+      36.083336
+      36.000000
+      37.000000
+      0.000000
+      36.083336
+      36.000000
+      37.000000
+      0.434327
+      0.898781
+      0.128014
+    
+    
+      18
+      0.007715
+      0.889948
+      0.000337
+      36.041668
+      36.000000
+      37.000000
+      0.000000
+      36.041668
+      36.000000
+      37.000000
+      0.415706
+      0.889948
+      0.129740
+    
+    
+      19
+      0.010519
+      0.945548
+      0.001287
+      36.041668
+      36.000000
+      37.000000
+      0.000000
+      36.041668
+      36.000000
+      37.000000
+      0.399323
+      0.945548
+      0.117421
+    
+    
+      20
+      0.009694
+      0.847690
+      0.000440
+      36.041668
+      36.000000
+      37.000000
+      0.000000
+      36.041668
+      36.000000
+      37.000000
+      0.401173
+      0.847690
+      0.107093
+    
+    
+      21
+      0.010373
+      0.916535
+      0.001798
+      36.166668
+      36.000000
+      37.000000
+      0.000000
+      36.166668
+      36.000000
+      37.000000
+      0.429474
+      0.916535
+      0.100634
+    
+    
+      22
+      0.008685
+      0.893887
+      0.001015
+      36.000000
+      36.000000
+      36.000000
+      0.000000
+      36.000000
+      36.000000
+      36.000000
+      0.411327
+      0.893887
+      0.103732
+    
+    
+      23
+      0.008160
+      0.870276
+      0.001347
+      36.000000
+      36.000000
+      36.000000
+      0.000000
+      36.000000
+      36.000000
+      36.000000
+      0.407250
+      0.870276
+      0.069545
+    
+    
+      24
+      0.010454
+      0.812979
+      0.001480
+      36.041668
+      36.000000
+      37.000000
+      0.000000
+      36.041668
+      36.000000
+      37.000000
+      0.420291
+      0.812980
+      0.029209
+    
+    
+      25
+      0.007985
+      0.860883
+      0.001141
+      36.000000
+      36.000000
+      36.000000
+      0.000000
+      36.000000
+      36.000000
+      36.000000
+      0.399619
+      0.860883
+      0.091995
+    
+    
+      26
+      0.007607
+      0.819427
+      0.002729
+      36.041668
+      36.000000
+      37.000000
+      0.000000
+      36.041668
+      36.000000
+      37.000000
+      0.445131
+      0.819427
+      0.028621
+    
+    
+      27
+      0.009271
+      0.894401
+      0.000024
+      36.000000
+      36.000000
+      36.000000
+      0.000000
+      36.000000
+      36.000000
+      36.000000
+      0.446088
+      0.894401
+      0.079281
+    
+    
+      28
+      0.007878
+      0.824017
+      0.002666
+      36.000000
+      36.000000
+      36.000000
+      0.000000
+      36.000000
+      36.000000
+      36.000000
+      0.393447
+      0.824017
+      0.070459
+    
+    
+      29
+      0.008503
+      0.832171
+      0.001706
+      36.000000
+      36.000000
+      36.000000
+      0.000000
+      36.000000
+      36.000000
+      36.000000
+      0.424382
+      0.832171
+      0.038710
+    
+    
+      30
+      0.009667
+      0.908449
+      0.001180
+      36.000000
+      36.000000
+      36.000000
+      0.000000
+      36.000000
+      36.000000
+      36.000000
+      0.482312
+      0.908449
+      0.083040
+    
+    
+      31
+      0.008712
+      0.847378
+      0.000306
+      36.083336
+      36.000000
+      37.000000
+      0.000000
+      36.083336
+      36.000000
+      37.000000
+      0.434301
+      0.847377
+      0.098542
+    
+    
+      32
+      0.009033
+      0.889294
+      0.001855
+      36.000000
+      36.000000
+      36.000000
+      0.000000
+      36.000000
+      36.000000
+      36.000000
+      0.446166
+      0.889293
+      0.063109
+    
+    
+      33
+      0.008762
+      0.865200
+      0.000919
+      36.041668
+      36.000000
+      37.000000
+      0.000000
+      36.041668
+      36.000000
+      37.000000
+      0.454103
+      0.865200
+      0.096917
+    
+    
+      34
+      0.009639
+      0.923794
+      0.002838
+      36.000000
+      36.000000
+      36.000000
+      0.000000
+      36.000000
+      36.000000
+      36.000000
+      0.481595
+      0.923794
+      0.120878
+    
+    
+      35
+      0.008847
+      0.933289
+      0.001185
+      36.000000
+      36.000000
+      36.000000
+      0.000000
+      36.000000
+      36.000000
+      36.000000
+      0.437655
+      0.933289
+      0.106073
+    
+    
+      36
+      0.009773
+      0.826725
+      0.000503
+      36.000000
+      36.000000
+      36.000000
+      0.000000
+      36.000000
+      36.000000
+      36.000000
+      0.481500
+      0.826725
+      0.044322
+    
+    
+      37
+      0.008648
+      0.869984
+      0.004599
+      36.041668
+      36.000000
+      37.000000
+      0.000000
+      36.041668
+      36.000000
+      37.000000
+      0.482306
+      0.869984
+      0.095250
+    
+    
+      38
+      0.011715
+      0.895926
+      0.000935
+      36.041668
+      36.000000
+      37.000000
+      0.000000
+      36.041668
+      36.000000
+      37.000000
+      0.500098
+      0.895926
+      0.111572
+    
+    
+      39
+      0.009341
+      0.857392
+      0.003097
+      36.000000
+      36.000000
+      36.000000
+      0.000000
+      36.000000
+      36.000000
+      36.000000
+      0.465947
+      0.857392
+      0.101663
+    
+    
+      40
+      0.010482
+      0.926603
+      0.001537
+      36.000000
+      36.000000
+      36.000000
+      0.000000
+      36.000000
+      36.000000
+      36.000000
+      0.521778
+      0.926603
+      0.097183
+    
+    
+      41
+      0.005120
+      0.860926
+      0.003165
+      36.208336
+      36.000000
+      37.000000
+      0.000000
+      36.208336
+      36.000000
+      37.000000
+      0.485724
+      0.860926
+      0.075981
+    
+    
+      42
+      0.009420
+      0.814299
+      0.002754
+      36.125000
+      36.000000
+      37.000000
+      0.000000
+      36.125000
+      36.000000
+      37.000000
+      0.454233
+      0.814298
+      0.032427
+    
+    
+      43
+      0.009048
+      0.804064
+      0.002580
+      36.041668
+      36.000000
+      37.000000
+      0.000000
+      36.041668
+      36.000000
+      37.000000
+      0.523292
+      0.804064
+      0.037388
+    
+    
+      44
+      0.008967
+      0.864478
+      0.000836
+      36.000000
+      36.000000
+      36.000000
+      0.000000
+      36.000000
+      36.000000
+      36.000000
+      0.447868
+      0.864478
+      0.108667
+    
+    
+      45
+      0.009934
+      0.904360
+      0.006285
+      36.000000
+      36.000000
+      36.000000
+      0.000000
+      36.000000
+      36.000000
+      36.000000
+      0.496349
+      0.904360
+      0.091588
+    
+    
+      46
+      0.010678
+      0.833818
+      0.000493
+      36.125000
+      36.000000
+      37.000000
+      0.000000
+      36.125000
+      36.000000
+      37.000000
+      0.498101
+      0.833818
+      0.099656
+    
+    
+      47
+      0.010966
+      0.800460
+      0.000898
+      36.041668
+      36.000000
+      37.000000
+      0.000000
+      36.041668
+      36.000000
+      37.000000
+      0.479228
+      0.800460
+      0.036893
+    
+    
+      48
+      0.009662
+      0.823143
+      0.004193
+      36.041668
+      36.000000
+      37.000000
+      0.000000
+      36.041668
+      36.000000
+      37.000000
+      0.496945
+      0.823143
+      0.022107
+    
+    
+      49
+      0.011090
+      0.825160
+      0.002286
+      36.083336
+      36.000000
+      37.000000
+      0.000000
+      36.083336
+      36.000000
+      37.000000
+      0.489671
+      0.825160
+      0.064563
+    
+    
+      50
+      0.009217
+      0.865304
+      0.000906
+      36.041668
+      36.000000
+      37.000000
+      0.000000
+      36.041668
+      36.000000
+      37.000000
+      0.486117
+      0.865304
+      0.065723
+    
+    
+      51
+      0.011271
+      0.817330
+      0.001700
+      36.083336
+      36.000000
+      37.000000
+      0.000000
+      36.083336
+      36.000000
+      37.000000
+      0.528036
+      0.817330
+      0.046338
+    
+    
+      52
+      0.010325
+      0.965480
+      0.001760
+      36.000000
+      36.000000
+      36.000000
+      0.000000
+      36.000000
+      36.000000
+      36.000000
+      0.515806
+      0.965480
+      0.109870
+    
+    
+      53
+      0.010460
+      0.972855
+      0.001302
+      36.000000
+      36.000000
+      36.000000
+      0.000000
+      36.000000
+      36.000000
+      36.000000
+      0.518722
+      0.972855
+      0.108537
+    
+    
+      54
+      0.009664
+      0.852684
+      0.004028
+      36.041668
+      36.000000
+      37.000000
+      0.000000
+      36.041668
+      36.000000
+      37.000000
+      0.509688
+      0.852684
+      0.030756
+    
+    
+      55
+      0.011086
+      0.862022
+      0.001167
+      36.041668
+      36.000000
+      37.000000
+      0.000000
+      36.041668
+      36.000000
+      37.000000
+      0.520524
+      0.862022
+      0.116616
+    
+    
+      56
+      0.009135
+      0.861371
+      0.003634
+      36.000000
+      36.000000
+      36.000000
+      0.000000
+      36.000000
+      36.000000
+      36.000000
+      0.456327
+      0.861371
+      0.075960
+    
+    
+      57
+      0.009334
+      0.891995
+      0.000838
+      36.041668
+      36.000000
+      37.000000
+      0.000000
+      36.041668
+      36.000000
+      37.000000
+      0.534373
+      0.891995
+      0.105560
+    
+    
+      58
+      0.009750
+      0.874906
+      0.000659
+      36.041668
+      36.000000
+      37.000000
+      0.000000
+      36.041668
+      36.000000
+      37.000000
+      0.493616
+      0.874906
+      0.068465
+    
+    
+      59
+      0.010386
+      0.821392
+      0.000335
+      36.000000
+      36.000000
+      36.000000
+      0.000000
+      36.000000
+      36.000000
+      36.000000
+      0.518459
+      0.821392
+      0.053765
+    
+    
+      60
+      0.010055
+      0.922312
+      0.003620
+      36.000000
+      36.000000
+      36.000000
+      0.000000
+      36.000000
+      36.000000
+      36.000000
+      0.496540
+      0.922312
+      0.116734
+    
+    
+      61
+      0.009225
+      0.894469
+      0.002411
+      36.166668
+      36.000000
+      37.000000
+      0.000000
+      36.166668
+      36.000000
+      37.000000
+      0.526145
+      0.894469
+      0.088287
+    
+    
+      62
+      0.006750
+      0.816760
+      0.001636
+      36.208336
+      36.000000
+      37.000000
+      0.000000
+      36.208336
+      36.000000
+      37.000000
+      0.500281
+      0.816760
+      0.031519
+    
+    
+      63
+      0.012890
+      0.822446
+      0.001158
+      36.125000
+      36.000000
+      37.000000
+      0.000000
+      36.125000
+      36.000000
+      37.000000
+      0.528996
+      0.822446
+      0.079048
+    
+    
+      64
+      0.011293
+      0.874581
+      0.002151
+      36.125000
+      36.000000
+      37.000000
+      0.000000
+      36.125000
+      36.000000
+      37.000000
+      0.570998
+      0.874581
+      0.073823
+    
+    
+      65
+      0.012425
+      0.822145
+      0.002259
+      36.125000
+      36.000000
+      37.000000
+      0.000000
+      36.125000
+      36.000000
+      37.000000
+      0.539415
+      0.822145
+      0.039931
+    
+    
+      66
+      0.009699
+      0.862827
+      0.001572
+      36.041668
+      36.000000
+      37.000000
+      0.000000
+      36.041668
+      36.000000
+      37.000000
+      0.518719
+      0.862827
+      0.080788
+    
+    
+      67
+      0.008848
+      0.815319
+      0.001629
+      36.083336
+      36.000000
+      37.000000
+      0.000000
+      36.083336
+      36.000000
+      37.000000
+      0.497988
+      0.815318
+      0.037855
+    
+  
+Both `max_new_tokens` (=256) and `max_length`(=40960) seem to have been set. `max_new_tokens` will take precedence. Please refer to the documentation for more information. (https://huggingface.co/docs/transformers/main/en/main_classes/text_generation)
+/usr/local/lib/python3.12/dist-packages/transformers/modeling_attn_mask_utils.py:71: FutureWarning: The attention mask API under `transformers.modeling_attn_mask_utils` (`AttentionMaskConverter`) is deprecated and will be removed in Transformers v5.10. Please use the new API in `transformers.masking_utils`.
+  warnings.warn(DEPRECATION_MESSAGE, FutureWarning)
+/usr/local/lib/python3.12/dist-packages/transformers/modeling_attn_mask_utils.py:281: FutureWarning: The attention mask API under `transformers.modeling_attn_mask_utils` (`AttentionMaskConverter`) is deprecated and will be removed in Transformers v5.10. Please use the new API in `transformers.masking_utils`.
+  warnings.warn(DEPRECATION_MESSAGE, FutureWarning)
+/usr/local/lib/python3.12/dist-packages/transformers/modeling_attn_mask_utils.py:172: FutureWarning: The attention mask API under `transformers.modeling_attn_mask_utils` (`AttentionMaskConverter`) is deprecated and will be removed in Transformers v5.10. Please use the new API in `transformers.masking_utils`.
+  warnings.warn(DEPRECATION_MESSAGE, FutureWarning)
+/usr/local/lib/python3.12/dist-packages/transformers/modeling_attn_mask_utils.py:202: FutureWarning: The attention mask API under `transformers.modeling_attn_mask_utils` (`AttentionMaskConverter`) is deprecated and will be removed in Transformers v5.10. Please use the new API in `transformers.masking_utils`.
+  warnings.warn(DEPRECATION_MESSAGE, FutureWarning)
+/usr/local/lib/python3.12/dist-packages/transformers/modeling_attn_mask_utils.py:254: FutureWarning: The attention mask API under `transformers.modeling_attn_mask_utils` (`AttentionMaskConverter`) is deprecated and will be removed in Transformers v5.10. Please use the new API in `transformers.masking_utils`.
+  warnings.warn(DEPRECATION_MESSAGE, FutureWarning)
+Both `max_new_tokens` (=256) and `max_length`(=40960) seem to have been set. `max_new_tokens` will take precedence. Please refer to the documentation for more information. (https://huggingface.co/docs/transformers/main/en/main_classes/text_generation)
+/usr/local/lib/python3.12/dist-packages/transformers/modeling_attn_mask_utils.py:71: FutureWarning: The attention mask API under `transformers.modeling_attn_mask_utils` (`AttentionMaskConverter`) is deprecated and will be removed in Transformers v5.10. Please use the new API in `transformers.masking_utils`.
+  warnings.warn(DEPRECATION_MESSAGE, FutureWarning)
+/usr/local/lib/python3.12/dist-packages/transformers/modeling_attn_mask_utils.py:281: FutureWarning: The attention mask API under `transformers.modeling_attn_mask_utils` (`AttentionMaskConverter`) is deprecated and will be removed in Transformers v5.10. Please use the new API in `transformers.masking_utils`.
+  warnings.warn(DEPRECATION_MESSAGE, FutureWarning)
+/usr/local/lib/python3.12/dist-packages/transformers/modeling_attn_mask_utils.py:172: FutureWarning: The attention mask API under `transformers.modeling_attn_mask_utils` (`AttentionMaskConverter`) is deprecated and will be removed in Transformers v5.10. Please use the new API in `transformers.masking_utils`.
+  warnings.warn(DEPRECATION_MESSAGE, FutureWarning)
+/usr/local/lib/python3.12/dist-packages/transformers/modeling_attn_mask_utils.py:202: FutureWarning: The attention mask API under `transformers.modeling_attn_mask_utils` (`AttentionMaskConverter`) is deprecated and will be removed in Transformers v5.10. Please use the new API in `transformers.masking_utils`.
+  warnings.warn(DEPRECATION_MESSAGE, FutureWarning)
+/usr/local/lib/python3.12/dist-packages/transformers/modeling_attn_mask_utils.py:254: FutureWarning: The attention mask API under `transformers.modeling_attn_mask_utils` (`AttentionMaskConverter`) is deprecated and will be removed in Transformers v5.10. Please use the new API in `transformers.masking_utils`.
+  warnings.warn(DEPRECATION_MESSAGE, FutureWarning)
+Both `max_new_tokens` (=256) and `max_length`(=40960) seem to have been set. `max_new_tokens` will take precedence. Please refer to the documentation for more information. (https://huggingface.co/docs/transformers/main/en/main_classes/text_generation)
+/usr/local/lib/python3.12/dist-packages/transformers/modeling_attn_mask_utils.py:71: FutureWarning: The attention mask API under `transformers.modeling_attn_mask_utils` (`AttentionMaskConverter`) is deprecated and will be removed in Transformers v5.10. Please use the new API in `transformers.masking_utils`.
+  warnings.warn(DEPRECATION_MESSAGE, FutureWarning)
+/usr/local/lib/python3.12/dist-packages/transformers/modeling_attn_mask_utils.py:281: FutureWarning: The attention mask API under `transformers.modeling_attn_mask_utils` (`AttentionMaskConverter`) is deprecated and will be removed in Transformers v5.10. Please use the new API in `transformers.masking_utils`.
+  warnings.warn(DEPRECATION_MESSAGE, FutureWarning)
+/usr/local/lib/python3.12/dist-packages/transformers/modeling_attn_mask_utils.py:172: FutureWarning: The attention mask API under `transformers.modeling_attn_mask_utils` (`AttentionMaskConverter`) is deprecated and will be removed in Transformers v5.10. Please use the new API in `transformers.masking_utils`.
+  warnings.warn(DEPRECATION_MESSAGE, FutureWarning)
+/usr/local/lib/python3.12/dist-packages/transformers/modeling_attn_mask_utils.py:202: FutureWarning: The attention mask API under `transformers.modeling_attn_mask_utils` (`AttentionMaskConverter`) is deprecated and will be removed in Transformers v5.10. Please use the new API in `transformers.masking_utils`.
+  warnings.warn(DEPRECATION_MESSAGE, FutureWarning)
+/usr/local/lib/python3.12/dist-packages/transformers/modeling_attn_mask_utils.py:254: FutureWarning: The attention mask API under `transformers.modeling_attn_mask_utils` (`AttentionMaskConverter`) is deprecated and will be removed in Transformers v5.10. Please use the new API in `transformers.masking_utils`.
+  warnings.warn(DEPRECATION_MESSAGE, FutureWarning)
+Both `max_new_tokens` (=256) and `max_length`(=40960) seem to have been set. `max_new_tokens` will take precedence. Please refer to the documentation for more information. (https://huggingface.co/docs/transformers/main/en/main_classes/text_generation)
+Both `max_new_tokens` (=256) and `max_length`(=40960) seem to have been set. `max_new_tokens` will take precedence. Please refer to the documentation for more information. (https://huggingface.co/docs/transformers/main/en/main_classes/text_generation)
+Both `max_new_tokens` (=256) and `max_length`(=40960) seem to have been set. `max_new_tokens` will take precedence. Please refer to the documentation for more information. (https://huggingface.co/docs/transformers/main/en/main_classes/text_generation)
+Both `max_new_tokens` (=256) and `max_length`(=40960) seem to have been set. `max_new_tokens` will take precedence. Please refer to the documentation for more information. (https://huggingface.co/docs/transformers/main/en/main_classes/text_generation)
+Both `max_new_tokens` (=256) and `max_length`(=40960) seem to have been set. `max_new_tokens` will take precedence. Please refer to the documentation for more information. (https://huggingface.co/docs/transformers/main/en/main_classes/text_generation)
+Both `max_new_tokens` (=256) and `max_length`(=40960) seem to have been set. `max_new_tokens` will take precedence. Please refer to the documentation for more information. (https://huggingface.co/docs/transformers/main/en/main_classes/text_generation)
+Unsloth: Restored added_tokens_decoder metadata in /kaggle/working/artifacts/motorassist-grpo/run-2026-04-26_02-58-25/checkpoint-10/tokenizer_config.json.
+Both `max_new_tokens` (=256) and `max_length`(=40960) seem to have been set. `max_new_tokens` will take precedence. Please refer to the documentation for more information. (https://huggingface.co/docs/transformers/main/en/main_classes/text_generation)
+/usr/local/lib/python3.12/dist-packages/transformers/modeling_attn_mask_utils.py:71: FutureWarning: The attention mask API under `transformers.modeling_attn_mask_utils` (`AttentionMaskConverter`) is deprecated and will be removed in Transformers v5.10. Please use the new API in `transformers.masking_utils`.
+  warnings.warn(DEPRECATION_MESSAGE, FutureWarning)
+/usr/local/lib/python3.12/dist-packages/transformers/modeling_attn_mask_utils.py:281: FutureWarning: The attention mask API under `transformers.modeling_attn_mask_utils` (`AttentionMaskConverter`) is deprecated and will be removed in Transformers v5.10. Please use the new API in `transformers.masking_utils`.
+  warnings.warn(DEPRECATION_MESSAGE, FutureWarning)
+/usr/local/lib/python3.12/dist-packages/transformers/modeling_attn_mask_utils.py:172: FutureWarning: The attention mask API under `transformers.modeling_attn_mask_utils` (`AttentionMaskConverter`) is deprecated and will be removed in Transformers v5.10. Please use the new API in `transformers.masking_utils`.
+  warnings.warn(DEPRECATION_MESSAGE, FutureWarning)
+/usr/local/lib/python3.12/dist-packages/transformers/modeling_attn_mask_utils.py:202: FutureWarning: The attention mask API under `transformers.modeling_attn_mask_utils` (`AttentionMaskConverter`) is deprecated and will be removed in Transformers v5.10. Please use the new API in `transformers.masking_utils`.
+  warnings.warn(DEPRECATION_MESSAGE, FutureWarning)
+/usr/local/lib/python3.12/dist-packages/transformers/modeling_attn_mask_utils.py:254: FutureWarning: The attention mask API under `transformers.modeling_attn_mask_utils` (`AttentionMaskConverter`) is deprecated and will be removed in Transformers v5.10. Please use the new API in `transformers.masking_utils`.
+  warnings.warn(DEPRECATION_MESSAGE, FutureWarning)
+Both `max_new_tokens` (=256) and `max_length`(=40960) seem to have been set. `max_new_tokens` will take precedence. Please refer to the documentation for more information. (https://huggingface.co/docs/transformers/main/en/main_classes/text_generation)
+Both `max_new_tokens` (=256) and `max_length`(=40960) seem to have been set. `max_new_tokens` will take precedence. Please refer to the documentation for more information. (https://huggingface.co/docs/transformers/main/en/main_classes/text_generation)
+Both `max_new_tokens` (=256) and `max_length`(=40960) seem to have been set. `max_new_tokens` will take precedence. Please refer to the documentation for more information. (https://huggingface.co/docs/transformers/main/en/main_classes/text_generation)
+Both `max_new_tokens` (=256) and `max_length`(=40960) seem to have been set. `max_new_tokens` will take precedence. Please refer to the documentation for more information. (https://huggingface.co/docs/transformers/main/en/main_classes/text_generation)
+Both `max_new_tokens` (=256) and `max_length`(=40960) seem to have been set. `max_new_tokens` will take precedence. Please refer to the documentation for more information. (https://huggingface.co/docs/transformers/main/en/main_classes/text_generation)
+Both `max_new_tokens` (=256) and `max_length`(=40960) seem to have been set. `max_new_tokens` will take precedence. Please refer to the documentation for more information. (https://huggingface.co/docs/transformers/main/en/main_classes/text_generation)
+Both `max_new_tokens` (=256) and `max_length`(=40960) seem to have been set. `max_new_tokens` will take precedence. Please refer to the documentation for more information. (https://huggingface.co/docs/transformers/main/en/main_classes/text_generation)
+Both `max_new_tokens` (=256) and `max_length`(=40960) seem to have been set. `max_new_tokens` will take precedence. Please refer to the documentation for more information. (https://huggingface.co/docs/transformers/main/en/main_classes/text_generation)
+Both `max_new_tokens` (=256) and `max_length`(=40960) seem to have been set. `max_new_tokens` will take precedence. Please refer to the documentation for more information. (https://huggingface.co/docs/transformers/main/en/main_classes/text_generation)
+Unsloth: Restored added_tokens_decoder metadata in /kaggle/working/artifacts/motorassist-grpo/run-2026-04-26_02-58-25/checkpoint-20/tokenizer_config.json.
+Both `max_new_tokens` (=256) and `max_length`(=40960) seem to have been set. `max_new_tokens` will take precedence. Please refer to the documentation for more information. (https://huggingface.co/docs/transformers/main/en/main_classes/text_generation)
+/usr/local/lib/python3.12/dist-packages/transformers/modeling_attn_mask_utils.py:71: FutureWarning: The attention mask API under `transformers.modeling_attn_mask_utils` (`AttentionMaskConverter`) is deprecated and will be removed in Transformers v5.10. Please use the new API in `transformers.masking_utils`.
+  warnings.warn(DEPRECATION_MESSAGE, FutureWarning)
+/usr/local/lib/python3.12/dist-packages/transformers/modeling_attn_mask_utils.py:281: FutureWarning: The attention mask API under `transformers.modeling_attn_mask_utils` (`AttentionMaskConverter`) is deprecated and will be removed in Transformers v5.10. Please use the new API in `transformers.masking_utils`.
+  warnings.warn(DEPRECATION_MESSAGE, FutureWarning)
+/usr/local/lib/python3.12/dist-packages/transformers/modeling_attn_mask_utils.py:172: FutureWarning: The attention mask API under `transformers.modeling_attn_mask_utils` (`AttentionMaskConverter`) is deprecated and will be removed in Transformers v5.10. Please use the new API in `transformers.masking_utils`.
+  warnings.warn(DEPRECATION_MESSAGE, FutureWarning)
+/usr/local/lib/python3.12/dist-packages/transformers/modeling_attn_mask_utils.py:202: FutureWarning: The attention mask API under `transformers.modeling_attn_mask_utils` (`AttentionMaskConverter`) is deprecated and will be removed in Transformers v5.10. Please use the new API in `transformers.masking_utils`.
+  warnings.warn(DEPRECATION_MESSAGE, FutureWarning)
+/usr/local/lib/python3.12/dist-packages/transformers/modeling_attn_mask_utils.py:254: FutureWarning: The attention mask API under `transformers.modeling_attn_mask_utils` (`AttentionMaskConverter`) is deprecated and will be removed in Transformers v5.10. Please use the new API in `transformers.masking_utils`.
+  warnings.warn(DEPRECATION_MESSAGE, FutureWarning)
+Both `max_new_tokens` (=256) and `max_length`(=40960) seem to have been set. `max_new_tokens` will take precedence. Please refer to the documentation for more information. (https://huggingface.co/docs/transformers/main/en/main_classes/text_generation)
+Both `max_new_tokens` (=256) and `max_length`(=40960) seem to have been set. `max_new_tokens` will take precedence. Please refer to the documentation for more information. (https://huggingface.co/docs/transformers/main/en/main_classes/text_generation)
+Both `max_new_tokens` (=256) and `max_length`(=40960) seem to have been set. `max_new_tokens` will take precedence. Please refer to the documentation for more information. (https://huggingface.co/docs/transformers/main/en/main_classes/text_generation)
+Both `max_new_tokens` (=256) and `max_length`(=40960) seem to have been set. `max_new_tokens` will take precedence. Please refer to the documentation for more information. (https://huggingface.co/docs/transformers/main/en/main_classes/text_generation)
+Both `max_new_tokens` (=256) and `max_length`(=40960) seem to have been set. `max_new_tokens` will take precedence. Please refer to the documentation for more information. (https://huggingface.co/docs/transformers/main/en/main_classes/text_generation)
+Both `max_new_tokens` (=256) and `max_length`(=40960) seem to have been set. `max_new_tokens` will take precedence. Please refer to the documentation for more information. (https://huggingface.co/docs/transformers/main/en/main_classes/text_generation)
+Both `max_new_tokens` (=256) and `max_length`(=40960) seem to have been set. `max_new_tokens` will take precedence. Please refer to the documentation for more information. (https://huggingface.co/docs/transformers/main/en/main_classes/text_generation)
+Both `max_new_tokens` (=256) and `max_length`(=40960) seem to have been set. `max_new_tokens` will take precedence. Please refer to the documentation for more information. (https://huggingface.co/docs/transformers/main/en/main_classes/text_generation)
+Both `max_new_tokens` (=256) and `max_length`(=40960) seem to have been set. `max_new_tokens` will take precedence. Please refer to the documentation for more information. (https://huggingface.co/docs/transformers/main/en/main_classes/text_generation)
+/usr/local/lib/python3.12/dist-packages/transformers/modeling_attn_mask_utils.py:71: FutureWarning: The attention mask API under `transformers.modeling_attn_mask_utils` (`AttentionMaskConverter`) is deprecated and will be removed in Transformers v5.10. Please use the new API in `transformers.masking_utils`.
+  warnings.warn(DEPRECATION_MESSAGE, FutureWarning)
+/usr/local/lib/python3.12/dist-packages/transformers/modeling_attn_mask_utils.py:281: FutureWarning: The attention mask API under `transformers.modeling_attn_mask_utils` (`AttentionMaskConverter`) is deprecated and will be removed in Transformers v5.10. Please use the new API in `transformers.masking_utils`.
+  warnings.warn(DEPRECATION_MESSAGE, FutureWarning)
+/usr/local/lib/python3.12/dist-packages/transformers/modeling_attn_mask_utils.py:172: FutureWarning: The attention mask API under `transformers.modeling_attn_mask_utils` (`AttentionMaskConverter`) is deprecated and will be removed in Transformers v5.10. Please use the new API in `transformers.masking_utils`.
+  warnings.warn(DEPRECATION_MESSAGE, FutureWarning)
+/usr/local/lib/python3.12/dist-packages/transformers/modeling_attn_mask_utils.py:202: FutureWarning: The attention mask API under `transformers.modeling_attn_mask_utils` (`AttentionMaskConverter`) is deprecated and will be removed in Transformers v5.10. Please use the new API in `transformers.masking_utils`.
+  warnings.warn(DEPRECATION_MESSAGE, FutureWarning)
+/usr/local/lib/python3.12/dist-packages/transformers/modeling_attn_mask_utils.py:254: FutureWarning: The attention mask API under `transformers.modeling_attn_mask_utils` (`AttentionMaskConverter`) is deprecated and will be removed in Transformers v5.10. Please use the new API in `transformers.masking_utils`.
+  warnings.warn(DEPRECATION_MESSAGE, FutureWarning)
+Unsloth: Restored added_tokens_decoder metadata in /kaggle/working/artifacts/motorassist-grpo/run-2026-04-26_02-58-25/checkpoint-30/tokenizer_config.json.
+Both `max_new_tokens` (=256) and `max_length`(=40960) seem to have been set. `max_new_tokens` will take precedence. Please refer to the documentation for more information. (https://huggingface.co/docs/transformers/main/en/main_classes/text_generation)
+/usr/local/lib/python3.12/dist-packages/transformers/modeling_attn_mask_utils.py:71: FutureWarning: The attention mask API under `transformers.modeling_attn_mask_utils` (`AttentionMaskConverter`) is deprecated and will be removed in Transformers v5.10. Please use the new API in `transformers.masking_utils`.
+  warnings.warn(DEPRECATION_MESSAGE, FutureWarning)
+/usr/local/lib/python3.12/dist-packages/transformers/modeling_attn_mask_utils.py:281: FutureWarning: The attention mask API under `transformers.modeling_attn_mask_utils` (`AttentionMaskConverter`) is deprecated and will be removed in Transformers v5.10. Please use the new API in `transformers.masking_utils`.
+  warnings.warn(DEPRECATION_MESSAGE, FutureWarning)
+/usr/local/lib/python3.12/dist-packages/transformers/modeling_attn_mask_utils.py:172: FutureWarning: The attention mask API under `transformers.modeling_attn_mask_utils` (`AttentionMaskConverter`) is deprecated and will be removed in Transformers v5.10. Please use the new API in `transformers.masking_utils`.
+  warnings.warn(DEPRECATION_MESSAGE, FutureWarning)
+/usr/local/lib/python3.12/dist-packages/transformers/modeling_attn_mask_utils.py:202: FutureWarning: The attention mask API under `transformers.modeling_attn_mask_utils` (`AttentionMaskConverter`) is deprecated and will be removed in Transformers v5.10. Please use the new API in `transformers.masking_utils`.
+  warnings.warn(DEPRECATION_MESSAGE, FutureWarning)
+/usr/local/lib/python3.12/dist-packages/transformers/modeling_attn_mask_utils.py:254: FutureWarning: The attention mask API under `transformers.modeling_attn_mask_utils` (`AttentionMaskConverter`) is deprecated and will be removed in Transformers v5.10. Please use the new API in `transformers.masking_utils`.
+  warnings.warn(DEPRECATION_MESSAGE, FutureWarning)
+Both `max_new_tokens` (=256) and `max_length`(=40960) seem to have been set. `max_new_tokens` will take precedence. Please refer to the documentation for more information. (https://huggingface.co/docs/transformers/main/en/main_classes/text_generation)
+Both `max_new_tokens` (=256) and `max_length`(=40960) seem to have been set. `max_new_tokens` will take precedence. Please refer to the documentation for more information. (https://huggingface.co/docs/transformers/main/en/main_classes/text_generation)
+Both `max_new_tokens` (=256) and `max_length`(=40960) seem to have been set. `max_new_tokens` will take precedence. Please refer to the documentation for more information. (https://huggingface.co/docs/transformers/main/en/main_classes/text_generation)
+Both `max_new_tokens` (=256) and `max_length`(=40960) seem to have been set. `max_new_tokens` will take precedence. Please refer to the documentation for more information. (https://huggingface.co/docs/transformers/main/en/main_classes/text_generation)
+Both `max_new_tokens` (=256) and `max_length`(=40960) seem to have been set. `max_new_tokens` will take precedence. Please refer to the documentation for more information. (https://huggingface.co/docs/transformers/main/en/main_classes/text_generation)
+Both `max_new_tokens` (=256) and `max_length`(=40960) seem to have been set. `max_new_tokens` will take precedence. Please refer to the documentation for more information. (https://huggingface.co/docs/transformers/main/en/main_classes/text_generation)
+Both `max_new_tokens` (=256) and `max_length`(=40960) seem to have been set. `max_new_tokens` will take precedence. Please refer to the documentation for more information. (https://huggingface.co/docs/transformers/main/en/main_classes/text_generation)
+Both `max_new_tokens` (=256) and `max_length`(=40960) seem to have been set. `max_new_tokens` will take precedence. Please refer to the documentation for more information. (https://huggingface.co/docs/transformers/main/en/main_classes/text_generation)
+Both `max_new_tokens` (=256) and `max_length`(=40960) seem to have been set. `max_new_tokens` will take precedence. Please refer to the documentation for more information. (https://huggingface.co/docs/transformers/main/en/main_classes/text_generation)
+Unsloth: Restored added_tokens_decoder metadata in /kaggle/working/artifacts/motorassist-grpo/run-2026-04-26_02-58-25/checkpoint-40/tokenizer_config.json.
+Both `max_new_tokens` (=256) and `max_length`(=40960) seem to have been set. `max_new_tokens` will take precedence. Please refer to the documentation for more information. (https://huggingface.co/docs/transformers/main/en/main_classes/text_generation)
+/usr/local/lib/python3.12/dist-packages/transformers/modeling_attn_mask_utils.py:71: FutureWarning: The attention mask API under `transformers.modeling_attn_mask_utils` (`AttentionMaskConverter`) is deprecated and will be removed in Transformers v5.10. Please use the new API in `transformers.masking_utils`.
+  warnings.warn(DEPRECATION_MESSAGE, FutureWarning)
+/usr/local/lib/python3.12/dist-packages/transformers/modeling_attn_mask_utils.py:281: FutureWarning: The attention mask API under `transformers.modeling_attn_mask_utils` (`AttentionMaskConverter`) is deprecated and will be removed in Transformers v5.10. Please use the new API in `transformers.masking_utils`.
+  warnings.warn(DEPRECATION_MESSAGE, FutureWarning)
+/usr/local/lib/python3.12/dist-packages/transformers/modeling_attn_mask_utils.py:172: FutureWarning: The attention mask API under `transformers.modeling_attn_mask_utils` (`AttentionMaskConverter`) is deprecated and will be removed in Transformers v5.10. Please use the new API in `transformers.masking_utils`.
+  warnings.warn(DEPRECATION_MESSAGE, FutureWarning)
+/usr/local/lib/python3.12/dist-packages/transformers/modeling_attn_mask_utils.py:202: FutureWarning: The attention mask API under `transformers.modeling_attn_mask_utils` (`AttentionMaskConverter`) is deprecated and will be removed in Transformers v5.10. Please use the new API in `transformers.masking_utils`.
+  warnings.warn(DEPRECATION_MESSAGE, FutureWarning)
+/usr/local/lib/python3.12/dist-packages/transformers/modeling_attn_mask_utils.py:254: FutureWarning: The attention mask API under `transformers.modeling_attn_mask_utils` (`AttentionMaskConverter`) is deprecated and will be removed in Transformers v5.10. Please use the new API in `transformers.masking_utils`.
+  warnings.warn(DEPRECATION_MESSAGE, FutureWarning)
+Both `max_new_tokens` (=256) and `max_length`(=40960) seem to have been set. `max_new_tokens` will take precedence. Please refer to the documentation for more information. (https://huggingface.co/docs/transformers/main/en/main_classes/text_generation)
+Both `max_new_tokens` (=256) and `max_length`(=40960) seem to have been set. `max_new_tokens` will take precedence. Please refer to the documentation for more information. (https://huggingface.co/docs/transformers/main/en/main_classes/text_generation)
+Both `max_new_tokens` (=256) and `max_length`(=40960) seem to have been set. `max_new_tokens` will take precedence. Please refer to the documentation for more information. (https://huggingface.co/docs/transformers/main/en/main_classes/text_generation)
+Both `max_new_tokens` (=256) and `max_length`(=40960) seem to have been set. `max_new_tokens` will take precedence. Please refer to the documentation for more information. (https://huggingface.co/docs/transformers/main/en/main_classes/text_generation)
+Both `max_new_tokens` (=256) and `max_length`(=40960) seem to have been set. `max_new_tokens` will take precedence. Please refer to the documentation for more information. (https://huggingface.co/docs/transformers/main/en/main_classes/text_generation)
+Both `max_new_tokens` (=256) and `max_length`(=40960) seem to have been set. `max_new_tokens` will take precedence. Please refer to the documentation for more information. (https://huggingface.co/docs/transformers/main/en/main_classes/text_generation)
+Both `max_new_tokens` (=256) and `max_length`(=40960) seem to have been set. `max_new_tokens` will take precedence. Please refer to the documentation for more information. (https://huggingface.co/docs/transformers/main/en/main_classes/text_generation)
+Both `max_new_tokens` (=256) and `max_length`(=40960) seem to have been set. `max_new_tokens` will take precedence. Please refer to the documentation for more information. (https://huggingface.co/docs/transformers/main/en/main_classes/text_generation)
+Both `max_new_tokens` (=256) and `max_length`(=40960) seem to have been set. `max_new_tokens` will take precedence. Please refer to the documentation for more information. (https://huggingface.co/docs/transformers/main/en/main_classes/text_generation)
+Unsloth: Restored added_tokens_decoder metadata in /kaggle/working/artifacts/motorassist-grpo/run-2026-04-26_02-58-25/checkpoint-50/tokenizer_config.json.
+Both `max_new_tokens` (=256) and `max_length`(=40960) seem to have been set. `max_new_tokens` will take precedence. Please refer to the documentation for more information. (https://huggingface.co/docs/transformers/main/en/main_classes/text_generation)
+/usr/local/lib/python3.12/dist-packages/transformers/modeling_attn_mask_utils.py:71: FutureWarning: The attention mask API under `transformers.modeling_attn_mask_utils` (`AttentionMaskConverter`) is deprecated and will be removed in Transformers v5.10. Please use the new API in `transformers.masking_utils`.
+  warnings.warn(DEPRECATION_MESSAGE, FutureWarning)
+/usr/local/lib/python3.12/dist-packages/transformers/modeling_attn_mask_utils.py:281: FutureWarning: The attention mask API under `transformers.modeling_attn_mask_utils` (`AttentionMaskConverter`) is deprecated and will be removed in Transformers v5.10. Please use the new API in `transformers.masking_utils`.
+  warnings.warn(DEPRECATION_MESSAGE, FutureWarning)
+/usr/local/lib/python3.12/dist-packages/transformers/modeling_attn_mask_utils.py:172: FutureWarning: The attention mask API under `transformers.modeling_attn_mask_utils` (`AttentionMaskConverter`) is deprecated and will be removed in Transformers v5.10. Please use the new API in `transformers.masking_utils`.
+  warnings.warn(DEPRECATION_MESSAGE, FutureWarning)
+/usr/local/lib/python3.12/dist-packages/transformers/modeling_attn_mask_utils.py:202: FutureWarning: The attention mask API under `transformers.modeling_attn_mask_utils` (`AttentionMaskConverter`) is deprecated and will be removed in Transformers v5.10. Please use the new API in `transformers.masking_utils`.
+  warnings.warn(DEPRECATION_MESSAGE, FutureWarning)
+/usr/local/lib/python3.12/dist-packages/transformers/modeling_attn_mask_utils.py:254: FutureWarning: The attention mask API under `transformers.modeling_attn_mask_utils` (`AttentionMaskConverter`) is deprecated and will be removed in Transformers v5.10. Please use the new API in `transformers.masking_utils`.
+  warnings.warn(DEPRECATION_MESSAGE, FutureWarning)
+Both `max_new_tokens` (=256) and `max_length`(=40960) seem to have been set. `max_new_tokens` will take precedence. Please refer to the documentation for more information. (https://huggingface.co/docs/transformers/main/en/main_classes/text_generation)
+Both `max_new_tokens` (=256) and `max_length`(=40960) seem to have been set. `max_new_tokens` will take precedence. Please refer to the documentation for more information. (https://huggingface.co/docs/transformers/main/en/main_classes/text_generation)
+Both `max_new_tokens` (=256) and `max_length`(=40960) seem to have been set. `max_new_tokens` will take precedence. Please refer to the documentation for more information. (https://huggingface.co/docs/transformers/main/en/main_classes/text_generation)
+Both `max_new_tokens` (=256) and `max_length`(=40960) seem to have been set. `max_new_tokens` will take precedence. Please refer to the documentation for more information. (https://huggingface.co/docs/transformers/main/en/main_classes/text_generation)
+Both `max_new_tokens` (=256) and `max_length`(=40960) seem to have been set. `max_new_tokens` will take precedence. Please refer to the documentation for more information. (https://huggingface.co/docs/transformers/main/en/main_classes/text_generation)
+Both `max_new_tokens` (=256) and `max_length`(=40960) seem to have been set. `max_new_tokens` will take precedence. Please refer to the documentation for more information. (https://huggingface.co/docs/transformers/main/en/main_classes/text_generation)
+Both `max_new_tokens` (=256) and `max_length`(=40960) seem to have been set. `max_new_tokens` will take precedence. Please refer to the documentation for more information. (https://huggingface.co/docs/transformers/main/en/main_classes/text_generation)
+Both `max_new_tokens` (=256) and `max_length`(=40960) seem to have been set. `max_new_tokens` will take precedence. Please refer to the documentation for more information. (https://huggingface.co/docs/transformers/main/en/main_classes/text_generation)
+Both `max_new_tokens` (=256) and `max_length`(=40960) seem to have been set. `max_new_tokens` will take precedence. Please refer to the documentation for more information. (https://huggingface.co/docs/transformers/main/en/main_classes/text_generation)
+Unsloth: Restored added_tokens_decoder metadata in /kaggle/working/artifacts/motorassist-grpo/run-2026-04-26_02-58-25/checkpoint-60/tokenizer_config.json.
+Both `max_new_tokens` (=256) and `max_length`(=40960) seem to have been set. `max_new_tokens` will take precedence. Please refer to the documentation for more information. (https://huggingface.co/docs/transformers/main/en/main_classes/text_generation)
+/usr/local/lib/python3.12/dist-packages/transformers/modeling_attn_mask_utils.py:71: FutureWarning: The attention mask API under `transformers.modeling_attn_mask_utils` (`AttentionMaskConverter`) is deprecated and will be removed in Transformers v5.10. Please use the new API in `transformers.masking_utils`.
+  warnings.warn(DEPRECATION_MESSAGE, FutureWarning)
+/usr/local/lib/python3.12/dist-packages/transformers/modeling_attn_mask_utils.py:281: FutureWarning: The attention mask API under `transformers.modeling_attn_mask_utils` (`AttentionMaskConverter`) is deprecated and will be removed in Transformers v5.10. Please use the new API in `transformers.masking_utils`.
+  warnings.warn(DEPRECATION_MESSAGE, FutureWarning)
+/usr/local/lib/python3.12/dist-packages/transformers/modeling_attn_mask_utils.py:172: FutureWarning: The attention mask API under `transformers.modeling_attn_mask_utils` (`AttentionMaskConverter`) is deprecated and will be removed in Transformers v5.10. Please use the new API in `transformers.masking_utils`.
+  warnings.warn(DEPRECATION_MESSAGE, FutureWarning)
+/usr/local/lib/python3.12/dist-packages/transformers/modeling_attn_mask_utils.py:202: FutureWarning: The attention mask API under `transformers.modeling_attn_mask_utils` (`AttentionMaskConverter`) is deprecated and will be removed in Transformers v5.10. Please use the new API in `transformers.masking_utils`.
+  warnings.warn(DEPRECATION_MESSAGE, FutureWarning)
+/usr/local/lib/python3.12/dist-packages/transformers/modeling_attn_mask_utils.py:254: FutureWarning: The attention mask API under `transformers.modeling_attn_mask_utils` (`AttentionMaskConverter`) is deprecated and will be removed in Transformers v5.10. Please use the new API in `transformers.masking_utils`.
+  warnings.warn(DEPRECATION_MESSAGE, FutureWarning)
+Both `max_new_tokens` (=256) and `max_length`(=40960) seem to have been set. `max_new_tokens` will take precedence. Please refer to the documentation for more information. (https://huggingface.co/docs/transformers/main/en/main_classes/text_generation)
+Both `max_new_tokens` (=256) and `max_length`(=40960) seem to have been set. `max_new_tokens` will take precedence. Please refer to the documentation for more information. (https://huggingface.co/docs/transformers/main/en/main_classes/text_generation)
+Both `max_new_tokens` (=256) and `max_length`(=40960) seem to have been set. `max_new_tokens` will take precedence. Please refer to the documentation for more information. (https://huggingface.co/docs/transformers/main/en/main_classes/text_generation)
+/usr/local/lib/python3.12/dist-packages/transformers/modeling_attn_mask_utils.py:71: FutureWarning: The attention mask API under `transformers.modeling_attn_mask_utils` (`AttentionMaskConverter`) is deprecated and will be removed in Transformers v5.10. Please use the new API in `transformers.masking_utils`.
+  warnings.warn(DEPRECATION_MESSAGE, FutureWarning)
+/usr/local/lib/python3.12/dist-packages/transformers/modeling_attn_mask_utils.py:281: FutureWarning: The attention mask API under `transformers.modeling_attn_mask_utils` (`AttentionMaskConverter`) is deprecated and will be removed in Transformers v5.10. Please use the new API in `transformers.masking_utils`.
+  warnings.warn(DEPRECATION_MESSAGE, FutureWarning)
+/usr/local/lib/python3.12/dist-packages/transformers/modeling_attn_mask_utils.py:172: FutureWarning: The attention mask API under `transformers.modeling_attn_mask_utils` (`AttentionMaskConverter`) is deprecated and will be removed in Transformers v5.10. Please use the new API in `transformers.masking_utils`.
+  warnings.warn(DEPRECATION_MESSAGE, FutureWarning)
+/usr/local/lib/python3.12/dist-packages/transformers/modeling_attn_mask_utils.py:202: FutureWarning: The attention mask API under `transformers.modeling_attn_mask_utils` (`AttentionMaskConverter`) is deprecated and will be removed in Transformers v5.10. Please use the new API in `transformers.masking_utils`.
+  warnings.warn(DEPRECATION_MESSAGE, FutureWarning)
+/usr/local/lib/python3.12/dist-packages/transformers/modeling_attn_mask_utils.py:254: FutureWarning: The attention mask API under `transformers.modeling_attn_mask_utils` (`AttentionMaskConverter`) is deprecated and will be removed in Transformers v5.10. Please use the new API in `transformers.masking_utils`.
+  warnings.warn(DEPRECATION_MESSAGE, FutureWarning)
+Both `max_new_tokens` (=256) and `max_length`(=40960) seem to have been set. `max_new_tokens` will take precedence. Please refer to the documentation for more information. (https://huggingface.co/docs/transformers/main/en/main_classes/text_generation)
+Both `max_new_tokens` (=256) and `max_length`(=40960) seem to have been set. `max_new_tokens` will take precedence. Please refer to the documentation for more information. (https://huggingface.co/docs/transformers/main/en/main_classes/text_generation)
+Both `max_new_tokens` (=256) and `max_length`(=40960) seem to have been set. `max_new_tokens` will take precedence. Please refer to the documentation for more information. (https://huggingface.co/docs/transformers/main/en/main_classes/text_generation)
+Unsloth: Restored added_tokens_decoder metadata in /kaggle/working/artifacts/motorassist-grpo/run-2026-04-26_02-58-25/checkpoint-67/tokenizer_config.json.
+Unsloth: Restored added_tokens_decoder metadata in /kaggle/working/artifacts/motorassist-grpo/run-2026-04-26_02-58-25/tokenizer_config.json.
+Saved adapter + tokenizer to /kaggle/working/artifacts/motorassist-grpo/run-2026-04-26_02-58-25

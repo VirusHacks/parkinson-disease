@@ -102,6 +102,13 @@ without dominating the gradient. The bio-experiment hackathon winner used a
 similar mix (small format bonus, large env-shaped reward).
 """
 
+# Theoretical maximum raw value = env_weight * 1.0 + format_bonus.
+# Dividing by this keeps the final reward in [0, 1] without hard-clamping
+# good actions to the same ceiling value, preserving GRPO gradient spread.
+_REWARD_MAX_RAW: float = (
+    DEFAULT_REPLAY_REWARD_WEIGHTS["env"] + DEFAULT_REPLAY_REWARD_WEIGHTS["format"]
+)  # = 1.2
+
 
 # ---------------------------------------------------------------------------
 # 1. Picklable env factory
@@ -393,8 +400,14 @@ def make_replay_reward_fn(
         env_reward = float(getattr(obs, "reward", 0.0) or 0.0)
         if parsed is None:
             # Heuristic-default action was applied; charge the format penalty.
-            return float(w["env"]) * env_reward - float(w["invalid"]), False, True
-        return float(w["env"]) * env_reward + float(w["format"]), True, True
+            raw = float(w["env"]) * env_reward - float(w["invalid"])
+        else:
+            raw = float(w["env"]) * env_reward + float(w["format"])
+        # Normalize by the theoretical maximum so the reward never hits 1.0
+        # unless the action is truly perfect (env_reward == 1.0, valid JSON).
+        # e.g. raw=1.07 (env=0.87) → 1.07/1.2 = 0.892 instead of clamping to 1.0.
+        normalized = raw / _REWARD_MAX_RAW
+        return max(0.0, min(1.0, normalized)), parsed is not None, True
 
     def reward_fn(
         completions: Sequence[Any],
