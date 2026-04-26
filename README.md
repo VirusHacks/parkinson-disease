@@ -50,18 +50,15 @@ short_description: RL environment for adaptive closed-loop Deep Brain Stimulatio
 
 ## TL;DR
 
-| Aspect | Value |
+An RL environment that trains AI agents to control a brain implant for Parkinson's patients — in real time, at the same 20 ms cadence as real DBS hardware.
+
+| | |
 | :--- | :--- |
-| **Action space** | 4 continuous params — `dbs_amplitude` (mA) · `dbs_pulse_width` (µs) · `dbs_frequency` (Hz) · `motor_command` |
-| **Observation** | 30-field noisy sensor JSON (beta ARV, tremor ARV, force, side-effect load, trends, episode context) |
-| **Episode horizon** | 36 steps (easy) · 60 steps (medium) · 150 steps (hard) |
-| **Reward** | Dense per-step every 20 ms + deterministic 9-component terminal grader |
-| **Grader** | Pure deterministic math · no LLM-as-judge · score ∈ [0.0, 1.0] |
-| **Biophysics** | Fleming et al. (2023) *J Neural Eng* · Hodgkin-Huxley · 400 neurons · 5M+ synaptic connections |
-| **Trainer** | TRL GRPOTrainer + Unsloth 4-bit QLoRA · Qwen3-4B · LoRA rank 16 · 33M trainable params |
-| **Curriculum** | 10 tasks: easy → medium → hard + 7 expert clinical scenarios |
-| **Training compute** | 337 GRPO steps · 116 minutes · free Kaggle T4 |
-| **Key result** | Trained 4B passes all 3 tasks · zero-shot 7B scores **0.019** on hard · zero-shot 72B matched on medium with 18× fewer params |
+| **What the agent does** | Adjusts stimulation amplitude, pulse width, and frequency every 20 ms to suppress tremor and protect motor function |
+| **What it runs on** | Peer-reviewed biophysical simulation of 400 neurons (Fleming et al., 2023) — not a proxy |
+| **How it's graded** | Deterministic 9-component clinical grader · no LLM-as-judge · score in [0, 1] |
+| **What we trained** | Qwen3-4B + LoRA · SFT → GRPO · 337 steps · 116 minutes on a free T4 GPU |
+| **Key result** | Our 4B model passes all 3 tasks · zero-shot 7B scores **0.019** on hard · our model scores **0.480** |
 
 ---
 
@@ -159,25 +156,16 @@ The agent never sees the true brain state — it sees a noisy sensor reading, ju
 
 ## Why This Is a Perfect RL Environment
 
-Most RL environments are designed to be solvable. This one is designed to be *learnable* — which is harder, and more useful.
+DBS control has every structural property that makes RL both necessary and tractable — and that breaks every classical controller:
 
-DBS control for Parkinson's has every structural property that makes RL both necessary and tractable:
+- **Decisions compound over time.** A wrong dose at step 10 echoes for 140 more steps. The agent must think across the episode, not just react to the current snapshot.
+- **No fixed optimal policy.** The right settings depend on patient profile, disease phase, medication level, and what the agent has already done. A lookup table won't work.
+- **Partial observability.** The agent sees noisy sensor readings — just like a real DBS device. The true neural state is hidden. It must infer and act under uncertainty.
+- **Dense reward every 20 ms.** Every action gets a signal. Credit assignment is tractable and clinically grounded.
+- **Multi-objective, no shortcuts.** Beta suppression, tremor reduction, force preservation, and side-effect budget must all be satisfied simultaneously. Maxing any one collapses the others. We tested 15 gaming strategies — all are explicitly blocked.
+- **Non-stationary dynamics.** Tachyphylaxis, medication dropout, and motor surges change the environment mid-episode. The policy has to keep working on a brain that is actively fighting back.
 
-**Sequential decisions that compound.** Every stimulation setting changes the brain state the agent will see at the next step. A bad choice at step 10 echoes forward for 140 more steps. A fixed dose that works early in an episode may actively harm the patient by step 80. The agent has to think across time, not just react to the current snapshot.
-
-**No fixed optimal policy.** The right amplitude and pulse width depend on the patient's profile, the current disease phase, medication level, and the history of what the agent has already done. A lookup table won't work. A PID controller tuned for one patient fails on another. Only a policy that can read context and reason about combinations of signals can adapt.
-
-**Partial observability with real sensor noise.** The agent sees what a DBS device actually sees: noisy LFP readings and surface EMG. The true neural firing state is hidden. The agent must infer what's happening inside the brain from incomplete, noisy signals — and still act confidently enough to help.
-
-**Dense feedback every 20 ms.** Unlike most medical environments where outcomes arrive at discharge, DBS produces meaningful physiological signals at every timestep. Every action gets a reward. That makes credit assignment tractable and reward shaping clinically grounded, not arbitrary.
-
-**Multi-objective trade-off with no easy shortcut.** Beta suppression, tremor reduction, motor force preservation, side-effect budget, stimulation efficiency, movement smoothness — all simultaneously. Max out any one of them and the others collapse. The environment was explicitly designed so that every known single-objective gaming strategy fails. The only path to a high score is actually treating the patient.
-
-**Non-stationary dynamics.** Tachyphylaxis degrades DBS effectiveness over time. Medication wears off mid-episode. Motor surges fire stochastically. The environment doesn't sit still. A policy that works at step 1 has to keep working at step 150 — on a brain that has been actively fighting back.
-
-**Long-horizon budget management.** The side-effect load accumulates across the episode. An agent that over-stimulates early to lock in a good beta score will exhaust its safety budget and spend the second half of the episode in a clinically unacceptable regime. The agent has to plan, ration, and recover — not just react.
-
-> These are the exact challenges that break classical controllers. PID tracks a setpoint. A language model trained with RL reads the combination of signals, reasons about where the episode is heading, and adjusts strategy accordingly. That is the gap. MotorAssistEnv bridges it.
+> A PID controller tracks a setpoint. A language model trained with RL reads the combination of signals, reasons about where the episode is heading, and adjusts strategy. That is the gap MotorAssistEnv was built to close.
 
 ---
 
@@ -292,21 +280,6 @@ Every model passes easy. Medium and hard reveal the gap. The 7B model scores **0
 
 That is what a principled two-stage training pipeline does. A smaller model, trained for under 2 hours on free compute, learns to do what a 72B model barely manages zero-shot — and what a 7B model cannot do at all. Parameter count is not destiny. Training is.
 
-### Summary Numbers
-
-| | Value |
-|---|---|
-| Total training steps | **337** (67 + 270) |
-| GPU time | **116 minutes** on free Kaggle T4 |
-| KL drift from base | **+0.37** (0.41 → 0.77) |
-| Peak training reward | **0.985** (step 9) |
-| Format compliance | **100%** across 337 steps |
-| Trained 4B — easy | **0.830** ✅ |
-| Trained 4B — medium | **0.610** ✅ |
-| Trained 4B — hard | **0.480** ✅ |
-| 7B zero-shot — medium | 0.255 ❌ |
-| 7B zero-shot — hard | 0.019 ❌ |
-
 > Full training narrative with all plots: [Results.md](./Results.md)
 
 ---
@@ -358,12 +331,6 @@ model, tokenizer = FastLanguageModel.from_pretrained(
 )
 ```
 
-**Live environment:** [huggingface.co/spaces/virustechhacks/parkinsons_Motor](https://huggingface.co/spaces/virustechhacks/parkinsons_Motor)
-
-**Watch the demo:** [youtu.be/ocF6SzPHexE](https://youtu.be/ocF6SzPHexE)
-
-**Training logs:** [wandb.ai/daksh-jain24-spit/parkinsons-motor-env](https://wandb.ai/daksh-jain24-spit/parkinsons-motor-env)
-
 ---
 
 ## Why It Matters
@@ -392,12 +359,6 @@ An RL-trained LLM that passes this benchmark is a serious candidate for the clos
 
 ---
 
-## Scientific Grounding
-
-The environment dynamics are calibrated from Fleming et al. (2023, *J Neural Eng* 20(5):056029) — a Hodgkin-Huxley simulation of cortex, STN, GPe, GPi, thalamus, spinal motoneurons, and Hill-type muscle model (~5M synaptic connections). Force values are in real millinewtons. Beta values are normalised against real pre-DBS LFP recordings. The 12×15 DBS entrainment surface the agent navigates was published in that paper.
-
-Every reward term has a peer-reviewed citation. Every exploit block has been tested, documented, and confirmed blocked. Nothing here is hand-waved.
-
 ---
 
-*MIT License · [HF Space](https://huggingface.co/spaces/virustechhacks/parkinsons_Motor) · [Trained Model](https://huggingface.co/virustechhacks/dbs-grpo-qwen3-4b) · [Demo Video](https://youtu.be/ocF6SzPHexE) · [Colab Notebook](https://colab.research.google.com/drive/1zJTiyyTcD_BahARPGa_2xlzH9MGCb8ye?usp=sharing) · [WandB Logs](https://wandb.ai/daksh-jain24-spit/parkinsons-motor-env) · [GitHub](https://github.com/VirusHacks/parkinson-disease/) · OpenEnv Hackathon India 2026*
+*MIT License · OpenEnv Hackathon India 2026*
