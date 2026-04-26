@@ -16,6 +16,25 @@
     <body>
         <h1 hidden></h1> <!-- Puts the Lighthouse Score over 90 heheh-->
 
+        <div id="viewer-loader" class="viewer-loader" role="status" aria-live="polite">
+            <div class="viewer-loader-card">
+                <div class="viewer-loader-kicker">MotorAssist Preview</div>
+                <div class="viewer-loader-title">Preparing the 3D simulation</div>
+                <div id="viewer-loader-message" class="viewer-loader-message">Starting viewer bootstrap...</div>
+                <div class="viewer-loader-progress" aria-hidden="true">
+                    <div id="viewer-loader-bar" class="viewer-loader-bar"></div>
+                </div>
+                <div class="viewer-loader-meta">
+                    <span id="viewer-loader-phase">Booting</span>
+                    <span id="viewer-loader-elapsed">0s elapsed</span>
+                </div>
+                <p class="viewer-loader-note">
+                    First load can take 1-2 minutes while WebAssembly, meshes, and textures are downloaded.
+                    Please wait for the preview to appear before judging the scene.
+                </p>
+            </div>
+        </div>
+
         <div class="info top">
             <div class="shadow">
                 <a href="https://sites.google.com/view/myosuite/" target="_blank" rel="noopener">MyoSuite</a> Demo
@@ -40,5 +59,6 @@
         <script type="module" src="./examples/main.js"></script>
         <script type="module" src="./examples/brain-overlay.js"></script>
         <script type="module" src="./examples/viewer-controller.js"></script>
+        <script type="module" src="./examples/guided-tour.js"></script>
     </body>
 </html>

@@ -80,11 +80,15 @@ def _slow_llm_generate(*_args: Any, **_kwargs: Any) -> tuple[str, List[int], Lis
 
 def _test_warm_up_skips_without_torch() -> None:
     import parkinsons_Motor.train as train
+    from parkinsons_Motor.training import llm_eval
 
     if train.torch is not None:
         print("NOTE: torch installed — _warm_up_generation not validated here (needs real model).")
         return
-    train._warm_up_generation(None, None)  # type: ignore[arg-type]
+    # _warm_up_generation now lives in parkinsons_Motor.training.llm_eval
+    # (re-exported from train via sanity_check_rollout). It must still be a
+    # no-op when torch isn't available.
+    llm_eval._warm_up_generation(None, None)  # type: ignore[arg-type]
     print("OK: _warm_up_generation no-ops when torch is absent")
 
 
@@ -183,12 +187,144 @@ def _test_parse_action_handles_only_thinking() -> None:
     print("OK: parse_action falls back to thinking content when answer is empty")
 
 
+def _test_apply_chat_template_thinking_off() -> None:
+    """Default ``enable_thinking=False`` should not crash; should pass kwarg
+    when supported and silently fall back when not."""
+    import parkinsons_Motor.train as train
+
+    class _TokSupports:
+        seen: dict = {}
+        def apply_chat_template(self, msgs, tokenize=True, add_generation_prompt=False, **kw):
+            _TokSupports.seen = dict(kw)
+            return "TEMPL:" + str(msgs)
+
+    out = train.apply_chat_template(_TokSupports(), "sys", "user")
+    assert "TEMPL:" in out, out
+    assert _TokSupports.seen.get("enable_thinking") is False, _TokSupports.seen
+    print("OK: apply_chat_template defaults to enable_thinking=False")
+
+    out = train.apply_chat_template(_TokSupports(), "sys", "user", enable_thinking=True)
+    assert _TokSupports.seen.get("enable_thinking") is True, _TokSupports.seen
+    print("OK: apply_chat_template threads enable_thinking=True for demo")
+
+    class _TokRejects:
+        def apply_chat_template(self, msgs, tokenize=True, add_generation_prompt=False):
+            return "FALLBACK:" + str(msgs)
+
+    out = train.apply_chat_template(_TokRejects(), "sys", "user")
+    assert "FALLBACK:" in out, out
+    print("OK: apply_chat_template falls back when tokenizer rejects enable_thinking")
+
+
+def _test_training_package_imports() -> None:
+    """The new training/ package mirrors mhtruong1031's bio-experiment layout.
+
+    Just importing the public surface and round-tripping a tiny trajectory
+    is enough to catch typos, wrong types, broken paths, etc.
+    """
+    from parkinsons_Motor.training import (
+        DBSTrajectory,
+        DBSTrajectoryDataset,
+        EvaluationSuite,
+        MetricResult,
+    )
+    from parkinsons_Motor.training import (
+        CLINICAL_TARGETS,
+        compare_to_literature,
+    )
+
+    traj = DBSTrajectory(episode_id="test-ep", task_id="easy", seed=0, policy="constant")
+    for i in range(5):
+        traj.add_step(
+            action={"dbs_amplitude": 1.5, "dbs_pulse_width": 0.13, "dbs_frequency": 130.0},
+            observation={
+                "beta_arv": 0.6 - 0.05 * i,
+                "tremor_arv": 0.5 - 0.05 * i,
+                "side_effect_load": 0.3,
+                "grader_score": 0.0 if i < 4 else 0.78,
+                "episode_success": (i == 4),
+                "grader_components": {"beta": 0.4, "tremor": 0.3, "safety": 0.08},
+            },
+            reward=0.2 * (i + 1),
+            done=(i == 4),
+            parsed=True,
+        )
+
+    assert traj.n_steps == 5, traj.n_steps
+    assert abs(traj.total_reward - sum(0.2 * (i + 1) for i in range(5))) < 1e-9
+    assert traj.success is True
+    assert traj.grader_score == 0.78
+    assert traj.grader_components.get("beta") == 0.4
+
+    ds = DBSTrajectoryDataset([traj])
+    summary = ds.summary()
+    assert summary["n"] == 1, summary
+    assert summary["success_rate"] == 1.0, summary
+
+    online = EvaluationSuite.online_metrics([traj])
+    assert any(m.name == "mean_grader_score" and m.value == 0.78 for m in online), online
+
+    bench = EvaluationSuite.benchmark_metrics(ds)
+    bench_names = {m.name for m in bench}
+    assert {"final_beta_suppression", "clinical_amplitude_window",
+            "format_validity_rate"} <= bench_names, bench_names
+
+    clin = compare_to_literature(ds)
+    clin_names = {m.name for m in clin}
+    assert "median_amplitude" in clin_names and "mean_frequency" in clin_names, clin_names
+    assert all(isinstance(m, MetricResult) for m in clin)
+    assert any(t.unit == "mA" for t in CLINICAL_TARGETS)
+
+    print(f"OK: parkinsons_Motor.training imports + 1-traj round-trip "
+          f"(online={len(online)}, bench={len(bench)}, clinical={len(clin)})")
+
+
+def _test_train_reexports_plots_and_eval() -> None:
+    """train.py must re-export every plot_* / eval_* / sanity_check_rollout
+    symbol so the existing notebook import block keeps working unchanged.
+
+    The functions actually live in parkinsons_Motor.training.{plots,llm_eval}
+    after the refactor, but `from parkinsons_Motor.train import …` must still
+    succeed for backwards compatibility.
+    """
+    from parkinsons_Motor.train import (
+        compare_trajectories,
+        eval_with_adapter_disabled,
+        evaluate_model_on_task,
+        evaluate_model_suite,
+        plot_baseline_vs_trained,
+        plot_training_dashboard,
+        plot_training_loss,
+        sanity_check_rollout,
+        save_training_plots,
+    )
+    from parkinsons_Motor.training import llm_eval as _ll
+    from parkinsons_Motor.training import plots as _pl
+
+    # Identity check — re-exports must point to the SAME function objects so a
+    # monkeypatch on `train.sanity_check_rollout` can't get out of sync with
+    # `training.llm_eval.sanity_check_rollout` and silently diverge.
+    assert sanity_check_rollout is _ll.sanity_check_rollout
+    assert evaluate_model_on_task is _ll.evaluate_model_on_task
+    assert evaluate_model_suite is _ll.evaluate_model_suite
+    assert eval_with_adapter_disabled is _ll.eval_with_adapter_disabled
+    assert plot_training_dashboard is _pl.plot_training_dashboard
+    assert plot_training_loss is _pl.plot_training_loss
+    assert plot_baseline_vs_trained is _pl.plot_baseline_vs_trained
+    assert compare_trajectories is _pl.compare_trajectories
+    assert save_training_plots is _pl.save_training_plots
+    print("OK: train.py re-exports plot_* / eval_* / sanity_check_rollout from training/")
+
+
 def main() -> int:
     print("--- dry_run_rollout_eventloop ---")
     _test_parse_action_last_json()
     _test_parse_action_strips_code_fence()
     _test_parse_action_handles_only_thinking()
+    _test_apply_chat_template_thinking_off()
     _test_warm_up_skips_without_torch()
+    _test_training_package_imports()
+    _test_train_reexports_plots_and_eval()
     asyncio.run(_main_async())
     print("--- all dry-run checks passed ---")
     return 0

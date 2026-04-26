@@ -23,6 +23,21 @@ const EEG_W = 320;
 const EEG_H = 96;
 const PATHWAY_H = 64;
 
+// Skin / cortical flesh tone for the brain mesh — slightly desaturated pink.
+// Real cortex is closer to greyish-pink (Brodmann gray matter); we lean a
+// touch warmer for visual contrast against the dark panel background.
+const SKIN_COLOR = 0xd9a89a;
+const SKIN_EMISSIVE = 0x2a0d0a;
+
+// Anchor positions (pivot-local) for the neural activation hotspots and
+// nerve pathway endpoints. Picked to sit roughly over real anatomy on the
+// loaded GLTF brain so labels and fibers line up.
+const ANCHOR_M1_L = [-0.55, 0.95, 0.35];
+const ANCHOR_M1_R = [0.55, 0.95, 0.35];
+const ANCHOR_THALAMUS = [0.0, 0.05, 0.35];
+const ANCHOR_STN_L = [-0.17, -0.08, 0.04];
+const ANCHOR_STN_R = [0.17, -0.08, 0.04];
+
 function makeStat(label, value) {
   const span = document.createElement('span');
   span.appendChild(document.createTextNode(label + ' '));
@@ -44,6 +59,23 @@ class BrainOverlay {
     this.tipPositions = [];
     this.pulseGroups = [];
     this._stnMeshes = [];
+    // Brain mesh materials we override to skin tone — kept so we can pulse
+    // their emissive in localized regions during simulated neural firing.
+    this._brainMaterials = [];
+    // Cortical hotspots (small additive glow spheres at M1 and other regions).
+    // Each entry: { mesh, region: 'cortex'|'thalamus'|'stn', side: -1|0|1 }
+    this._hotspots = [];
+    // Nerve pathway tubes from cortex → thalamus → STN. Each tube has a
+    // material whose emissive intensity scales with active signal flow.
+    this._nerves = [];
+    // Traveling action-potential pulses sliding along the nerve curves.
+    this._actionPotentials = [];
+    // EEG sample timing — proper sample rate so beta/tremor look real.
+    this._eegSampleRate = 250;
+    this._eegLastT = -1;
+    this._eegPhase = { beta: 0, tremor: 0, mu: 0, motor: 0 };
+    this._betaBurstSeed = Math.random() * 1000;
+    this._noiseState = { lpfBeta: 0, lpfMotor: 0 };
     // Dual EEG ring buffers — pathological beta and DBS-corrected motor signal.
     this.betaBuffer = new Float32Array(EEG_W).fill(EEG_H * 0.30);
     this.motorBuffer = new Float32Array(EEG_W).fill(EEG_H * 0.72);
@@ -328,21 +360,22 @@ class BrainOverlay {
         model.position.sub(center.multiplyScalar(scale));
         model.position.y += 0.1;
 
+        // Override every brain mesh with a skin-tone material so the model
+        // renders as relaxed cortical tissue at baseline. Activation regions
+        // tint redder later via the hotspot/nerve overlay, not the cortex.
         model.traverse((child) => {
-          if (child.isMesh) {
-            child.castShadow = true;
-            child.receiveShadow = true;
-            if (child.material) {
-              const mats = Array.isArray(child.material) ? child.material : [child.material];
-              mats.forEach((mat) => {
-                if (mat.isMeshStandardMaterial || mat.isMeshPhongMaterial) {
-                  mat.roughness = Math.max(mat.roughness ?? 0.8, 0.72);
-                  mat.metalness = Math.min(mat.metalness ?? 0.0, 0.05);
-                  mat.envMapIntensity = 0.4;
-                }
-              });
-            }
-          }
+          if (!child.isMesh) { return; }
+          child.castShadow = true;
+          child.receiveShadow = true;
+          const skinMat = new THREE.MeshStandardMaterial({
+            color: SKIN_COLOR,
+            emissive: SKIN_EMISSIVE,
+            emissiveIntensity: 0.18,
+            roughness: 0.78,
+            metalness: 0.04,
+          });
+          child.material = skinMat;
+          this._brainMaterials.push(skinMat);
         });
 
         this.brainRoot = model;
@@ -351,6 +384,8 @@ class BrainOverlay {
         this._buildElectrodes();
         this._buildPulses();
         this._buildSTN();
+        this._buildHotspots();
+        this._buildNervePathways();
         this._buildAnatomicalLabels();
       },
       (xhr) => {
@@ -364,6 +399,8 @@ class BrainOverlay {
         this._buildElectrodes();
         this._buildPulses();
         this._buildSTN();
+        this._buildHotspots();
+        this._buildNervePathways();
         this._buildAnatomicalLabels();
       },
     );
@@ -387,25 +424,24 @@ class BrainOverlay {
     pos.needsUpdate = true;
     geo.computeVertexNormals();
 
-    const mesh = new THREE.Mesh(
-      geo,
-      new THREE.MeshStandardMaterial({ color: 0xbe7882, roughness: 0.84 }),
-    );
+    const skinMatA = new THREE.MeshStandardMaterial({
+      color: SKIN_COLOR, emissive: SKIN_EMISSIVE, emissiveIntensity: 0.18,
+      roughness: 0.78, metalness: 0.04,
+    });
+    const skinMatB = skinMatA.clone();
+    const skinMatC = skinMatA.clone();
+    this._brainMaterials.push(skinMatA, skinMatB, skinMatC);
+
+    const mesh = new THREE.Mesh(geo, skinMatA);
     mesh.scale.set(1.08, 0.87, 0.96);
     this.pivot.add(mesh);
 
-    const cbl = new THREE.Mesh(
-      new THREE.IcosahedronGeometry(0.42, 3),
-      new THREE.MeshStandardMaterial({ color: 0xbe7882, roughness: 0.84 }),
-    );
+    const cbl = new THREE.Mesh(new THREE.IcosahedronGeometry(0.42, 3), skinMatB);
     cbl.position.set(0, -0.72, -0.58);
     cbl.scale.set(1.3, 0.7, 0.9);
     this.pivot.add(cbl);
 
-    const stem = new THREE.Mesh(
-      new THREE.CylinderGeometry(0.13, 0.10, 0.58, 10),
-      new THREE.MeshStandardMaterial({ color: 0xbe7882, roughness: 0.84 }),
-    );
+    const stem = new THREE.Mesh(new THREE.CylinderGeometry(0.13, 0.10, 0.58, 10), skinMatC);
     stem.position.set(0, -1.02, -0.18);
     this.pivot.add(stem);
   }
@@ -455,15 +491,83 @@ class BrainOverlay {
   }
 
   _buildSTN() {
-    const mat = new THREE.MeshStandardMaterial({
-      color: 0xffcc44, emissive: 0xffaa00, emissiveIntensity: 1.8, roughness: 0.2,
-    });
-    for (const sx of [-0.17, 0.17]) {
-      const m = new THREE.Mesh(new THREE.SphereGeometry(0.05, 12, 12), mat.clone());
-      m.position.set(sx, -0.08, 0.04);
+    // STN nuclei: subtle skin-toned at idle, redden / brighten with beta_arv.
+    // The deep nuclei sit just below the thalamus on either side of midline.
+    for (const pos of [ANCHOR_STN_L, ANCHOR_STN_R]) {
+      const mat = new THREE.MeshStandardMaterial({
+        color: 0xc88a78, emissive: 0x2a0d09,
+        emissiveIntensity: 0.4, roughness: 0.45, metalness: 0.0,
+      });
+      const m = new THREE.Mesh(new THREE.SphereGeometry(0.05, 14, 14), mat);
+      m.position.set(...pos);
       this.pivot.add(m);
       this._stnMeshes.push(m);
     }
+  }
+
+  // Cortical hotspots: small additive-blended emissive spheres glued onto
+  // the cortex / deep nuclei. They bloom red as the corresponding signal
+  // (beta_arv at STN, tremor_arv at M1, etc.) rises — giving a physically-
+  // localized "that nerve cluster is firing" cue without recoloring the
+  // whole brain mesh.
+  _buildHotspots() {
+    const spec = [
+      { region: 'cortex_l', pos: ANCHOR_M1_L, baseColor: 0xff5544, radius: 0.07, side: -1 },
+      { region: 'cortex_r', pos: ANCHOR_M1_R, baseColor: 0xff5544, radius: 0.07, side: 1 },
+      { region: 'thalamus', pos: ANCHOR_THALAMUS, baseColor: 0xffaa44, radius: 0.07, side: 0 },
+      { region: 'stn_l', pos: ANCHOR_STN_L, baseColor: 0xff3322, radius: 0.075, side: -1 },
+      { region: 'stn_r', pos: ANCHOR_STN_R, baseColor: 0xff3322, radius: 0.075, side: 1 },
+    ];
+    spec.forEach((s) => {
+      const mat = new THREE.MeshBasicMaterial({
+        color: s.baseColor, transparent: true, opacity: 0.0,
+        blending: THREE.AdditiveBlending, depthWrite: false,
+      });
+      const mesh = new THREE.Mesh(new THREE.SphereGeometry(s.radius, 16, 16), mat);
+      mesh.position.set(...s.pos);
+      this.pivot.add(mesh);
+      this._hotspots.push({ mesh, region: s.region, side: s.side });
+    });
+  }
+
+  // Nerve pathway tubes connect M1 ↔ Thalamus ↔ STN on each side. They sit
+  // just below the cortex and route through the deep nuclei. Idle: invisible.
+  // Active: thin red tube + traveling action-potential pulses sliding along
+  // the curve, intensity scaled by signal load.
+  _buildNervePathways() {
+    const pathSpec = [
+      { id: 'm1_thal_stn_L', points: [ANCHOR_M1_L, [-0.20, 0.45, 0.35], ANCHOR_THALAMUS, ANCHOR_STN_L], color: 0xff3a2a, side: -1 },
+      { id: 'm1_thal_stn_R', points: [ANCHOR_M1_R, [0.20, 0.45, 0.35], ANCHOR_THALAMUS, ANCHOR_STN_R], color: 0xff3a2a, side: 1 },
+      { id: 'inter_stn', points: [ANCHOR_STN_L, [0.0, -0.12, 0.04], ANCHOR_STN_R], color: 0xff6a3a, side: 0 },
+    ];
+
+    pathSpec.forEach((p) => {
+      const curvePoints = p.points.map((pt) => new THREE.Vector3(...pt));
+      const curve = new THREE.CatmullRomCurve3(curvePoints, false, 'catmullrom', 0.4);
+      const tubeGeo = new THREE.TubeGeometry(curve, 48, 0.008, 8, false);
+      const tubeMat = new THREE.MeshBasicMaterial({
+        color: p.color, transparent: true, opacity: 0.0,
+        blending: THREE.AdditiveBlending, depthWrite: false,
+      });
+      const tube = new THREE.Mesh(tubeGeo, tubeMat);
+      this.pivot.add(tube);
+      this._nerves.push({ id: p.id, side: p.side, curve, tube, mat: tubeMat, baseColor: new THREE.Color(p.color) });
+
+      // Two action-potential pulses per fiber, phase-offset, traveling
+      // toward STN (cortex → deep) — i.e. descending command flow.
+      for (let k = 0; k < 2; k++) {
+        const apMat = new THREE.MeshBasicMaterial({
+          color: 0xffd0a8, transparent: true, opacity: 0.0,
+          blending: THREE.AdditiveBlending, depthWrite: false,
+        });
+        const apMesh = new THREE.Mesh(new THREE.SphereGeometry(0.022, 10, 10), apMat);
+        this.pivot.add(apMesh);
+        this._actionPotentials.push({
+          curve, mesh: apMesh, mat: apMat,
+          phase: k * 0.5, speed: 0.55 + Math.random() * 0.25, side: p.side,
+        });
+      }
+    });
   }
 
   _buildPulses() {
@@ -593,37 +697,84 @@ class BrainOverlay {
     const ctx = this.eegCtx;
     const beta = this.betaBuffer;
     const motor = this.motorBuffer;
-    beta.copyWithin(0, 1);
-    motor.copyWithin(0, 1);
+
+    const Fs = this._eegSampleRate;            // 250 Hz simulated sample rate
+    if (this._eegLastT < 0) { this._eegLastT = t - 1 / Fs; }
+    let nNew = Math.max(1, Math.min(EEG_W, Math.round((t - this._eegLastT) * Fs)));
+    this._eegLastT = t;
+
+    // Scroll buffers left by nNew samples.
+    if (nNew > 0 && nNew < EEG_W) {
+      beta.copyWithin(0, nNew);
+      motor.copyWithin(0, nNew);
+    }
 
     const betaArv = this.signalState.beta_arv;
     const tremor = this.signalState.tremor_arv;
     const dbs = this.signalState.dbs_entrainment;
     const sideFx = this.signalState.side_effect_load;
     const tracking = this.signalState.tracking_accuracy || 0;
+    const dbsAmp = clamp01(this.signalState.dbs_amplitude / 3.0);
+    const dbsFreq = Math.max(20, this.signalState.dbs_frequency || 130);
 
-    // Pathological STN beta: ~20 Hz oscillation, amplitude grows with beta_arv
-    // and tremor_arv. Sits in upper half of canvas around y=EEG_H*0.30.
+    // Beta-burst envelope — pathological STN beta in PD comes in bursts of
+    // ~150–400 ms rather than steady oscillation. Drive the envelope from a
+    // slow low-freq carrier modulated by beta_arv, then fully suppress it
+    // when DBS entrainment is high.
+    const burstMod = (st) => {
+      const slow = 0.5 + 0.5 * Math.sin(st * 5.3 + this._betaBurstSeed);
+      const burst = Math.max(0, Math.sin(st * 11.7 + this._betaBurstSeed * 0.3) ** 4);
+      const env = (0.35 + 0.65 * burst) * (0.45 + 0.55 * slow);
+      return env * (1 - 0.85 * dbs);
+    };
+
     const betaCenter = EEG_H * 0.30;
-    const betaAmp = 4 + 18 * betaArv + 8 * tremor;
-    const betaWave =
-      Math.sin(t * 125) * 0.55 +
-      Math.sin(t * 207) * 0.30 +
-      Math.sin(t * 47) * 0.15 +
-      Math.sin(t * 313) * (0.10 + tremor * 0.20);
-    beta[EEG_W - 1] = betaCenter + betaWave * betaAmp;
-
-    // Effective motor cortex output: clean smooth low-freq sinusoid that
-    // grows as DBS engages and tracking improves; lower noise floor as
-    // side-effect load drops.
     const motorCenter = EEG_H * 0.72;
-    const motorAmp = 4 + 14 * dbs + 6 * tracking;
-    const noise = (1 - dbs) * 4 + sideFx * 6;
-    const motorWave =
-      Math.sin(t * 6.5) * 0.7 +
-      Math.sin(t * 11.2) * 0.25 +
-      (Math.random() - 0.5) * noise * 0.18;
-    motor[EEG_W - 1] = motorCenter + motorWave * motorAmp;
+    // Synthesize new samples one timestep at a time so frequency content
+    // matches real Hz instead of being aliased by the 60fps render rate.
+    for (let n = 0; n < nNew; n++) {
+      const st = t - (nNew - 1 - n) / Fs;
+
+      // === STN local-field potential (top trace) ===
+      // Real PD STN LFP: dominant beta band 13–30 Hz, often peaking ~18–22 Hz,
+      // riding on ~8 µV/sqrt(Hz) 1/f background. Tremor adds a 4–6 Hz
+      // sub-band. DBS pulse artifact appears at the stim frequency.
+      const env = burstMod(st);
+      const beta1 = Math.sin(2 * Math.PI * 18 * st) * 0.55;
+      const beta2 = Math.sin(2 * Math.PI * 24 * st + 0.7) * 0.35;
+      const beta3 = Math.sin(2 * Math.PI * 30 * st + 1.3) * 0.18;
+      const tremorBand = Math.sin(2 * Math.PI * 5.2 * st) * (0.5 * tremor);
+      const harmonic = Math.sin(2 * Math.PI * 10.4 * st + 0.4) * (0.18 * tremor);
+      // 1/f-ish pink noise via cheap LPF on white noise.
+      this._noiseState.lpfBeta = 0.85 * this._noiseState.lpfBeta + 0.15 * (Math.random() - 0.5);
+      const pink = this._noiseState.lpfBeta * 1.3 + (Math.random() - 0.5) * 0.25;
+      // DBS stim artifact — short biphasic spike at dbsFreq, scaled by amp.
+      const dbsArt = dbsAmp > 0.02
+        ? Math.sin(2 * Math.PI * dbsFreq * st) * 0.45 * dbsAmp * (0.6 + 0.4 * Math.sin(2 * Math.PI * dbsFreq * st * 0.5))
+        : 0;
+
+      const betaSig = (beta1 + beta2 + beta3) * env * (0.6 + 1.0 * betaArv)
+        + tremorBand + harmonic + pink * (0.4 + 0.6 * (1 - dbs));
+      const betaAmp = 6 + 14 * Math.max(betaArv, tremor) + 4 * sideFx;
+      beta[EEG_W - nNew + n] = betaCenter + (betaSig + dbsArt) * betaAmp;
+
+      // === Motor cortex EEG (bottom trace) ===
+      // Healthy M1 EEG shows mu (8–12 Hz) at rest that desynchronizes during
+      // movement, then an event-related beta rebound. We model:
+      //   - mu rhythm whose amplitude ∝ (1 - movement)
+      //   - beta rebound rising with DBS entrainment + tracking
+      //   - movement-related cortical potential as a slow ~0.5 Hz drift
+      //   - white noise floor falling as DBS engages
+      const movement = clamp01(0.3 + 0.7 * tracking);
+      const muAmp = (0.5 + 0.5 * (1 - movement)) * (0.8 - 0.4 * dbs);
+      const mu = Math.sin(2 * Math.PI * 10 * st) * 0.55 * muAmp;
+      const motorBeta = Math.sin(2 * Math.PI * 20 * st + 0.4) * 0.35 * (0.4 + 0.7 * dbs);
+      const mrcp = Math.sin(2 * Math.PI * 0.6 * st) * 0.5 * tracking;
+      this._noiseState.lpfMotor = 0.78 * this._noiseState.lpfMotor + 0.22 * (Math.random() - 0.5);
+      const motorNoise = this._noiseState.lpfMotor * 1.2 + (Math.random() - 0.5) * (0.6 - 0.4 * dbs + sideFx);
+      const motorAmp = 5 + 12 * dbs + 6 * tracking;
+      motor[EEG_W - nNew + n] = motorCenter + (mu + motorBeta + mrcp + motorNoise * 0.55) * motorAmp;
+    }
 
     ctx.clearRect(0, 0, EEG_W, EEG_H);
     ctx.fillStyle = 'rgba(0,0,0,0.78)';
@@ -831,6 +982,97 @@ class BrainOverlay {
   }
 
   // -------------------------------------------------------------------------
+  // Activation drivers — keep brain skin-toned at rest, light up only
+  // localized regions when the agent state implies that pathway is firing.
+  // -------------------------------------------------------------------------
+
+  _driveHotspots(t, pathology, entrainment, warning) {
+    if (!this._hotspots.length) { return; }
+    const beta = this.signalState.beta_arv;
+    const tremor = this.signalState.tremor_arv;
+    const dbsAmp = clamp01(this.signalState.dbs_amplitude / 3.0);
+    this._hotspots.forEach((h) => {
+      let activity = 0;
+      let baseOpacity = 0;
+      if (h.region === 'stn_l' || h.region === 'stn_r') {
+        // STN hotspots driven by pathological beta + DBS spike; pulse at
+        // ~beta-burst rate. Damped when DBS controls the beta load.
+        const burstPulse = (Math.sin(t * 4.2 + (h.side || 1) * 0.7) ** 2);
+        activity = beta * (0.65 + 0.35 * burstPulse) + dbsAmp * 0.45;
+        activity *= (1 - 0.5 * entrainment);
+        baseOpacity = 0.18;
+      } else if (h.region === 'cortex_l' || h.region === 'cortex_r') {
+        // M1 hotspots driven by tremor + active motor command.
+        const tremorPulse = (0.5 + 0.5 * Math.sin(t * (2 * Math.PI * 5.2) + h.side));
+        activity = tremor * 0.9 * tremorPulse + pathology * 0.25;
+        baseOpacity = 0.10;
+      } else if (h.region === 'thalamus') {
+        // Thalamus relays the loop — glows when either pathology drives or
+        // DBS-shaped output is propagating.
+        activity = 0.4 * pathology + 0.55 * entrainment;
+        baseOpacity = 0.10;
+      }
+      activity = clamp01(activity);
+      h.mesh.material.opacity = baseOpacity + activity * 0.85;
+      // Color: pathology-red → over-stim purple → DBS-suppressed cyan.
+      const col = warning > 0.55
+        ? 0xc13cff
+        : (entrainment > pathology ? 0x32ffd4 : 0xff2a18);
+      h.mesh.material.color.set(col);
+      // Subtle scale pulse so it reads as living tissue.
+      const s = 1.0 + activity * 0.45 + Math.sin(t * 7 + h.side * 0.6) * 0.06 * activity;
+      h.mesh.scale.setScalar(s);
+    });
+  }
+
+  _driveNerves(t, pathology, entrainment, warning, pulsePower) {
+    if (!this._nerves.length) { return; }
+    const beta = this.signalState.beta_arv;
+    const tremor = this.signalState.tremor_arv;
+    const flow = clamp01(0.45 * pathology + 0.55 * entrainment);
+    this._nerves.forEach((n) => {
+      const target = warning > 0.55
+        ? new THREE.Color(0xc13cff)
+        : entrainment > pathology
+          ? new THREE.Color(0x32ffd4)
+          : new THREE.Color(0xff3a2a);
+      n.mat.color.copy(target);
+      n.mat.opacity = 0.05 + flow * 0.55 + Math.sin(t * 4.6 + n.side) * 0.08 * flow;
+    });
+    // Action potentials slide cortex → STN. Speed up with command rate
+    // (tremor + DBS). Brighten when pathway is hot.
+    this._actionPotentials.forEach((ap) => {
+      const speedScale = 0.4 + pathology * 1.2 + entrainment * 0.8 + tremor * 0.7;
+      ap.phase = (ap.phase + ap.speed * speedScale * 0.012) % 1;
+      const u = ap.phase;
+      const pos = ap.curve.getPointAt(u);
+      ap.mesh.position.copy(pos);
+      const head = Math.max(0, Math.sin(u * Math.PI));   // fade at endpoints
+      const visible = clamp01(0.35 * pathology + 0.65 * entrainment + 0.25 * pulsePower);
+      ap.mat.opacity = visible * head;
+      ap.mat.color.set(entrainment > pathology ? 0xa8ffe6 : 0xffe0b8);
+      const s = 0.7 + visible * 1.4;
+      ap.mesh.scale.setScalar(s);
+    });
+  }
+
+  // Brain mesh stays skin-toned. Only when something pathological is
+  // actively firing do we warm the emissive a touch — and even then it
+  // recedes immediately. Prevents the whole brain from glowing red.
+  _driveBrainTint(pathology, warning, entrainment) {
+    if (!this._brainMaterials.length) { return; }
+    const heat = clamp01(0.85 * pathology + 0.6 * warning - 0.3 * entrainment);
+    const baseEmissive = new THREE.Color(SKIN_EMISSIVE);
+    const hot = warning > 0.55 ? new THREE.Color(0x4a0a4a) : new THREE.Color(0x4a0d08);
+    const target = baseEmissive.clone().lerp(hot, heat);
+    const intensity = 0.18 + heat * 0.55;
+    this._brainMaterials.forEach((mat) => {
+      mat.emissive.copy(target);
+      mat.emissiveIntensity = intensity;
+    });
+  }
+
+  // -------------------------------------------------------------------------
   // Animation loop
   // -------------------------------------------------------------------------
 
@@ -854,15 +1096,30 @@ class BrainOverlay {
       tip.material.color.set(entrainment > pathology ? 0x00ffee : 0xffd447);
       tip.material.emissive.set(entrainment > pathology ? 0x00ffee : 0xff8a00);
     });
+    // STN baseline = skin-toned. Reddens with beta_arv / tremor; cyan when
+    // DBS suppresses; magenta when over-stimulation side-effects fire.
     this._stnMeshes.forEach((m, i) => {
       const controlled = entrainment > pathology * 0.75;
-      const color = warning > 0.55 ? 0xc13cff : (controlled ? 0x00ffc8 : 0xff3d2e);
-      m.material.color.set(color);
-      m.material.emissive.set(color);
-      m.material.emissiveIntensity = 0.9 + pathology * 3.4 + Math.sin(t * 6.0 + i * Math.PI) * 0.7;
+      const baseR = 0xc8 / 255, baseG = 0x8a / 255, baseB = 0x78 / 255;
+      const target = warning > 0.55
+        ? new THREE.Color(0xc13cff)
+        : controlled
+          ? new THREE.Color(0x00ffc8)
+          : new THREE.Color(0xff2a18);
+      const blend = Math.min(1, 0.15 + pathology * 1.1 + warning * 0.7 + (controlled ? 0.4 : 0));
+      const skinCol = new THREE.Color(baseR, baseG, baseB);
+      m.material.color.copy(skinCol.lerp(target, blend));
+      m.material.emissive.copy(target);
+      m.material.emissiveIntensity = 0.15 + pathology * 1.6 + warning * 0.9 + Math.sin(t * 6.0 + i * Math.PI) * 0.25 * pathology;
     });
-    this.innerGlow.color.set(warning > 0.55 ? 0xc13cff : 0x00ffcc);
-    this.innerGlow.intensity = 0.2 + entrainment * 1.8 + pathology * 0.7 + warning * 0.8;
+    this.innerGlow.color.set(warning > 0.55 ? 0xc13cff : (entrainment > pathology ? 0x00ffcc : 0xff5544));
+    // Inner glow only kicks in when something is actively firing — prevents
+    // the brain from being lit red at rest.
+    this.innerGlow.intensity = 0.05 + entrainment * 1.4 + pathology * 0.8 + warning * 0.9;
+
+    this._driveHotspots(t, pathology, entrainment, warning);
+    this._driveNerves(t, pathology, entrainment, warning, pulsePower);
+    this._driveBrainTint(pathology, warning, entrainment);
 
     this.pulseGroups.forEach((group) => {
       group.forEach((shell) => {

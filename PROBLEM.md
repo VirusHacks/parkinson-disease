@@ -103,54 +103,57 @@ Every observation the RL agent will ever see is a transformation of this calibra
 
 ## 4. System Architecture
 
+Five layers, cleanly separated so the RL training loop never blocks on 3D rendering and the grader never touches the agent's observation path.
+
 ```
-═══════════════════════════════════════════════════════════════════
-                    DATA LAYER (offline, fixed)
-═══════════════════════════════════════════════════════════════════
-
-  parkinsons_Motor/fleming-model-based-brain/
-  ├── Model_Results/              ← 34 CSV controller files
-  │   ├── tremor_ARV_Observer_values.csv
-  │   ├── beta_ARV_Observer_values.csv
-  │   ├── Force_amplitude_values.csv  (6.7M samples)
-  │   └── ... (31 more files)
-  ├── Collaterals_Entrained_values.txt  ← 12×15 DBS sweep
-  ├── DBS_Amplitude_Interpolation_values.txt
-  └── DBS_Pulse_Width_Interpolation_values.txt
-
-═══════════════════════════════════════════════════════════════════
-                    CALIBRATION (runs once, cached)
-═══════════════════════════════════════════════════════════════════
-
-  parkinsons_Motor/core/calibration.py
-  └── calibrate() → CalibratedBrainState
-      ├── 100-step timeline of WindowFeatures
-      ├── Normalization bounds (from actual data maxima)
-      ├── Physiological baselines (pre-DBS median values)
-      └── 12×15 DBS entrainment matrix
-
-═══════════════════════════════════════════════════════════════════
-                    OPENENV ENVIRONMENT (online, per-episode)
-═══════════════════════════════════════════════════════════════════
-
-  parkinsons_Motor/
-  ├── tasks/dbs_tasks.py          ← 3 clinical task specs (frozen dataclasses)
-  ├── graders/dbs_graders.py      ← 3 deterministic graders (0.0–1.0)
-  ├── core/models.py              ← Pydantic Action + Observation types
-  ├── server/
-  │   ├── parkinsons_Motor_environment.py  ← reset/step/state logic
-  │   └── app.py                           ← FastAPI server
-  └── client.py                   ← WebSocket client for inference
-
-═══════════════════════════════════════════════════════════════════
-                    VISUALISATION (separate, demo only)
-═══════════════════════════════════════════════════════════════════
-
-  static/myosuite_demo/           ← MyoSuite WebGL 3D arm visualiser
-  /viewer endpoint                ← serves the demo
-  Bridge: polls backend for tremor_arv → drives 3D arm jitter
-  As agent suppresses beta → arm smoothes → patient performs task
+  ┌──────────────────────────────────────────────────────┐
+  │  Biophysical Data Layer  (offline, fixed)             │
+  │                                                       │
+  │  34 CSVs: beta, tremor, force, sEMG timelines        │
+  │  3 TXTs: 12×15 DBS entrainment sweep                 │
+  │  Source: Fleming et al. (2023), peer-reviewed         │
+  └────────────────────┬─────────────────────────────────┘
+                       │  loaded once at startup
+                       ▼
+  ┌──────────────────────────────────────────────────────┐
+  │  Brain Calibrator  (runs once, cached)                │
+  │                                                       │
+  │  calibrate() → CalibratedBrainState                  │
+  │  · 100-step physiological anchor (t = 10–12 s)       │
+  │  · Normalisation bounds from data maxima              │
+  │  · Pre-DBS baselines (β, tremor, force)               │
+  │  · Bilinear DBS entrainment surface                   │
+  └────────────────────┬─────────────────────────────────┘
+                       │  calibrated state
+                       ▼
+  ┌──────────────────────────────────────────────────────┐     ┌─────────────────────┐
+  │  MotorAssist Environment  (online, per-episode)       │────►│  3D Viewer          │
+  │                                                       │     │                     │
+  │  10 task specs  ·  9-component grader                │     │  MyoSuite arm model │
+  │  Pydantic Action / Observation models                │     │  driven by          │
+  │  reset() / step() / state()  via FastAPI             │     │  tremor_arv live     │
+  │  Stochastic events · Patient profiles                │     │  (not in RL loop)   │
+  └────────────────────┬─────────────────────────────────┘     └─────────────────────┘
+                       │  obs (30 floats)  ↕  action (4 floats)
+                       ▼
+  ┌──────────────────────────────────────────────────────┐
+  │  Agent  (Qwen3-4B + LoRA, trained via GRPO)          │
+  │                                                       │
+  │  Reads: beta, tremor, force, device state, trends    │
+  │  Writes: dbs_amplitude, pulse_width, freq, motor_cmd │
+  └────────────────────┬─────────────────────────────────┘
+                       │  episode return
+                       ▼
+  ┌──────────────────────────────────────────────────────┐
+  │  Grader  (deterministic math, no LLM-as-judge)       │
+  │                                                       │
+  │  Reads latent _beta_state directly                   │
+  │  9 components · task-varying weights                 │
+  │  score ∈ [0.0, 1.0]                                  │
+  └──────────────────────────────────────────────────────┘
 ```
+
+The grader reads `self._beta_state` directly; the agent reads it through Gaussian sensor noise via `_make_obs`. There is no API path from agent action to grader buffer — sensor-fooling is structurally impossible.
 
 ---
 

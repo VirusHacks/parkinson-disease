@@ -6,8 +6,66 @@ import { DragStateManager } from './utils/DragStateManager.js';
 import { setupGUI, downloadExampleScenesFolder, loadSceneFromURL, getPosition, getQuaternion, toMujocoPos, standardNormal } from './mujocoUtils.js';
 import   load_mujoco        from '../dist/mujoco_wasm.js';
 
+function createBootLoader() {
+  const root = document.getElementById('viewer-loader');
+  if (!root) {
+    return {
+      setPhase() {},
+      fail(error) { throw error; },
+      complete() {},
+    };
+  }
+
+  const messageNode = document.getElementById('viewer-loader-message');
+  const phaseNode = document.getElementById('viewer-loader-phase');
+  const elapsedNode = document.getElementById('viewer-loader-elapsed');
+  const barNode = document.getElementById('viewer-loader-bar');
+  const start = Date.now();
+
+  const renderElapsed = () => {
+    const seconds = Math.floor((Date.now() - start) / 1000);
+    elapsedNode.textContent = `${seconds}s elapsed`;
+  };
+
+  renderElapsed();
+  const timer = window.setInterval(renderElapsed, 1000);
+
+  return {
+    setPhase(phase, message, progress) {
+      phaseNode.textContent = phase;
+      messageNode.textContent = message;
+      if (typeof progress === 'number') {
+        barNode.style.width = `${Math.max(8, Math.min(100, progress * 100))}%`;
+      }
+    },
+    fail(error) {
+      window.clearInterval(timer);
+      root.classList.remove('is-hidden');
+      root.classList.add('is-error');
+      phaseNode.textContent = 'Load failed';
+      messageNode.textContent = error?.message || 'The 3D preview failed to initialize.';
+      barNode.style.width = '100%';
+      elapsedNode.textContent = 'Please refresh and try again.';
+      throw error;
+    },
+    complete() {
+      window.clearInterval(timer);
+      barNode.style.width = '100%';
+      phaseNode.textContent = 'Ready';
+      messageNode.textContent = 'Preview ready. Launching the live 3D scene...';
+      window.setTimeout(() => {
+        root.classList.add('is-hidden');
+      }, 250);
+    },
+  };
+}
+
+const bootLoader = createBootLoader();
+bootLoader.setPhase('Booting', 'Starting MuJoCo WebAssembly runtime...', 0.08);
+
 // Load the MuJoCo Module
 const mujoco = await load_mujoco();
+bootLoader.setPhase('Downloading assets', 'Fetching scene files, meshes, and textures for the first preview...', 0.32);
 
 // Set up Emscripten's Virtual File System
 var initialScene = "myo_sim/elbow/myo_elbow_combined.xml";
@@ -15,6 +73,7 @@ mujoco.FS.mkdir('/working');
 mujoco.FS.mount(mujoco.MEMFS, { root: '.' }, '/working');
 // Download the the examples to MuJoCo's virtual file system
 await downloadExampleScenesFolder(mujoco);
+bootLoader.setPhase('Building scene', 'Loading the musculoskeletal model into Three.js. This is the slowest step on first load...', 0.68);
 
 export class MuJoCoDemo {
   constructor() {
@@ -29,6 +88,16 @@ export class MuJoCoDemo {
     this.params = { scene: initialScene, paused: false, help: false, ctrlnoiserate: 0.0, ctrlnoisestd: 0.0, keyframeNumber: 0 };
     this.mujoco_time = 0.0;
     this.agentMotorState = null;
+    // Motion mode is set by viewer-controller when a task is selected:
+    //   tap | pinch | tremor | flex | gait | cycle. Drives the per-actuator
+    //   waveform shape so each body part performs its UPDRS-style motion.
+    this.bodyMotionMode = 'tremor';
+    // Gate flag — body holds its rest pose (zero ctrl) until the viewer
+    // controller flips this on. Set true on Connect (WS) or Start (SSE),
+    // back to false on Disconnect / Stop. Prevents the limb from twitching
+    // in the background before the user has actually launched the agent.
+    this.bodyActive = false;
+    this._lastAgentStateMs = 0;
     this.bodies  = {}, this.lights = {};
     this.tmpVec  = new THREE.Vector3();
     this.tmpQuat = new THREE.Quaternion();
@@ -91,6 +160,25 @@ export class MuJoCoDemo {
 
   async switchScene(scenePath) {
     this.params.scene = scenePath;
+    // Strip the previous body root before loading the new one. Without this
+    // every swap stacks another skeleton on top of the previous one (the
+    // old bodies/lights/instanced tendon meshes never get GC'd because the
+    // group is still parented to the THREE scene). Match what reloadFunc()
+    // in mujocoUtils does on the GUI dropdown path.
+    const prev = this.scene.getObjectByName('MuJoCo Root');
+    if (prev) {
+      this.scene.remove(prev);
+      prev.traverse((node) => {
+        if (node.geometry) { node.geometry.dispose(); }
+        if (node.material) {
+          const mats = Array.isArray(node.material) ? node.material : [node.material];
+          mats.forEach((m) => m && m.dispose && m.dispose());
+        }
+      });
+    }
+    this.bodies = {};
+    this.lights = {};
+    this.mujocoRoot = null;
     [this.model, this.state, this.simulation, this.bodies, this.lights] =
       await loadSceneFromURL(this.mujoco, this.params.scene, this);
     this.simulation.forward();
@@ -120,54 +208,106 @@ export class MuJoCoDemo {
       dbsAmp: Math.max(0, Number(action.dbs_amplitude ?? obs.dbs_amplitude_ma ?? 0)),
       step: Number(snapshot?.step ?? 0),
     };
+    this._lastAgentStateMs = performance.now();
+  }
+
+  // Per-mode waveform shape applied to each actuator. Returns a value in
+  // roughly [-1, 1] before clamp; the caller scales to ctrl range.
+  // Real PD signatures:
+  //   tap     — UPDRS finger taps: large rhythmic open/close at ~3 Hz with
+  //             decrement (amplitude shrinks with bradykinesia).
+  //   pinch   — sustained low-frequency posture with 5 Hz tremor overlay.
+  //   tremor  — pure 4–6 Hz rest tremor envelope.
+  //   flex    — slow elbow flex/extend at ~0.5 Hz with cogwheel bursts.
+  //   gait    — alternating leg cycle ~1 Hz with foot push-off pulse.
+  //   cycle   — exercise burst, faster 1.6 Hz cycling on legs.
+  _motorWaveform(mode, timeMS, actuatorIdx, s) {
+    const t = timeMS * 0.001;
+    const freq = (hz) => Math.sin(2 * Math.PI * hz * t + actuatorIdx * 0.7);
+    switch (mode) {
+      case 'tap': {
+        // Bradykinesia: amplitude decrement when beta is high.
+        const decrement = 1 - 0.45 * s.beta * (0.5 + 0.5 * Math.sin(t * 0.3));
+        return Math.sign(freq(3.0)) * 0.8 * decrement * (actuatorIdx % 3 === 0 ? 1.0 : 0.6);
+      }
+      case 'pinch': {
+        const posture = Math.sin(t * 0.6 + actuatorIdx * 0.4) * 0.5 + 0.3;
+        const tremor = Math.sin(2 * Math.PI * 5.2 * t + actuatorIdx) * 0.35 * s.tremor;
+        return posture + tremor;
+      }
+      case 'tremor': {
+        // Mostly rest — slight tonic, big 5 Hz oscillation.
+        return Math.sin(2 * Math.PI * 5 * t + actuatorIdx * 1.1) * (0.35 + 0.65 * s.tremor) * 0.7;
+      }
+      case 'flex': {
+        const slow = Math.sin(2 * Math.PI * 0.5 * t) * 0.85;
+        const cogwheel = Math.sin(2 * Math.PI * 6.5 * t + actuatorIdx) * 0.18 * s.beta;
+        return slow + cogwheel;
+      }
+      case 'gait': {
+        // Alternate left/right by actuator parity. Push-off pulse at ~1 Hz.
+        const cycle = Math.sin(2 * Math.PI * 1.0 * t + (actuatorIdx % 2 === 0 ? 0 : Math.PI));
+        const pushoff = Math.max(0, Math.sin(2 * Math.PI * 1.0 * t)) ** 4 * 0.4;
+        return cycle * 0.8 + pushoff * (actuatorIdx % 2 === 0 ? 1 : -1);
+      }
+      case 'cycle': {
+        return Math.sin(2 * Math.PI * 1.6 * t + (actuatorIdx % 2 === 0 ? 0 : Math.PI)) * 0.85;
+      }
+      default:
+        return Math.sin(t * 0.004 * 1000 + actuatorIdx * 0.8) * 0.3;
+    }
   }
 
   _applyAgentMotorControls(timeMS) {
-    if (!this.agentMotorState || !this.simulation || !this.model || !this.simulation.ctrl) { return; }
+    if (!this.simulation || !this.model || !this.simulation.ctrl) { return; }
+
+    // Body is gated — sit at zero ctrl until the controller (Connect or
+    // Start) flips bodyActive on. Avoids "pre-show" twitching.
+    if (!this.bodyActive) {
+      for (let i = 0; i < this.model.nu; i++) {
+        this.simulation.ctrl[i] = 0;
+      }
+      return;
+    }
+    if (!this.agentMotorState) {
+      // Connected but no state yet — hold rest pose.
+      for (let i = 0; i < this.model.nu; i++) {
+        this.simulation.ctrl[i] = 0;
+      }
+      return;
+    }
     const s = this.agentMotorState;
 
-    // Effective tremor amplitude: starts from obs.tremor_arv but is suppressed
-    // proportional to DBS entrainment. This is the visual story — once DBS
-    // engages, the actuator-level tremor wave shrinks toward zero.
-    const dbsSuppression = 0.20 + 0.80 * s.entrainment;        // [0.2, 1.0]
+    const mode = this.bodyMotionMode || 'tremor';
+    const dbsSuppression = 0.20 + 0.80 * s.entrainment;
+    // DBS reins in the pathological component but doesn't kill voluntary
+    // movement — that's the whole point of well-tuned stimulation.
     const visibleTremor = s.tremor * (1.0 - 0.85 * s.entrainment);
-
-    // Parkinson rest tremor sits at 4–6 Hz. timeMS is in ms; angular freq is
-    // 2π * f / 1000. Use 5 Hz primary + 9 Hz harmonic to look organic.
-    const omega5 = (2 * Math.PI * 5) / 1000;
-    const omega9 = (2 * Math.PI * 9) / 1000;
-    const tremorWave =
-      Math.sin(timeMS * omega5) * 0.85 +
-      Math.sin(timeMS * omega9 + 0.7) * 0.18;
-
-    // Dyskinesia (over-stimulation) shows up as faster, jittery wobble when
-    // side_effect_load is high — different visual signature than tremor.
     const dyskinesia = s.sideEffect > 0.35
       ? Math.sin(timeMS * 0.018) * (s.sideEffect - 0.25) * 0.6
       : 0;
 
-    const slowWave = Math.sin(timeMS * 0.003 + s.step * 0.12);
-    const movement = (s.effective || s.target || slowWave * 0.35) * (0.35 + s.force * 0.75);
-    const stiffness = 1.0 - s.beta * 0.42;
-    const tremorComponent = tremorWave * visibleTremor * 0.85;
-    const drive = Math.max(-1, Math.min(1, movement * stiffness + tremorComponent + dyskinesia));
-
     for (let i = 0; i < this.model.nu; i++) {
       const lo = this.model.actuator_ctrlrange ? this.model.actuator_ctrlrange[2 * i] : -1;
       const hi = this.model.actuator_ctrlrange ? this.model.actuator_ctrlrange[2 * i + 1] : 1;
+      // Sign alternation gives the limb agonist/antagonist contrast so it
+      // doesn't co-contract into stiffness.
       const polarity = i % 2 === 0 ? 1 : -0.65;
-      // Per-actuator tremor phase scatter so the limb shakes (not breathes).
-      const tremorPhase =
-        Math.sin(timeMS * omega5 + i * 1.7) * visibleTremor * 0.45;
-      const phase = Math.sin(timeMS * 0.004 + i * 0.8) * 0.18;
-      const value = Math.max(
-        lo,
-        Math.min(hi, (drive + phase * s.force + tremorPhase) * polarity),
-      );
+
+      // Voluntary motor command shaped by task mode.
+      const taskWave = this._motorWaveform(mode, timeMS, i, s);
+      // Tremor overlay sits on top of every actuator with phase scatter.
+      const tremorPhase = Math.sin((2 * Math.PI * 5.0 * timeMS) / 1000 + i * 1.7) * visibleTremor * 0.45;
+      // Beta-band rigidity drag scales the voluntary command down.
+      const stiffness = 1.0 - s.beta * (0.45 - 0.25 * s.entrainment);
+      // Effective motor command from agent — fall back to taskWave when no
+      // explicit target is being streamed.
+      const directDrive = (s.effective || s.target || 0) * (0.35 + s.force * 0.75);
+      const drive = directDrive * stiffness + taskWave * (0.6 + 0.4 * s.force);
+
+      const value = Math.max(lo, Math.min(hi, (drive + tremorPhase + dyskinesia) * polarity));
       this.simulation.ctrl[i] = value;
     }
-    // dbsSuppression is intentionally referenced for future per-muscle gain
-    // shaping; touched here so linters don't strip it.
     void dbsSuppression;
   }
 
@@ -335,6 +475,15 @@ export class MuJoCoDemo {
   }
 }
 
-let demo = new MuJoCoDemo();
-await demo.init();
-window.myoDemo = demo;
+try {
+  const demo = new MuJoCoDemo();
+  bootLoader.setPhase('Initializing viewer', 'Creating the renderer, camera, and simulation state...', 0.84);
+  await demo.init();
+  bootLoader.setPhase('Finalizing', 'Attaching the interactive preview and controls...', 0.96);
+  window.myoDemo = demo;
+  window.dispatchEvent(new CustomEvent('myoDemo:ready'));
+  bootLoader.complete();
+} catch (error) {
+  console.error(error);
+  bootLoader.fail(error);
+}

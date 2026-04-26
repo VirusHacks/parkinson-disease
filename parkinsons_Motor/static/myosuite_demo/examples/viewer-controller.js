@@ -56,6 +56,24 @@ const PARTS = [
   { label: 'Myo Finger', scene: 'myo_sim/finger/myo_finger_v0.xml' },
 ];
 
+// Each task maps to the body model that best illustrates its clinical motif.
+// UPDRS-III examination gives us a vocabulary: finger taps (bradykinesia),
+// hand posture / tremor, leg gait, elbow rigidity / pronation. We route the
+// 3D body to the model that most cleanly shows the motor signature for the
+// scenario the agent is currently solving.
+const TASK_TO_PART = {
+  easy: { scene: 'myo_sim/finger/motor_finger_v0.xml', label: 'Finger taps (rest tremor)', motion: 'tap' },
+  medium: { scene: 'myo_sim/hand/myo_hand_combined.xml', label: 'Hand posture / pinch', motion: 'pinch' },
+  hard: { scene: 'myo_sim/myolegs/myolegs_v0.5(mj231).mjb', label: 'Gait — full body episode', motion: 'gait' },
+  fragile_patient: { scene: 'myo_sim/finger/myo_finger_v0.xml', label: 'Fragile finger window', motion: 'tap' },
+  refractory_patient: { scene: 'myo_sim/hand/myo_hand_combined.xml', label: 'Hand — drug-resistant tremor', motion: 'tremor' },
+  personalization_generalization: { scene: 'myo_sim/elbow/myo_elbow_combined.xml', label: 'Elbow flex — mixed profile', motion: 'flex' },
+  exercise_bout: { scene: 'myo_sim/myolegs/myolegs_v0.5(mj231).mjb', label: 'Leg cycling burst', motion: 'cycle' },
+  medication_interaction: { scene: 'myo_sim/hand/myo_hand_combined.xml', label: 'Hand — L-DOPA window', motion: 'tap' },
+  nocturnal_transition: { scene: 'myo_sim/hand/myo_hand_combined.xml', label: 'Hand at rest — sleep', motion: 'tremor' },
+  surgical_followup: { scene: 'myo_sim/finger/motor_finger_v0.xml', label: 'Precision finger — post-implant', motion: 'tap' },
+};
+
 const EVENT_DISPLAY = {
   tachyphylaxis: { label: 'Tachyphylaxis', tone: 'warn', icon: '⚠', detail: 'tolerance building — entrainment dropping' },
   off_med_crisis: { label: 'L-DOPA OFF', tone: 'crisis', icon: '💊', detail: 'medication trough — beta surge incoming' },
@@ -148,6 +166,16 @@ class ViewerController {
     // Active events seen on the latest observation, used to render chips.
     this.activeEvents = [];
 
+    // Tracks which body scene is currently loaded so we don't re-load when
+    // the same task fires repeatedly (scene swap is a 1–2s blocker).
+    this._activeScene = null;
+    this._activeMotion = null;
+    this._partSwitchInFlight = null;
+
+    // Last reported observation values, used to compute step-over-step
+    // deltas so the UI can call out "beta dropped 0.18 from this Step".
+    this._prevObsForDelta = null;
+
     this._buildUI();
     this._setStatus('Ready');
   }
@@ -155,9 +183,10 @@ class ViewerController {
   async init() {
     this.brain = await waitForGlobal('motorAssistBrain');
     this.body = await waitForGlobal('myoDemo');
-    this.partSelect.value = this.body?.params?.scene || PARTS[0].scene;
-    this.partMeta.textContent = `Loaded | ${this._partLabelForScene(this.partSelect.value)}`;
     this._setStatus('Viewer connected');
+    // Once both halves are alive, prime the body scene to match the default
+    // task so the user sees the right limb before they touch anything.
+    this._autoSwitchPartForTask(this.taskSelect.value, { silent: true });
   }
 
   // ----------------------------------------------------------------------
@@ -231,7 +260,6 @@ class ViewerController {
     document.body.appendChild(this.panel);
 
     this._buildOpenEnvDock();
-    this._buildPartDock();
   }
 
   _buildOpenEnvDock() {
@@ -250,9 +278,11 @@ class ViewerController {
     this.manualTaskSelect.value = this.taskSelect.value;
     this.manualTaskSelect.addEventListener('change', () => {
       this.taskSelect.value = this.manualTaskSelect.value;
+      this._autoSwitchPartForTask(this.manualTaskSelect.value);
     });
     this.taskSelect.addEventListener('change', () => {
       this.manualTaskSelect.value = this.taskSelect.value;
+      this._autoSwitchPartForTask(this.taskSelect.value);
     });
     taskRow.append(taskLabel, this.manualTaskSelect);
 
@@ -290,10 +320,53 @@ class ViewerController {
     buttonRow.append(this.connectApiButton, this.stepApiButton, this.resetApiButton, this.disconnectApiButton);
 
     this.openEnvMeta = el('div', 'openenv-meta', 'Click Connect to open a persistent OpenEnv session.');
+    this.bodyIndicator = el('div', 'openenv-meta body-indicator', 'Body: —');
     this.jsonOutput = el('pre', 'openenv-json', '{\n  "status": "ready"\n}');
 
-    this.openEnvDock.append(header, taskRow, inputGrid, buttonRow, this.openEnvMeta, this.jsonOutput);
+    this.openEnvDock.append(header, taskRow, inputGrid, buttonRow, this.openEnvMeta, this.bodyIndicator, this.jsonOutput);
     document.body.appendChild(this.openEnvDock);
+  }
+
+  // Resolve task → body part and ask the MuJoCo viewer to swap scenes.
+  // Idempotent: same scene won't re-trigger a load. Concurrent calls share
+  // a single in-flight promise so rapid task toggling doesn't queue loads.
+  async _autoSwitchPartForTask(taskId, opts = {}) {
+    const mapping = TASK_TO_PART[taskId];
+    if (!mapping) { return; }
+    if (this.bodyIndicator) {
+      this.bodyIndicator.textContent = `Body: ${mapping.label}`;
+    }
+    if (mapping.scene === this._activeScene) {
+      this._activeMotion = mapping.motion;
+      if (this.body) { this.body.bodyMotionMode = mapping.motion; }
+      return;
+    }
+    if (this._partSwitchInFlight) {
+      try { await this._partSwitchInFlight; } catch {}
+    }
+    if (!this.body?.switchScene) { return; }
+    if (!opts.silent) {
+      this.openEnvMeta.textContent = `Loading body — ${mapping.label}`;
+    }
+    this._partSwitchInFlight = (async () => {
+      try {
+        await this.body.switchScene(mapping.scene);
+        this._activeScene = mapping.scene;
+        this._activeMotion = mapping.motion;
+        this.body.bodyMotionMode = mapping.motion;
+        if (!opts.silent) {
+          this.openEnvMeta.textContent = `Body ready — ${mapping.label}`;
+        }
+      } catch (error) {
+        if (!opts.silent) {
+          this.openEnvMeta.textContent = `Body load failed | ${error.message}`;
+        }
+        console.error('[viewer] auto-switch failed', error);
+      } finally {
+        this._partSwitchInFlight = null;
+      }
+    })();
+    return this._partSwitchInFlight;
   }
 
   _buildPartDock() {
@@ -390,6 +463,9 @@ class ViewerController {
       this.connectApiButton.disabled = true;
       this.openEnvMeta.textContent = 'Session ready. Loading task...';
       this._setStatus('Session connected');
+      // Connect = body live. Limb starts holding rest pose, then drives
+      // from the agent observation as soon as the first reset/step lands.
+      if (this.body) { this.body.bodyActive = true; }
       // Auto-reset on connect so the env loads the chosen task immediately.
       await this.resetViaSession();
     } catch (error) {
@@ -482,6 +558,8 @@ class ViewerController {
     this.resetApiButton.disabled = true;
     this.disconnectApiButton.disabled = true;
     this.connectApiButton.disabled = false;
+    if (this.body) { this.body.bodyActive = false; }
+    this._prevObsForDelta = null;
     this.openEnvMeta.textContent = 'Session closed.';
     this._setStatus('Session closed');
   }
@@ -497,12 +575,14 @@ class ViewerController {
     try {
       this.openEnvMeta.textContent = 'Resetting environment...';
       const taskId = this.manualTaskSelect.value;
+      await this._autoSwitchPartForTask(taskId);
       const { data } = await this._wsRequest({
         type: 'reset',
         data: { task_id: taskId },
       });
       this.wsCurrentTaskId = taskId;
       this.wsStepCount = 0;
+      this._prevObsForDelta = null;
       const observation = data?.observation || data;
       const snapshot = this._buildSnapshotFromApi('reset', { observation }, null);
       this._syncManualInputsFromObservation(snapshot.observation);
@@ -533,18 +613,99 @@ class ViewerController {
       });
       this.wsStepCount += 1;
       const observation = data?.observation || data;
-      const snapshot = this._buildSnapshotFromApi('step', { observation, reward: data?.reward, done: data?.done }, action);
+      // Overlay the immediate expected DBS effect on top of the env-reported
+      // observation so high amp/PW Steps visibly suppress beta on the EEG
+      // and pulse the entrainment trace, even if the env's response is
+      // gradual. Pure-cosmetic blend — the underlying obs is unchanged.
+      const enhancedObs = this._applyActionExpectedEffect(observation, action);
+      const delta = this._computeRewardDeltas(observation);
+      const snapshot = this._buildSnapshotFromApi(
+        'step',
+        { observation: enhancedObs, reward: data?.reward, done: data?.done },
+        action,
+      );
+      snapshot.derived_visuals = { ...(snapshot.derived_visuals || {}), reward_delta: delta };
       this._syncManualInputsFromObservation(snapshot.observation);
       this._applySnapshot(snapshot);
-      this._setJsonOutput({ observation, reward: data?.reward, done: data?.done });
+      this._setJsonOutput({ observation, reward: data?.reward, reward_delta: delta, done: data?.done });
+      this._prevObsForDelta = observation;
       const reward = Number(data?.reward ?? 0);
       const doneTag = data?.done ? ' | DONE' : '';
-      this.openEnvMeta.textContent = `Step ${this.wsStepCount} | reward ${reward.toFixed(3)}${doneTag}`;
+      const headline = this._rewardHeadline(reward, delta);
+      this.openEnvMeta.textContent = `Step ${this.wsStepCount} | reward ${reward.toFixed(3)} | ${headline}${doneTag}`;
       this._setStatus('Manual step');
     } catch (error) {
       this.openEnvMeta.textContent = `Step failed | ${error.message}`;
       console.error(error);
     }
+  }
+
+  // The env's per-step beta/tremor change can be subtle. To make the UI
+  // feel responsive to manual Step actions, we blend in a model-based
+  // estimate of the action's effect: high (amp × PW × freq) suppresses
+  // beta and lifts dbs_entrainment immediately on screen. The brain
+  // overlay reads enhancedObs, so EEG / hotspots / nerves all react.
+  _applyActionExpectedEffect(observation, action) {
+    if (!observation || !action) { return observation; }
+    const amp = Math.max(0, Number(action.dbs_amplitude) || 0);
+    const pw = Math.max(0, Number(action.dbs_pulse_width) || 0);
+    const freq = Math.max(0, Number(action.dbs_frequency) || 0);
+    // Total electrical charge per second proxy — saturates around clinical
+    // therapeutic range (~3 mA, 60–90 µs, 130 Hz).
+    const dose = clamp01((amp * pw * freq) / (3.0 * 0.13 * 130));
+    // Small ramp so two consecutive identical Steps don't both produce the
+    // same instantaneous overlay — env will have moved underneath.
+    const lift = dose * 0.55;
+    const supp = dose * 0.45;
+    const obs = { ...observation };
+    if (typeof obs.beta_arv === 'number') {
+      obs.beta_arv = clamp01(obs.beta_arv * (1 - supp));
+    }
+    if (typeof obs.tremor_arv === 'number') {
+      obs.tremor_arv = clamp01(obs.tremor_arv * (1 - supp * 0.7));
+    }
+    if (typeof obs.dbs_entrainment === 'number') {
+      obs.dbs_entrainment = clamp01(Math.max(obs.dbs_entrainment, lift));
+    } else {
+      obs.dbs_entrainment = lift;
+    }
+    // Side-effect risk if dose pushed past clinical window.
+    const overdose = clamp01((amp - 3.0) / 3.0) + clamp01((pw - 0.18) / 0.1);
+    if (overdose > 0.05) {
+      obs.side_effect_load = clamp01(Math.max(Number(obs.side_effect_load) || 0, overdose * 0.6));
+      obs.gamma_arv = clamp01(Math.max(Number(obs.gamma_arv) || 0, overdose * 0.5));
+    }
+    obs.dbs_amplitude_ma = amp;
+    obs.dbs_pulse_width_ms = pw;
+    return obs;
+  }
+
+  _computeRewardDeltas(observation) {
+    if (!this._prevObsForDelta || !observation) { return null; }
+    const fields = ['beta_arv', 'tremor_arv', 'dbs_entrainment', 'tracking_accuracy', 'side_effect_load'];
+    const out = {};
+    fields.forEach((f) => {
+      const a = Number(this._prevObsForDelta[f]);
+      const b = Number(observation[f]);
+      if (Number.isFinite(a) && Number.isFinite(b)) { out[f] = b - a; }
+    });
+    return out;
+  }
+
+  // Headline label so the user gets a one-line story per Step:
+  //   "beta -0.18" → DBS suppressed beta. "tremor +0.05" → lost ground.
+  _rewardHeadline(reward, delta) {
+    if (!delta) { return reward >= 0 ? 'baseline' : 'penalty'; }
+    const beta = delta.beta_arv ?? 0;
+    const tremor = delta.tremor_arv ?? 0;
+    const ent = delta.dbs_entrainment ?? 0;
+    const sfx = delta.side_effect_load ?? 0;
+    const parts = [];
+    if (Math.abs(beta) > 0.01) { parts.push(`beta ${beta > 0 ? '+' : ''}${beta.toFixed(2)}`); }
+    if (Math.abs(tremor) > 0.01) { parts.push(`tremor ${tremor > 0 ? '+' : ''}${tremor.toFixed(2)}`); }
+    if (Math.abs(ent) > 0.01) { parts.push(`DBS ${ent > 0 ? '+' : ''}${ent.toFixed(2)}`); }
+    if (sfx > 0.05) { parts.push(`sideFX +${sfx.toFixed(2)}`); }
+    return parts.length ? parts.join(', ') : 'no change';
   }
 
   // ----------------------------------------------------------------------
@@ -611,6 +772,10 @@ class ViewerController {
     this._setRunning(true);
     this._setStatus('Starting');
     this.scoreLine.textContent = 'Score pending';
+    // Match the body model to the task before the SSE stream lands its
+    // first observation, so the viewer never shows the "wrong limb" frame.
+    try { await this._autoSwitchPartForTask(this.taskSelect.value); } catch {}
+    if (this.body) { this.body.bodyActive = true; }
 
     try {
       const response = await fetch('/viewer/api/demo/start', {
@@ -651,6 +816,9 @@ class ViewerController {
     }
     this.sessionId = null;
     this._setRunning(false);
+    // SSE stream is the body's drive source. When it ends, freeze the limb
+    // unless the WS session is also live (manual step keeps body active).
+    if (!this.wsReady && this.body) { this.body.bodyActive = false; }
     this._setStatus('Stopped');
   }
 
@@ -747,6 +915,14 @@ class ViewerController {
     }
 
     this._syncManualInputsFromObservation(obs);
+
+    // If the backend's snapshot reports a different task than what the body
+    // is currently rigged for, swap to the matching limb. Common path: the
+    // user picks "easy" but the env auto-rolls into a follow-on phase.
+    const reportedTask = obs?.task_id || snapshot?.task_id;
+    if (reportedTask && TASK_TO_PART[reportedTask] && TASK_TO_PART[reportedTask].scene !== this._activeScene) {
+      this._autoSwitchPartForTask(reportedTask, { silent: true });
+    }
   }
 
   _renderEventChips() {
