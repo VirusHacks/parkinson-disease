@@ -154,6 +154,42 @@ _PROMPT_STATE_KEYS: Tuple[str, ...] = (
 
 # Compact JSON object regex tolerant of internal whitespace / floats / negatives.
 _JSON_RE = re.compile(r"\{[^{}]*\}", re.DOTALL)
+_CODE_FENCE_RE = re.compile(r"```(?:json|JSON)?\s*(.*?)```", re.DOTALL)
+
+
+def _strip_code_fences(text: str) -> str:
+    """Replace ```json ... ``` blocks with their inner content (in-place).
+
+    Qwen3-4B sometimes wraps its final action in a markdown code fence even when
+    we tell it not to. Returning the inner content makes the JSON regex find it.
+    """
+    if "```" not in text:
+        return text
+    return _CODE_FENCE_RE.sub(lambda m: " " + m.group(1) + " ", text)
+
+
+def _find_balanced_json(text: str) -> Optional[str]:
+    """Scan for the LAST balanced ``{...}`` substring (handles nested objects).
+
+    The flat ``_JSON_RE`` rejects any nested brace, so we keep this as a
+    backup for the (rare) case where the model emits ``{"a": {"b": 1}}``.
+    Returns the JSON text or None.
+    """
+    last: Optional[str] = None
+    depth = 0
+    start = -1
+    for i, ch in enumerate(text):
+        if ch == "{":
+            if depth == 0:
+                start = i
+            depth += 1
+        elif ch == "}":
+            if depth > 0:
+                depth -= 1
+                if depth == 0 and start >= 0:
+                    last = text[start : i + 1]
+                    start = -1
+    return last
 
 
 def _obs_to_dict(obs: Any) -> Dict[str, Any]:
@@ -262,15 +298,23 @@ def parse_action(text: str) -> Optional[Dict[str, float]]:
     ``<think>...</think>`` blocks) because Qwen3-style models often write
     intermediate JSON examples while reasoning, then commit to the real action
     on the final line. We want the commit, not the first scratchpad sample.
+
+    Robustness layers, applied in order:
+      1. Strip ``<think>...</think>`` blocks.
+      2. Strip ```` ```json ... ``` ```` markdown fences (Qwen3 sometimes adds
+         them even when told not to).
+      3. Try the flat ``_JSON_RE`` (matches non-nested ``{...}``).
+      4. Fall back to a balanced-brace scan to recover nested or
+         multi-line JSON the simple regex misses.
     """
     if not text:
         return None
     answer = re.sub(r"<think>.*?</think>", "", text, flags=re.DOTALL)
     if not answer.strip():
         answer = text  # all of it was inside <think> — fall back to full text
+    answer = _strip_code_fences(answer)
+
     candidates = list(_JSON_RE.finditer(answer))
-    if not candidates:
-        return None
     for match in reversed(candidates):
         try:
             d = json.loads(match.group(0))
@@ -278,6 +322,15 @@ def parse_action(text: str) -> Optional[Dict[str, float]]:
             continue
         if isinstance(d, dict):
             return d
+
+    nested = _find_balanced_json(answer)
+    if nested:
+        try:
+            d = json.loads(nested)
+            if isinstance(d, dict):
+                return d
+        except json.JSONDecodeError:
+            return None
     return None
 
 
@@ -371,10 +424,15 @@ def llm_generate(
     *,
     max_new_tokens: int = 256,
     temperature: float = 0.7,
-    top_p: float = 0.9,
+    top_p: float = 0.95,
     max_prompt_length: int = 1024,
 ) -> Tuple[str, "torch.Tensor", "torch.Tensor"]:
-    """Run one greedy/sampling generation. Returns (text, prompt_ids, completion_ids)."""
+    """Run one greedy/sampling generation. Returns (text, prompt_ids, completion_ids).
+
+    ``top_p`` defaults to 0.95 to match the value GRPOConfig uses during
+    training; aligning rollout-time and trainer-time samplers prevents an
+    importance-sampling mismatch in TRL's per-token loss.
+    """
     if torch is None:  # pragma: no cover
         raise RuntimeError("torch is required for llm_generate; install transformers + torch.")
     inputs = tokenizer(
@@ -383,6 +441,9 @@ def llm_generate(
         truncation=True,
         max_length=max_prompt_length,
     ).to(model.device)
+    pad_id = tokenizer.pad_token_id
+    if pad_id is None:
+        pad_id = tokenizer.eos_token_id
     with torch.no_grad():
         out = model.generate(
             **inputs,
@@ -390,7 +451,7 @@ def llm_generate(
             do_sample=temperature > 0,
             temperature=max(temperature, 1e-6),
             top_p=top_p,
-            pad_token_id=tokenizer.pad_token_id,
+            pad_token_id=pad_id,
         )
     prompt_ids = inputs["input_ids"][0].detach().cpu()
     completion_ids = out[0][inputs["input_ids"].shape[1]:].detach().cpu()
@@ -460,7 +521,13 @@ async def rollout_episode_async(
             user = build_user_prompt(step, obs_dict, task_id, traj.history)
             prompt = apply_chat_template(tokenizer, SYSTEM_PROMPT, user)
 
-            text, p_ids, c_ids = llm_generate(
+            # CRITICAL: model.generate() is a blocking sync call. Running it
+            # directly inside this coroutine starves the asyncio event loop, so
+            # the EnvClient's persistent-WebSocket keepalive task can't PONG
+            # within ~20 s and the server closes with code 1011. Hand the
+            # generation to a worker thread so the loop stays responsive.
+            text, p_ids, c_ids = await asyncio.to_thread(
+                llm_generate,
                 model, tokenizer, prompt,
                 max_new_tokens=max_new_tokens,
                 temperature=temperature,
@@ -1186,6 +1253,33 @@ def eval_with_adapter_disabled(
     return evaluate_model_suite(model, tokenizer, env_url, tasks, seeds, **kwargs)
 
 
+def _warm_up_generation(
+    model: Any,
+    tokenizer: Any,
+    *,
+    max_new_tokens: int = 16,
+) -> None:
+    """One throwaway generation so the env doesn't pay the CUDA-compile cost
+    on its very first step (which can add 8-15 s and cause WebSocket timeouts).
+    """
+    if torch is None:  # pragma: no cover
+        return
+    try:
+        prompt = "ping"
+        inputs = tokenizer(prompt, return_tensors="pt")
+        device = next(model.parameters()).device
+        inputs = {k: v.to(device) for k, v in inputs.items()}
+        with torch.inference_mode():
+            model.generate(
+                **inputs,
+                max_new_tokens=max_new_tokens,
+                do_sample=False,
+                pad_token_id=tokenizer.eos_token_id,
+            )
+    except Exception as exc:  # pragma: no cover
+        logger.debug("GPU warm-up generation skipped (%s)", exc)
+
+
 def sanity_check_rollout(
     model: Any,
     tokenizer: Any,
@@ -1195,25 +1289,92 @@ def sanity_check_rollout(
     seed: int = 0,
     max_turns: int = 4,
     temperature: float = 0.7,
-    max_new_tokens: int = 512,
+    max_new_tokens: int = 256,
     max_prompt_length: int = 1280,
     raise_on_failure: bool = True,
+    warm_up: bool = True,
+    retry_on_env_error: bool = True,
 ) -> Dict[str, Any]:
     """Run ONE short rollout and verify the LLM→env loop is healthy.
 
-    Use this BEFORE training to catch the four most common GRPO collapses:
+    Use this BEFORE training to catch the five most common failure modes:
       1. completions never produce parseable JSON (cap too small / wrong template)
       2. env never returns a non-zero step reward (URL wrong / task broken)
       3. all rollouts emit identical actions (no reward variance => GRPO can't learn)
       4. env errors silently (ENVIRONMENT_ERROR_PENALTY appears in every step)
+      5. **WebSocket keepalive timeouts during long generations** (sync call
+         in async coroutine — fixed in ``rollout_episode_async`` via
+         ``asyncio.to_thread``; this check verifies the fix actually landed)
 
     Prints raw completion + parsed action + per-step env reward + final grader,
     and (by default) raises ``RuntimeError`` on a hard failure so the notebook
     cell turns red instead of letting you waste an hour on a flat training run.
 
-    Returns a dict with the inspection data so you can assert on it in tests.
+    ``warm_up`` runs one throwaway generation first so CUDA kernels are
+    compiled before we open the env (otherwise the first real step pays
+    +8-15 s of compile time and the env's keepalive can fire).
+
+    ``retry_on_env_error`` will re-attempt the rollout once if the first
+    attempt failed with an env error (HF Spaces sometimes 503 on cold start).
     """
+    if warm_up:
+        print("[warm-up] compiling CUDA kernels with one throwaway generation ...")
+        _warm_up_generation(model, tokenizer)
+
+    # ── Pre-rollout: trace ONE completion offline so we can show the raw text
+    # if parsing fails. This is the only way to tell apart "thinking ate the
+    # budget" vs "model wrote markdown around the JSON" vs "wrong template".
     print(f"\n=== sanity_check_rollout  task={task_id}  seed={seed}  turns={max_turns} ===")
+    print("\n[trace] generating one completion offline (no env call) to inspect raw text ...")
+    try:
+        _trace_obs = {
+            "beta_arv": 0.55, "tremor_arv": 0.45, "side_effect_load": 0.10,
+            "gamma_arv": 0.30, "beta_trend": 0.02, "tremor_trend": 0.01,
+            "target_output": 0.0, "side_effect_rate": 0.0,
+        }
+        _trace_user = build_user_prompt(1, _trace_obs, task_id, [])
+        _trace_prompt = apply_chat_template(tokenizer, SYSTEM_PROMPT, _trace_user)
+        _trace_text, _trace_p, _trace_c = llm_generate(
+            model, tokenizer, _trace_prompt,
+            max_new_tokens=max_new_tokens,
+            temperature=temperature,
+            max_prompt_length=max_prompt_length,
+        )
+        _trace_parsed = parse_action(_trace_text)
+        _completion_token_count = len(_trace_c) if _trace_c is not None else 0
+        _hit_cap = _completion_token_count >= max_new_tokens
+        _has_think_open = "<think>" in _trace_text
+        _has_think_close = "</think>" in _trace_text
+        _has_json_brace = "{" in _trace_text and "}" in _trace_text
+        _preview = _trace_text if len(_trace_text) <= 800 else (_trace_text[:600] + " ... [truncated] ... " + _trace_text[-200:])
+
+        print(f"  completion tokens       : {_completion_token_count} / {max_new_tokens}  "
+              f"({'HIT CAP' if _hit_cap else 'ok'})")
+        print(f"  has <think> ... </think>: open={_has_think_open}  close={_has_think_close}")
+        print(f"  has any JSON-like {{...}}: {_has_json_brace}")
+        print(f"  parse_action result     : {_trace_parsed}")
+        print("  --- raw completion (preview) ---")
+        for line in _preview.split("\n"):
+            print(f"  | {line}")
+        print("  --- end preview ---")
+
+        if _trace_parsed is None:
+            print("\n  [diagnosis] parse failed. Most likely cause:")
+            if _hit_cap and _has_think_open and not _has_think_close:
+                print("    * The thinking block did NOT finish before max_new_tokens. "
+                      "Bump MAX_COMPLETION_LENGTH (try 1024 or 1536) or "
+                      "set enable_thinking=False in apply_chat_template.")
+            elif _has_json_brace and not _trace_parsed:
+                print("    * Model wrote JSON-like text but the regex/json.loads rejected it. "
+                      "Check for code fences, smart quotes, trailing commas, or comments.")
+            elif not _has_json_brace:
+                print("    * Model emitted prose with no JSON object at all. "
+                      "Check the chat template / SYSTEM_PROMPT — the model isn't following the format.")
+            else:
+                print("    * Unclear — inspect the preview above.")
+    except Exception as exc:
+        print(f"  [trace] generation crashed: {exc!r}  — falling through to env rollout anyway")
+
     traj = rollout_episode(
         model, tokenizer, env_url,
         task_id=task_id, seed=seed,
@@ -1223,6 +1384,20 @@ def sanity_check_rollout(
         max_prompt_length=max_prompt_length,
         fallback_to_heuristic_on_invalid=False,  # we WANT to see parse failures here
     )
+
+    if retry_on_env_error and traj.env_error and len(traj.rewards) == 0:
+        print(f"\n[retry] first attempt failed with env_error={traj.env_error!r}; retrying once ...")
+        import time as _time
+        _time.sleep(3.0)
+        traj = rollout_episode(
+            model, tokenizer, env_url,
+            task_id=task_id, seed=seed,
+            max_turns=max_turns,
+            temperature=temperature,
+            max_new_tokens=max_new_tokens,
+            max_prompt_length=max_prompt_length,
+            fallback_to_heuristic_on_invalid=False,
+        )
 
     n_steps        = len(traj.rewards)
     n_invalid      = traj.invalid_count
