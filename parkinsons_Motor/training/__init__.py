@@ -4,6 +4,11 @@ This package mirrors the architecture used by the OpenEnv-Hackathon
 bio-experiment winner ([mhtruong1031/OpenENV-Hackathon] ``training/``).
 Each module is a single responsibility:
 
+  * :mod:`parkinsons_Motor.training.replay_grpo`        — single-turn GRPO
+    against an *in-process* env: ``LocalEnvFactory``,
+    ``collect_prompt_dataset``, ``make_replay_reward_fn``. This is the path
+    used by the notebook for actual training (no custom ``rollout_func``,
+    no asyncio, no WebSocket).
   * :mod:`parkinsons_Motor.training.trajectory`         — JSON-serialisable
     trajectories, datasets, save/load.
   * :mod:`parkinsons_Motor.training.evaluation`         — ``EvaluationSuite``
@@ -23,11 +28,11 @@ Each module is a single responsibility:
     ``eval_with_adapter_disabled``. Also re-exported from
     :mod:`parkinsons_Motor.train`.
 
-For the **GRPO training pipeline itself** (LLM rollouts, reward composition,
-GRPO trainer glue) see :mod:`parkinsons_Motor.train`. That module is the
-runtime entry point used by ``colab_train_motorassist.ipynb``; this package
-provides everything around it (offline analysis, evaluation, plotting,
-literature benchmarking).
+For the **legacy multi-turn pipeline** (custom ``rollout_func``,
+``rollout_episode_async``, async WebSocket env) see
+:mod:`parkinsons_Motor.train`. That surface is kept for backwards
+compatibility but is no longer used by the notebook; ``replay_grpo`` is the
+recommended path.
 """
 
 from .evaluation import EvaluationSuite, MetricResult
@@ -43,6 +48,12 @@ from .plots import (
     plot_training_dashboard,
     plot_training_loss,
     save_training_plots,
+)
+from .replay_grpo import (
+    DEFAULT_REPLAY_REWARD_WEIGHTS,
+    LocalEnvFactory,
+    collect_prompt_dataset,
+    make_replay_reward_fn,
 )
 from .trajectory import DBSTrajectory, DBSTrajectoryDataset, DBSTrajectoryStep
 
@@ -68,6 +79,11 @@ __all__ = [
     "evaluate_model_on_task",
     "evaluate_model_suite",
     "sanity_check_rollout",
+    # replay-based GRPO (recommended training path)
+    "DEFAULT_REPLAY_REWARD_WEIGHTS",
+    "LocalEnvFactory",
+    "collect_prompt_dataset",
+    "make_replay_reward_fn",
 ]
 
 
