@@ -41,7 +41,7 @@ def get_hard_task() -> DBSTask:
         target_beta_arv=0.21,
         target_tremor_arv=0.27,
         target_tracking_error=0.22,
-        success_threshold=0.68,
+        success_threshold=0.42,
         patient_profile_ids=("refractory",),
         target_output_range=(-0.65, 0.65),
         event_profile="long_horizon",

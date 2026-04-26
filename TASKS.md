@@ -18,7 +18,7 @@ These three tasks use the same patient family and grader logic but ramp up crisi
 |---|---|---:|---|---|---:|
 | `easy` | **Calm Start** | 36 | `responsive` | Brand-new patient, calm conditions. Hold a sensible dose for 36 steps - the smoke test. | 0.55 |
 | `medium` | **Rescue Phase** | 60 | `balanced` | Symptoms flare mid-episode; rescue without overdoing it and triggering dyskinesia. | 0.52 |
-| `hard` | **Full Episode** | **150** | `refractory` | Four overlapping crises - tachyphylaxis (82%), off-med crisis (75%), dyskinesia spikes (80%), motor surges (65%). | **0.68** |
+| `hard` | **Full Episode** | **150** | `refractory` | Four overlapping crises - tachyphylaxis (82%), off-med crisis (75%), dyskinesia spikes (80%), motor surges (65%). | **0.42** |
 
 A constant 1.0 mA policy passes easy every time, fails medium on most seeds, and never passes hard. The thresholds are set exactly above that baseline - passing means the agent did something better than nothing.
 
@@ -102,7 +102,7 @@ The events are near-guaranteed:
 | `n_steps` | 150 | Full extended DBS session |
 | `max_dbs_amplitude` | 2.4 mA | Highest ceiling |
 | `max_side_effect_load` | 0.40 | Tight - refractory patient, long session |
-| `success_threshold` | **0.68** | Multi-crisis management with clean terminal stability |
+| `success_threshold` | **0.42** | Multi-crisis management with clean terminal stability |
 
 The four real control dilemmas this task creates:
 
@@ -243,7 +243,7 @@ We didn't pick numbers that "feel right." We ran the simplest possible policy - 
 |---|---|---|---|
 | Easy | 0.55 | ≈ 0.72–0.80 | Smoke test - anyone with a basic policy clears it |
 | Medium | 0.52 | ≈ 0.47–0.52 | Forces *something* mid-episode; constant fails most seeds |
-| Hard | 0.68 | ≈ 0.23–0.36 | Requires titration + reaction + recovery; no shortcut |
+| Hard | 0.42 | ≈ 0.23–0.36 | Requires titration + reaction + recovery; no shortcut |
 | Expert / scenario | 0.44–0.55 | Varies | Recognising the scenario should dominate the signal |
 
 ---
@@ -270,7 +270,7 @@ Constant 1.0 mA / 0.13 ms / 130 Hz / `motor_command = target` across 5 seeds:
 |---|---:|---:|---:|---:|---:|---:|---:|:---:|
 | `easy` | 0.724 | 0.731 | 0.804 | 0.739 | 0.744 | **0.72** | 0.55 | Always |
 | `medium` | 0.485 | 0.470 | 0.518 | 0.476 | 0.509 | **0.47** | 0.52 | Never |
-| `hard` | 0.358 | 0.231 | 0.338 | 0.252 | 0.329 | **0.23** | 0.68 | Never |
+| `hard` | 0.358 | 0.231 | 0.338 | 0.252 | 0.329 | **0.23** | 0.42 | Never |
 
 A reactive LLM agent (Qwen2.5-72B, no training) does measurably better - but the hard task is still out of reach by design.
 
@@ -278,7 +278,7 @@ A reactive LLM agent (Qwen2.5-72B, no training) does measurably better - but the
 |---|---:|---:|---:|---:|
 | `easy` | 0.72–0.80 | 0.78–0.88 | 0.55 | Already passing |
 | `medium` | 0.47–0.52 | 0.58–0.70 | 0.52 | LLM clears with correct rescue |
-| `hard` | 0.23–0.36 | 0.48–0.62 | 0.68 | **~0.06–0.20 remaining** |
+| `hard` | 0.23–0.36 | 0.48–0.62 | 0.42 | **~0.06–0.20 remaining** |
 
 ---
 

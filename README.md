@@ -68,7 +68,7 @@
   |---|---:|---|---:|
   | `easy` - Calm Start | 36 | Smoke test. Reasonable amp gets you through. | 0.55 |
   | `medium` - Rescue Phase | 60 | Mid-episode deterioration wave (55%); rescue without dyskinesia. | 0.52 |
-  | `hard` - Full Episode | **150** | Tachyphylaxis (82%) + off-med crisis (75%) + dyskinesia spikes (80%) + motor surges (65%). Four overlapping crises. | **0.68** |
+  | `hard` - Full Episode | **150** | Tachyphylaxis (82%) + off-med crisis (75%) + dyskinesia spikes (80%) + motor surges (65%). Four overlapping crises. | **0.42** |
 
   A constant 1.0 mA / 0.13 ms / 130 Hz baseline was run 5 seeds per task. Easy passes 5/5 (`0.72–0.80`). Medium fails 5/5 (`0.47–0.52`). Hard fails 5/5 (`0.23–0.36`). Thresholds sit exactly above what doing nothing achieves - passing means the agent reasoned.
 

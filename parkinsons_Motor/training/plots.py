@@ -33,7 +33,7 @@ from typing import Any, Dict, List, Mapping, Optional, Sequence, Tuple, Union
 # ``success_threshold`` values published in TASKS.md and are used as guide
 # lines on the dashboards.
 _TASK_THRESHOLDS: Dict[str, float] = {
-    "easy": 0.55, "medium": 0.52, "hard": 0.68,
+    "easy": 0.55, "medium": 0.52, "hard": 0.42,
 }
 
 

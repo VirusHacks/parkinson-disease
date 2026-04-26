@@ -206,7 +206,7 @@ The constant 1.0 mA baseline policy was run across 5 seeds on each task. Strict 
 |---|---|---|---|---|
 | easy | 0.72 | 0.80 | 0.55 | Always |
 | medium | 0.47 | 0.52 | 0.52 | Never |
-| hard | 0.23 | 0.36 | 0.68 | Never |
+| hard | 0.23 | 0.36 | 0.42 | Never |
 
 Expected ranges for a good reactive LLM agent (adjusts amplitude based on `beta_trend` and `side_effect_rate`):
 

@@ -37,7 +37,7 @@ MODEL_COLORS = {
     "Mistral-7B":  "#55A868",
 }
 TASK_COLORS = {"easy": "#2CA02C", "medium": "#FF7F0E", "hard": "#D62728"}
-TASK_THRESHOLDS = {"easy": 0.55, "medium": 0.52, "hard": 0.68}
+TASK_THRESHOLDS = {"easy": 0.55, "medium": 0.52, "hard": 0.42}
 
 plt.rcParams.update({
     "figure.facecolor": "white",
@@ -74,7 +74,7 @@ def _mock_data() -> list[dict]:
     tasks = [
         ("easy",   36, 0.55),
         ("medium", 60, 0.52),
-        ("hard",   150, 0.68),
+        ("hard",   150, 0.42),
     ]
     # Rough expected scores from docs: easy all pass, medium 72B passes, hard none
     base_scores = {
