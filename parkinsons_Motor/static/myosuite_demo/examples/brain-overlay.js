@@ -23,7 +23,7 @@ const EEG_W = 320;
 const EEG_H = 96;
 const PATHWAY_H = 64;
 
-// Skin / cortical flesh tone for the brain mesh — slightly desaturated pink.
+// Skin / cortical flesh tone for the brain mesh - slightly desaturated pink.
 // Real cortex is closer to greyish-pink (Brodmann gray matter); we lean a
 // touch warmer for visual contrast against the dark panel background.
 const SKIN_COLOR = 0xd9a89a;
@@ -59,7 +59,7 @@ class BrainOverlay {
     this.tipPositions = [];
     this.pulseGroups = [];
     this._stnMeshes = [];
-    // Brain mesh materials we override to skin tone — kept so we can pulse
+    // Brain mesh materials we override to skin tone - kept so we can pulse
     // their emissive in localized regions during simulated neural firing.
     this._brainMaterials = [];
     // Cortical hotspots (small additive glow spheres at M1 and other regions).
@@ -70,13 +70,13 @@ class BrainOverlay {
     this._nerves = [];
     // Traveling action-potential pulses sliding along the nerve curves.
     this._actionPotentials = [];
-    // EEG sample timing — proper sample rate so beta/tremor look real.
+    // EEG sample timing - proper sample rate so beta/tremor look real.
     this._eegSampleRate = 250;
     this._eegLastT = -1;
     this._eegPhase = { beta: 0, tremor: 0, mu: 0, motor: 0 };
     this._betaBurstSeed = Math.random() * 1000;
     this._noiseState = { lpfBeta: 0, lpfMotor: 0 };
-    // Dual EEG ring buffers — pathological beta and DBS-corrected motor signal.
+    // Dual EEG ring buffers - pathological beta and DBS-corrected motor signal.
     this.betaBuffer = new Float32Array(EEG_W).fill(EEG_H * 0.30);
     this.motorBuffer = new Float32Array(EEG_W).fill(EEG_H * 0.72);
     this.brainRoot = null;
@@ -507,7 +507,7 @@ class BrainOverlay {
 
   // Cortical hotspots: small additive-blended emissive spheres glued onto
   // the cortex / deep nuclei. They bloom red as the corresponding signal
-  // (beta_arv at STN, tremor_arv at M1, etc.) rises — giving a physically-
+  // (beta_arv at STN, tremor_arv at M1, etc.) rises - giving a physically-
   // localized "that nerve cluster is firing" cue without recoloring the
   // whole brain mesh.
   _buildHotspots() {
@@ -558,7 +558,7 @@ class BrainOverlay {
       this._nerves.push({ id: p.id, side: p.side, curve, tube, mat: tubeMat, baseColor: new THREE.Color(p.color) });
 
       // Two action-potential pulses per fiber, phase-offset, traveling
-      // toward STN (cortex → deep) — i.e. descending command flow.
+      // toward STN (cortex → deep) - i.e. descending command flow.
       for (let k = 0; k < 2; k++) {
         const apMat = new THREE.MeshBasicMaterial({
           color: 0xffd0a8, transparent: true, opacity: 0.0,
@@ -722,7 +722,7 @@ class BrainOverlay {
     const dbsAmp = clamp01(this.signalState.dbs_amplitude / 3.0);
     const dbsFreq = Math.max(20, this.signalState.dbs_frequency || 130);
 
-    // Beta-burst envelope — pathological STN beta in PD comes in bursts of
+    // Beta-burst envelope - pathological STN beta in PD comes in bursts of
     // ~150–400 ms rather than steady oscillation. Drive the envelope from a
     // slow low-freq carrier modulated by beta_arv, then fully suppress it
     // when DBS entrainment is high.
@@ -753,7 +753,7 @@ class BrainOverlay {
       // 1/f-ish pink noise via cheap LPF on white noise.
       this._noiseState.lpfBeta = 0.85 * this._noiseState.lpfBeta + 0.15 * (Math.random() - 0.5);
       const pink = this._noiseState.lpfBeta * 1.3 + (Math.random() - 0.5) * 0.25;
-      // DBS stim artifact — short biphasic spike at dbsFreq, scaled by amp.
+      // DBS stim artifact - short biphasic spike at dbsFreq, scaled by amp.
       const dbsArt = dbsAmp > 0.02
         ? Math.sin(2 * Math.PI * dbsFreq * st) * 0.45 * dbsAmp * (0.6 + 0.4 * Math.sin(2 * Math.PI * dbsFreq * st * 0.5))
         : 0;
@@ -897,7 +897,7 @@ class BrainOverlay {
       this.pathwayNodes[node.id] = { circle, label, color: node.color };
     });
 
-    // Arrows between nodes — direction: STN → Thal (inhibitory in PD), Thal → M1.
+    // Arrows between nodes - direction: STN → Thal (inhibitory in PD), Thal → M1.
     const arrows = [
       { id: 'stn_th', from: { x: 210, y: 32 }, to: { x: 144, y: 32 } },
       { id: 'th_m1', from: { x: 116, y: 32 }, to: { x: 50, y: 32 } },
@@ -987,7 +987,7 @@ class BrainOverlay {
   }
 
   // -------------------------------------------------------------------------
-  // Activation drivers — keep brain skin-toned at rest, light up only
+  // Activation drivers - keep brain skin-toned at rest, light up only
   // localized regions when the agent state implies that pathway is firing.
   // -------------------------------------------------------------------------
 
@@ -1012,7 +1012,7 @@ class BrainOverlay {
         activity = tremor * 0.9 * tremorPulse + pathology * 0.25;
         baseOpacity = 0.10;
       } else if (h.region === 'thalamus') {
-        // Thalamus relays the loop — glows when either pathology drives or
+        // Thalamus relays the loop - glows when either pathology drives or
         // DBS-shaped output is propagating.
         activity = 0.4 * pathology + 0.55 * entrainment;
         baseOpacity = 0.10;
@@ -1062,7 +1062,7 @@ class BrainOverlay {
   }
 
   // Brain mesh stays skin-toned. Only when something pathological is
-  // actively firing do we warm the emissive a touch — and even then it
+  // actively firing do we warm the emissive a touch - and even then it
   // recedes immediately. Prevents the whole brain from glowing red.
   _driveBrainTint(pathology, warning, entrainment) {
     if (!this._brainMaterials.length) { return; }
@@ -1118,7 +1118,7 @@ class BrainOverlay {
       m.material.emissiveIntensity = 0.15 + pathology * 1.6 + warning * 0.9 + Math.sin(t * 6.0 + i * Math.PI) * 0.25 * pathology;
     });
     this.innerGlow.color.set(warning > 0.55 ? 0xc13cff : (entrainment > pathology ? 0x00ffcc : 0xff5544));
-    // Inner glow only kicks in when something is actively firing — prevents
+    // Inner glow only kicks in when something is actively firing - prevents
     // the brain from being lit red at rest.
     this.innerGlow.intensity = 0.05 + entrainment * 1.4 + pathology * 0.8 + warning * 0.9;
 

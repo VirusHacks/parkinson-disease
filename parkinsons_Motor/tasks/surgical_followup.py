@@ -1,18 +1,18 @@
-"""Surgical-followup task — first-week post-implant programming.
+"""Surgical-followup task - first-week post-implant programming.
 
 Clinical scenario
 -----------------
 The patient is in the first programming session days after DBS implantation.
 A microlesion effect from the surgery itself temporarily improves symptoms,
 masking the true baseline. During the first 25% of the episode the amplitude
-ceiling is hard-capped at 0.6 mA — exceeding it during the swelling window
+ceiling is hard-capped at 0.6 mA - exceeding it during the swelling window
 risks tissue damage. After step 25%, the ceiling ramps back to the task max.
 Lead impedance can surge mid-episode as swelling resolves, transiently
 reducing delivered current.
 
 Why it is hard
 --------------
-* The early amplitude cap is enforced by the scheduler, not by the action — the
+* The early amplitude cap is enforced by the scheduler, not by the action - the
   agent must learn to live within it.
 * Impedance surges drop delivered current without an action change; the agent
   observes `dbs_entrainment` falling and must compensate.
@@ -32,7 +32,7 @@ def get_surgical_followup_task() -> DBSTask:
             "120-step first-week post-implant session. The amplitude ceiling is "
             "hard-clamped to 0.6 mA during the early microlesion window, then "
             "ramps to the task max. Lead impedance may surge mid-episode, "
-            "transiently reducing delivered current — the agent observes "
+            "transiently reducing delivered current - the agent observes "
             "entrainment falling without an action change and must compensate. "
             "Models the realistic clinical challenge of titrating immediately "
             "after implantation when the patient's true response curve is not "

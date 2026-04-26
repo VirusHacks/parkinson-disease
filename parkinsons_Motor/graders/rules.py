@@ -139,7 +139,7 @@ def hard_failure_penalty(
             penalty += 0.16
 
     if task.task_id == "medication_interaction":
-        # Recovery is the critical signal — must compensate the off-med crisis.
+        # Recovery is the critical signal - must compensate the off-med crisis.
         if details["recovery_score"] < 0.40:
             penalty += 0.12
         # Over-treating during the dyskinesia window: high mean amp + poor safety.

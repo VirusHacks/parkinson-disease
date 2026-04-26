@@ -82,7 +82,7 @@ class WindowFeatures:
 
 @dataclass
 class CalibratedBrainState:
-    """Full calibration output — authoritative ground truth for the RL env."""
+    """Full calibration output - authoritative ground truth for the RL env."""
 
     # Ordered timeline of simulation states (by time)
     timeline: List[WindowFeatures] = field(default_factory=list)
@@ -171,7 +171,7 @@ def _interp_window_mean(times_src: np.ndarray, values_src: np.ndarray,
 def calibrate(verbose: bool = False) -> CalibratedBrainState:
     """
     Load all park-sen results and return a CalibratedBrainState.
-    Cached — computed once per process.
+    Cached - computed once per process.
     """
     state = CalibratedBrainState()
 
@@ -248,7 +248,7 @@ def calibrate(verbose: bool = False) -> CalibratedBrainState:
         # Side effects
         se_load = _interp_nearest(se_t, se_v / state.side_effect_max, t_s) if len(se_t) > 0 else 0.0
 
-        # Force/sEMG — use 20ms window around t_ms
+        # Force/sEMG - use 20ms window around t_ms
         if force_t is not None and len(force_t) > 0:
             force_mean = _interp_window_mean(force_t, force_v, t_ms - 10, t_ms + 10)
         else:

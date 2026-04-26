@@ -45,7 +45,7 @@ def plot_training_dashboard(
     csv_path: Union[str, Path],
     png_path: Union[str, Path],
     train_tasks: Optional[Sequence[str]] = None,
-    title: str = "MotorAssistEnv — GRPO training",
+    title: str = "MotorAssistEnv - GRPO training",
 ) -> Path:
     """Render a 2x2 dashboard (total / grader / per-task / decomposition).
 
@@ -112,11 +112,11 @@ def plot_training_dashboard(
 def plot_training_loss(
     log_history: Sequence[Mapping[str, Any]],
     png_path: Union[str, Path],
-    title: str = "MotorAssistEnv — GRPO training (loss & policy stats)",
+    title: str = "MotorAssistEnv - GRPO training (loss & policy stats)",
 ) -> Path:
     """Plot loss + reward + KL + grad_norm from ``trainer.state.log_history``.
 
-    Judges explicitly ask for "loss AND reward plots" — the
+    Judges explicitly ask for "loss AND reward plots" - the
     ``training_dashboard`` covers reward decomposition; this one covers the
     optimization side (policy loss, KL anchor, gradient norm).
 
@@ -186,7 +186,7 @@ def plot_baseline_vs_trained(
     png_path: Union[str, Path],
     *,
     thresholds: Optional[Mapping[str, float]] = None,
-    title: str = "Base vs trained — grader score by task",
+    title: str = "Base vs trained - grader score by task",
 ) -> Path:
     """Side-by-side bar chart comparing two ``evaluate_model_suite`` outputs.
 
@@ -280,7 +280,7 @@ def compare_trajectories(
     with ``history`` / ``task_id`` / ``seed`` / ``grader_score`` /
     ``episode_success`` keys (e.g. ``Trajectory.to_dict()`` output).
 
-    Judges explicitly ask for "before/after behavior" as qualitative evidence —
+    Judges explicitly ask for "before/after behavior" as qualitative evidence -
     this is that plot. We extract amplitude / β / tremor / side-effect-load
     from the ``history`` strings written by ``rollout_episode_async``.
     """
@@ -363,7 +363,7 @@ def compare_trajectories(
 
     task_id = base.get("task_id") or tr.get("task_id") or "?"
     seed    = base.get("seed") if base.get("seed") is not None else tr.get("seed")
-    full_title = title or f"Before vs after training — task=`{task_id}` seed={seed}"
+    full_title = title or f"Before vs after training - task=`{task_id}` seed={seed}"
     fig.suptitle(full_title, fontweight="bold")
     fig.tight_layout(rect=(0, 0, 1, 0.96))
     fig.savefig(png_path, dpi=130)

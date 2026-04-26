@@ -50,7 +50,7 @@ Real-world utility (30%)
 •  0–5: Toy/artificial problem with no practical application
 •  6–15: Valid domain but shallow modeling of the real task
 •  16–25: Good domain modeling, would be useful for agent evaluation
-•  26–30: Excellent — fills a real gap, immediate value for the RL/agent community
+•  26–30: Excellent - fills a real gap, immediate value for the RL/agent community
 Task & grader quality (25%)
 •  3+ tasks with difficulty range?
 •  Graders produce scores between 0.0–1.0?
@@ -72,9 +72,9 @@ Creativity & novelty (10%)
 •  Clever mechanics that make the environment engaging?
 How Judging Works
 Phase 1: Automated Validation
-Pass/fail gate — HF Space deploys, OpenEnv spec compliance, Dockerfile builds, baseline reproduces, 3+ tasks with graders.
+Pass/fail gate - HF Space deploys, OpenEnv spec compliance, Dockerfile builds, baseline reproduces, 3+ tasks with graders.
 Phase 2: Agentic Evaluation
-Scored — baseline agent re-run, standard Open LLM agent (e.g. Nemotron 3 Super) run against all environments, score variance check.
+Scored - baseline agent re-run, standard Open LLM agent (e.g. Nemotron 3 Super) run against all environments, score variance check.
 Phase 3: Human Review
 Top submissions reviewed by Meta and Hugging Face engineers for real-world utility, creativity, and exploit checks.
 Disqualification Criteria
@@ -82,15 +82,15 @@ Environment does not deploy or respond
 Plagiarized or trivially modified existing environments
 Graders that always return the same score
 No baseline inference script
-Pre-Submission Checklist  — all must pass or you're disqualified
+Pre-Submission Checklist  - all must pass or you're disqualified
 HF Space deploys
-Automated ping to the Space URL — must return 200 and respond to reset()
+Automated ping to the Space URL - must return 200 and respond to reset()
 OpenEnv spec compliance
 Validate openenv.yaml, typed models, step()/reset()/state() endpoints
 Dockerfile builds
 Automated docker build on the submitted repo
 Baseline reproduces
-Run the submitted inference script — must complete without error and produce scores
+Run the submitted inference script - must complete without error and produce scores
 3+ tasks with graders
 Enumerate tasks, run each grader, verify scores in 0.0–1.0 range
 Additional Instructions

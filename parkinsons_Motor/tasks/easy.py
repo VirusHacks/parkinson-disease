@@ -1,10 +1,10 @@
-"""Easy task — calm-start titration with mild sensor noise.
+"""Easy task - calm-start titration with mild sensor noise.
 
 Clinical intent: a clean, lightly stochastic introduction to closed-loop DBS.
 Rising beta with mild tremor on a responsive patient, modest motor demands,
 and a short 36-step horizon. Biomarker recordings carry small Gaussian sensor
 noise so the agent learns to act on trends rather than single noisy samples,
-but no major disturbances fire — this task remains the gentlest of the suite.
+but no major disturbances fire - this task remains the gentlest of the suite.
 """
 
 from __future__ import annotations
@@ -21,7 +21,7 @@ def get_easy_task() -> DBSTask:
             "Early-session DBS titration on a responsive patient with rising "
             "beta and mild tremor. The episode is short (36 steps) and the "
             "patient is predictable, but biomarker recordings carry mild sensor "
-            "noise — the agent must respond to trends, not single noisy samples. "
+            "noise - the agent must respond to trends, not single noisy samples. "
             "Clinically this resembles a routine morning programming session: "
             "bring symptoms under control with the lowest effective dose, hold a "
             "stable safety margin, and avoid unnecessary brute-force stimulation."

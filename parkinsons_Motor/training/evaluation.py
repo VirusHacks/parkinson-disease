@@ -3,17 +3,17 @@
 Separates metrics into four families (mirrors mhtruong1031's bio-experiment
 ``training/evaluation.py``):
 
-  - ``online_metrics``         — collected during training rollouts (mean
+  - ``online_metrics``         - collected during training rollouts (mean
                                  return, std, episode length, success rate)
-  - ``benchmark_metrics``      — computed on a fixed held-out trajectory set
+  - ``benchmark_metrics``      - computed on a fixed held-out trajectory set
                                  (final β-suppression, side-effect compliance,
                                  mean amplitude in the clinical 1.5–4.0 mA
                                  window, action smoothness, format validity)
-  - ``clinical_metrics``       — compare against published adaptive-DBS
-                                 literature (Little et al. 2016 — see
+  - ``clinical_metrics``       - compare against published adaptive-DBS
+                                 literature (Little et al. 2016 - see
                                  :mod:`parkinsons_Motor.training.clinical_benchmark`
                                  for the full setup)
-  - ``simulator_fidelity``     — placeholder for sim-to-real distributional
+  - ``simulator_fidelity``     - placeholder for sim-to-real distributional
                                  distance once real iEEG traces are available
 
 Each public method returns ``List[MetricResult]`` so the dashboard can loop
@@ -84,7 +84,7 @@ class EvaluationSuite:
 
     @staticmethod
     def online_metrics(trajectories: Sequence[DBSTrajectory]) -> List[MetricResult]:
-        """One row per training rollout — what the GRPO trainer should converge on."""
+        """One row per training rollout - what the GRPO trainer should converge on."""
         if not trajectories:
             return []
         rewards = [t.total_reward for t in trajectories]
@@ -108,7 +108,7 @@ class EvaluationSuite:
 
     @staticmethod
     def benchmark_metrics(dataset: DBSTrajectoryDataset) -> List[MetricResult]:
-        """Static metrics on a held-out dataset — what the README reports."""
+        """Static metrics on a held-out dataset - what the README reports."""
         if len(dataset) == 0:
             return []
 
@@ -190,7 +190,7 @@ class EvaluationSuite:
         baseline: Optional[DBSTrajectoryDataset] = None,
         include_clinical: bool = True,
     ) -> Dict[str, List[MetricResult]]:
-        """Run every metric family and return them grouped — the README dump."""
+        """Run every metric family and return them grouped - the README dump."""
         report: Dict[str, List[MetricResult]] = {
             "online":    cls.online_metrics(list(dataset)),
             "benchmark": cls.benchmark_metrics(dataset),
@@ -264,7 +264,7 @@ class EvaluationSuite:
 
     @staticmethod
     def _action_smoothness(ds: DBSTrajectoryDataset) -> float:
-        """Mean |Δ amplitude| per step — lower is smoother (and clinically safer)."""
+        """Mean |Δ amplitude| per step - lower is smoother (and clinically safer)."""
         deltas: List[float] = []
         for t in ds.trajectories:
             amps = t.amplitudes()

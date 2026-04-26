@@ -1,8 +1,8 @@
-# Reward Design — MotorAssistEnv
+# Reward Design - MotorAssistEnv
 
 ## 1. What does each reward term actually measure clinically?
 
-Every term maps to a published clinical endpoint or a documented DBS failure mode — not a heuristic.
+Every term maps to a published clinical endpoint or a documented DBS failure mode - not a heuristic.
 
 | Reward component | Clinical basis |
 |---|---|
@@ -12,7 +12,7 @@ Every term maps to a published clinical endpoint or a documented DBS failure mod
 | `side_effect_load` budget | Stimulation-induced dyskinesia threshold (Rosa 2015; Swann 2018) |
 | `efficiency` (min effective amp) | Battery longevity (Priori 2013); aDBS cuts stim time 56% (Little 2016) |
 | `smoothness_cost` | Abrupt parameter changes cause transient dyskinesia (Velisar 2019) |
-| `terminal_stability` | Sustained benefit at episode end — prevents early-episode gaming |
+| `terminal_stability` | Sustained benefit at episode end - prevents early-episode gaming |
 
 ---
 
@@ -33,8 +33,8 @@ r_t = w_force  * force_preserved_t
 ```
 
 - `safety_t = clamp(1 − side_effect_load_t / max_side_effect_load)`
-- `efficiency_t = 0.65 * (1 − amp/amp_max) + 0.35 * (1 − pw_norm)` — gated by therapeutic engagement
-- `shaping_t` — late-episode terminal-stability proxy (hard: final 25%; medium: recovery proxy from ~step 50%)
+- `efficiency_t = 0.65 * (1 − amp/amp_max) + 0.35 * (1 − pw_norm)` - gated by therapeutic engagement
+- `shaping_t` - late-episode terminal-stability proxy (hard: final 25%; medium: recovery proxy from ~step 50%)
 
 | Weight | `easy` | `medium` | `hard` |
 |---|---|---|---|
@@ -66,7 +66,7 @@ Nine independent components, each combining mean performance with a threshold-ad
 | `terminal_stability_score` | `0.45·force + 0.30·(1−T) + 0.25·(1−err)` on **last 5 steps only** | Sustained benefit; blocks front-loading |
 | `recovery_score` | `0.40·force_recov + 0.40·tremor_recov + 0.20·track_recov` (first 6 vs last 8 steps) | Did the agent rescue the patient, or just survive? |
 
-`therapeutic_engagement = 0.40·force_score + 0.30·beta_score + 0.30·tremor_score` — the gate that makes "do nothing for perfect efficiency" score zero.
+`therapeutic_engagement = 0.40·force_score + 0.30·beta_score + 0.30·tremor_score` - the gate that makes "do nothing for perfect efficiency" score zero.
 
 ---
 
@@ -81,24 +81,24 @@ Different tasks weight components differently to reflect different clinical prio
 | `force_score` | 0.16 | 0.16 | 0.14 |
 | `tracking_score` | 0.12 | 0.16 | 0.16 |
 | `safety_score` | 0.14 | **0.22** | 0.18 |
-| `terminal_stability` | — | 0.08 | 0.08 |
+| `terminal_stability` | - | 0.08 | 0.08 |
 | `efficiency_score` | 0.05 | 0.08 | 0.04 |
 | `smoothness_score` | 0.05 | 0.04 | 0.04 |
-| `recovery_score` | — | 0.06 | — |
+| `recovery_score` | - | 0.06 | - |
 
-Easy emphasises beta — the agent must learn DBS actually suppresses pathological activity. Medium emphasises safety + recovery — rescue without dyskinesia. Hard balances beta+tremor+safety so low-stim coasting can no longer game the safety term.
+Easy emphasises beta - the agent must learn DBS actually suppresses pathological activity. Medium emphasises safety + recovery - rescue without dyskinesia. Hard balances beta+tremor+safety so low-stim coasting can no longer game the safety term.
 
 ### Expert / scenario tasks
 
 | Task | Primary weights |
 |---|---|
-| `fragile_patient` | safety 0.28, tracking 0.18, force 0.18 — therapeutic window precision |
-| `refractory_patient` | force 0.18, tracking 0.14, tremor 0.12 — outcome despite weak response |
-| `personalization_generalization` | force 0.18, tracking 0.18, safety 0.18 — balanced across all profiles |
-| `exercise_bout` | force 0.22, tracking 0.22 — motor performance during exertion |
-| `medication_interaction` | safety 0.22, recovery 0.10 — crisis management without over-treatment |
-| `nocturnal_transition` | safety 0.22, terminal_stability 0.12, efficiency 0.12 — sleep-phase stability |
-| `surgical_followup` | safety 0.30 — microlesion window dominates |
+| `fragile_patient` | safety 0.28, tracking 0.18, force 0.18 - therapeutic window precision |
+| `refractory_patient` | force 0.18, tracking 0.14, tremor 0.12 - outcome despite weak response |
+| `personalization_generalization` | force 0.18, tracking 0.18, safety 0.18 - balanced across all profiles |
+| `exercise_bout` | force 0.22, tracking 0.22 - motor performance during exertion |
+| `medication_interaction` | safety 0.22, recovery 0.10 - crisis management without over-treatment |
+| `nocturnal_transition` | safety 0.22, terminal_stability 0.12, efficiency 0.12 - sleep-phase stability |
+| `surgical_followup` | safety 0.30 - microlesion window dominates |
 
 ---
 
@@ -152,28 +152,28 @@ Fifteen attack policies, each traced to a specific block. **None** = fully block
 | 1 | Do nothing (zero amp) | `efficiency × therapeutic_engagement` collapses | `β < 0.40 → −0.06`; easy `−0.20`, fragile `−0.22` | None |
 | 2 | Always max amp | `adaptation_state` degrades entrainment over time | `safety < 0.20 → −0.12`; hard `−0.08`, easy `−0.14` | None |
 | 3 | Constant 1.0 mA | Calibrated difficulty ordering | easy 0.72–0.80 ✓, medium 0.47–0.52 ✗, hard 0.23–0.36 ✗ | None |
-| 4 | `motor_command` only, skip DBS | Motor output gated by physics | `(1 − 0.52β)(1 − 0.30T)(1 − 0.10SE)` — tracking requires DBS | None |
+| 4 | `motor_command` only, skip DBS | Motor output gated by physics | `(1 − 0.52β)(1 − 0.30T)(1 − 0.10SE)` - tracking requires DBS | None |
 | 5 | Tank early steps, farm recovery | Dense reward penalises early inaction | Recovery weight ≤ 0.10; `terminal_stability` reads last 5 steps | **Bounded** |
 | 6 | Stay inactive for perfect smoothness | Smoothness weight ≤ 0.05 | Every other component collapses simultaneously | None |
 | 7 | Front-load good steps, drift later | `terminal_stability_score` reads last 5 steps only | hard `−0.08`, nocturnal `−0.12` | None |
-| 8 | Fool the sensor, not the patient | Grader reads latent `_beta_state` directly | No API path from `_make_obs` to grader — structurally impossible | None |
+| 8 | Fool the sensor, not the patient | Grader reads latent `_beta_state` directly | No API path from `_make_obs` to grader - structurally impossible | None |
 | 9 | Tamper with the reward signal | FastAPI sandbox with Pydantic validation | Capability not exposed via `step(action)` | None |
 | 10 | Exploit a simulator edge case | Hardened numerics throughout | Divisors floored at `1e-6`; all noise ranges clamped | Negligible |
 | 11 | Memorise the Fleming trajectory | Per-episode stochastic noise on all signals | Random L-DOPA phase + target + seeded events per reset | None |
 | 12 | Optimise dense reward, ignore grader | GRPO uses episode return (= grader) directly | No gap between training signal and evaluation signal | **Bounded** |
 | 13 | Set `motor_command = 0` always | `tracking_score` penalises missed target | `1 − |target − effective| / 2` → near 0 at nonzero target | None |
 | 14 | Push frequency to 185 Hz | `_freq_side_effect_factor` scales side-effect burden | Above 140 Hz: safety budget depletes before beta is suppressed | None |
-| 15 | React to events, coast between them | Events are stochastic per seed | Baseline control required throughout — no free cruise phase | None |
+| 15 | React to events, coast between them | Events are stochastic per seed | Baseline control required throughout - no free cruise phase | None |
 
 ## 7. What stops cheating outside the reward function?
 
-The penalty tables in §5 catch obvious specification gaming. The defenses below catch the cleverer attacks — including ones we haven't thought of yet. None of these appear in the score formulas; they live in the surrounding scaffolding.
+The penalty tables in §5 catch obvious specification gaming. The defenses below catch the cleverer attacks - including ones we haven't thought of yet. None of these appear in the score formulas; they live in the surrounding scaffolding.
 
 | Mechanism | What it does | What it blocks |
 |---|---|---|
 | Latent vs sensed split | Grader reads `_beta_state`; agent reads `obs.beta_arv` with Gaussian sensor noise | Sensor-fooling (DeepMind grasping example) |
 | Per-episode noise factors | `ep_beta_noise`, `ep_tremor_noise`, `ep_force_noise`, `ep_semg_noise` resampled on every reset | Open-loop trajectory memorisation |
-| Stochastic events as real physics | `_apply_event` modifies entrainment, beta drive, side-effect rate — not just the score | Pre-baked schedules; ignoring events |
+| Stochastic events as real physics | `_apply_event` modifies entrainment, beta drive, side-effect rate - not just the score | Pre-baked schedules; ignoring events |
 | FastAPI sandbox | Only entry is `step(action)` with Pydantic-validated `ParkinsonsMotorAction` | Reward tampering; reading grader weights |
 | Bounded multipliers | All noise/factor ranges clamped; divisors floored at `1e-6` | Floating-point exploits, divide-by-zero |
 | Random `target_output` per episode | Tracking target re-rolled at reset within task range | Hard-coding a target value |
@@ -188,10 +188,10 @@ Lessons from DeepMind's *Specification gaming* post and the OpenEnv hackathon gu
 
 | Principle | Implemented as |
 |---|---|
-| Agents read the reward contract literally — design for that | 9-component grader + hard-failure penalties + dense/sparse alignment |
+| Agents read the reward contract literally - design for that | 9-component grader + hard-failure penalties + dense/sparse alignment |
 | Multiple independent axes beat one aggregated score | Each grader component measures a different clinical axis |
 | Dense feedback, not a terminal 0/1 | Per-step reward at 20 ms cadence shapes gradients; grader judges the episode |
-| Block every named exploit before training begins | §6 — 15 attacks, each with a documented block and residual-risk verdict |
+| Block every named exploit before training begins | §6 - 15 attacks, each with a documented block and residual-risk verdict |
 | Exploiting the metric without solving the task should score low | `therapeutic_engagement` gate; constant baseline scores below every threshold |
 | Anticipate sensor-fooling and reward tampering | Latent vs sensed split (§5 in STATE_ACTION_SPACE.md); FastAPI sandbox (§7) |
 | Difficulty ordering must be empirically falsifiable | Constant baseline scores in §9 are strictly monotone across all seeds |
@@ -214,7 +214,7 @@ Expected ranges for a good reactive LLM agent (adjusts amplitude based on `beta_
 |---|---|---|
 | easy | 0.78–0.88 | Yes |
 | medium | 0.58–0.70 | Yes |
-| hard | 0.48–0.62 | Marginal — needs phase-aware crisis management |
+| hard | 0.48–0.62 | Marginal - needs phase-aware crisis management |
 
 ---
 

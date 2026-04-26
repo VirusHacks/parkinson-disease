@@ -30,12 +30,12 @@ class ParkinsonsMotorAction(Action):
 
     The agent controls three DBS parameters (the standard clinical triad) plus a motor command:
 
-      1. dbs_amplitude [0, 5 mA] — stimulation current. Drives cortical entrainment.
-      2. dbs_pulse_width [60, 200 μs] — pulse duration. Controls spatial spread (more neurons recruited).
-      3. dbs_frequency [60, 185 Hz] — stimulation frequency. Beta suppression peaks at ~130 Hz;
+      1. dbs_amplitude [0, 5 mA] - stimulation current. Drives cortical entrainment.
+      2. dbs_pulse_width [60, 200 μs] - pulse duration. Controls spatial spread (more neurons recruited).
+      3. dbs_frequency [60, 185 Hz] - stimulation frequency. Beta suppression peaks at ~130 Hz;
          very high frequency increases side effects; very low frequency favors tremor over beta.
-      4. motor_command [-1, 1] — set to target_output (visible in obs) each step. The environment
-         degrades this proportional to beta_arv and tremor_arv — better DBS → less degradation.
+      4. motor_command [-1, 1] - set to target_output (visible in obs) each step. The environment
+         degrades this proportional to beta_arv and tremor_arv - better DBS → less degradation.
 
     Clinical basis: the three-parameter DBS action space matches the tunable parameters on
     commercial implantable pulse generators (Medtronic Activa, Abbott Infinity, Boston Scientific
@@ -102,16 +102,16 @@ class ParkinsonsMotorObservation(Observation):
 
     Key fields for DBS tuning:
       - beta_arv, tremor_arv: primary disease signals to suppress (targets in task spec)
-      - side_effect_load: cumulative safety budget — keep below task max or score drops sharply
+      - side_effect_load: cumulative safety budget - keep below task max or score drops sharply
       - beta_trend, tremor_trend: direction of change (negative = improving)
       - dbs_entrainment: fraction of cortical axons entrained by current DBS settings
 
     Key fields for motor tracking:
       - target_output: the motor goal this episode (set motor_command to match this)
-      - task_error: |target_output - effective_motor_output| — minimize this
+      - task_error: |target_output - effective_motor_output| - minimize this
       - tracking_accuracy: 1 - task_error/2, normalized to [0,1]
 
-    Derived convenience fields (not independent — computed from primary signals):
+    Derived convenience fields (not independent - computed from primary signals):
       - disease_severity = 0.55*tremor_arv + 0.45*beta_arv
       - beta_suppression = 1 - beta_arv
     """
@@ -138,7 +138,7 @@ class ParkinsonsMotorObservation(Observation):
         description="Fraction of healthy force preserved (0=total loss, 1=fully healthy). Primary graded outcome.",
     )
 
-    # Derived summaries (computed from primary signals — not independent)
+    # Derived summaries (computed from primary signals - not independent)
     disease_severity: float = Field(
         default=0.0, ge=0.0, le=1.0,
         description="Composite disease index = 0.55*tremor_arv + 0.45*beta_arv. Convenience aggregate.",
@@ -212,7 +212,7 @@ class ParkinsonsMotorObservation(Observation):
     )
     dbs_constraint_violation: float = Field(
         default=0.0, ge=0.0, le=1.0,
-        description="Fraction by which action exceeded task amplitude or pulse-width cap. Avoid — incurs hard penalty.",
+        description="Fraction by which action exceeded task amplitude or pulse-width cap. Avoid - incurs hard penalty.",
     )
 
     # Extended physiological signals (real closed-loop DBS devices observe these)
@@ -220,7 +220,7 @@ class ParkinsonsMotorObservation(Observation):
         default=0.0, ge=0.0, le=1.0,
         description=(
             "High-gamma band (60–90 Hz) LFP power, normalized. Elevated gamma indicates "
-            "over-stimulation — the brain's response to excessive DBS drive. "
+            "over-stimulation - the brain's response to excessive DBS drive. "
             "Clinically used as a real-time over-stimulation biomarker (Kühn et al. 2008). "
             "Correlated with side_effect_load but measured independently from a different frequency band."
         ),
@@ -240,7 +240,7 @@ class ParkinsonsMotorObservation(Observation):
         description=(
             "Normalized instantaneous DBS battery consumption rate [0, 1]. "
             "Proportional to amplitude × pulse_width × frequency (charge per second delivered). "
-            "Implanted pulse generators (IPGs) have 5–10 year battery life — high drain "
+            "Implanted pulse generators (IPGs) have 5–10 year battery life - high drain "
             "requires surgical replacement. Efficiency-conscious agents minimize this. "
             "Formula: (amp/5.0)^1.2 × (pw_norm)^0.8 × (freq_norm)^0.6, normalized to [0,1]."
         ),

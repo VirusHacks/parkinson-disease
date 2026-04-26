@@ -13,7 +13,7 @@ in a format that supports:
 
 Mirrors the architecture used by the OpenEnv-Hackathon bio-experiment winner
 ([mhtruong1031/OpenENV-Hackathon] ``training/trajectory.py``) so judges see a
-familiar shape — but specialised for our continuous-control DBS setting
+familiar shape - but specialised for our continuous-control DBS setting
 (amplitude / pulse-width / frequency triple per step) instead of the
 discrete experiment-action enum the bio-env used.
 """

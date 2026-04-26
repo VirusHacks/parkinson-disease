@@ -26,7 +26,7 @@ The :func:`compare_to_literature` function checks the trajectory dataset
 against these reference values and emits a small set of
 :class:`MetricResult` objects for the README.
 
-This is a **deliberately curated, transparent benchmark** — we list each
+This is a **deliberately curated, transparent benchmark** - we list each
 reference target inline so judges can verify the numbers against the
 papers.  No paper-text NLP, no fuzzy matching: just structured comparisons
 the reviewer can audit.
@@ -113,7 +113,7 @@ def _energy_proxy(dataset: DBSTrajectoryDataset) -> float:
 
 
 def _stim_on_fraction(dataset: DBSTrajectoryDataset, on_thresh_mA: float = 0.5) -> float:
-    """Fraction of steps where amplitude exceeded ``on_thresh_mA`` — a proxy for
+    """Fraction of steps where amplitude exceeded ``on_thresh_mA`` - a proxy for
     'stimulator was actively on'. Closed-loop should reduce this vs always-on cDBS."""
     on = 0
     tot = 0
@@ -163,7 +163,7 @@ def compare_to_literature(
 
     When ``baseline`` is provided, computes the reductions relative to a
     cDBS-style always-on baseline (the "before fine-tuning" model would do
-    this in practice — it stimulates more bluntly).
+    this in practice - it stimulates more bluntly).
     """
     out: List[MetricResult] = []
 

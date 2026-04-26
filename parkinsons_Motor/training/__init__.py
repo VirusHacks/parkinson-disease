@@ -4,25 +4,25 @@ This package mirrors the architecture used by the OpenEnv-Hackathon
 bio-experiment winner ([mhtruong1031/OpenENV-Hackathon] ``training/``).
 Each module is a single responsibility:
 
-  * :mod:`parkinsons_Motor.training.replay_grpo`        — single-turn GRPO
+  * :mod:`parkinsons_Motor.training.replay_grpo`        - single-turn GRPO
     against an *in-process* env: ``LocalEnvFactory``,
     ``collect_prompt_dataset``, ``make_replay_reward_fn``. This is the path
     used by the notebook for actual training (no custom ``rollout_func``,
     no asyncio, no WebSocket).
-  * :mod:`parkinsons_Motor.training.trajectory`         — JSON-serialisable
+  * :mod:`parkinsons_Motor.training.trajectory`         - JSON-serialisable
     trajectories, datasets, save/load.
-  * :mod:`parkinsons_Motor.training.evaluation`         — ``EvaluationSuite``
+  * :mod:`parkinsons_Motor.training.evaluation`         - ``EvaluationSuite``
     with online / benchmark / clinical / fidelity metric families.
-  * :mod:`parkinsons_Motor.training.clinical_benchmark` — comparisons against
+  * :mod:`parkinsons_Motor.training.clinical_benchmark` - comparisons against
     published adaptive-DBS literature (Little 2013/2016, Velisar 2019,
     Bronte-Stewart 2020).
-  * :mod:`parkinsons_Motor.training.rollout_collection` — CLI to collect
+  * :mod:`parkinsons_Motor.training.rollout_collection` - CLI to collect
     heuristic / constant-policy rollouts as JSON for offline analysis.
-  * :mod:`parkinsons_Motor.training.plots`              — training-curve
+  * :mod:`parkinsons_Motor.training.plots`              - training-curve
     dashboards, base-vs-trained comparisons, before/after trajectory overlays.
     Re-exported by :mod:`parkinsons_Motor.train` so existing notebook imports
     still work.
-  * :mod:`parkinsons_Motor.training.llm_eval`           — LLM-driven
+  * :mod:`parkinsons_Motor.training.llm_eval`           - LLM-driven
     evaluation against the live env: ``sanity_check_rollout``,
     ``evaluate_model_on_task``, ``evaluate_model_suite``,
     ``eval_with_adapter_disabled``. Also re-exported from

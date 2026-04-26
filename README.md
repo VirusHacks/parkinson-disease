@@ -1,308 +1,348 @@
-  # MotorAssistEnv
-
-  > OpenEnv Hackathon (India 2026) - Theme #3.1 (World Modeling / Professional Tasks)
-
-  [![Hugging Face Space](https://img.shields.io/badge/Hugging%20Face-Space-blue)](https://huggingface.co/spaces/virustechhacks/parkinsons_Motor) [![OpenEnv](https://img.shields.io/badge/OpenEnv-Compatible-green)](https://github.com/meta-pytorch/OpenEnv) [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
-
-  [Problem](#problem) · [How It Works](#how-it-works) · [Tasks](#task-suite) · [Reward Design](#reward-design) · [Results](#results) · [Why It Matters](#why-it-matters) · [Quick Start](#quick-start) · [Architecture](#architecture) · [Docs](#documentation-map)
-
-
-
-  ## Problem
-
-  **Can a language model learn to program a brain implant and give a Parkinson's patient back the ability to perform their daily tasks?**
-
-  We gave an LLM a noisy LFP electrode, three knobs on a Medtronic-class deep brain stimulator, and a patient whose basal ganglia is collapsing in real time. No medical training. No examples of "good DBS programming." Just raw biomarkers every 20 ms and a clock that doesn't stop.
-
-  By step 36 of an easy episode, an off-the-shelf 72B model can suppress pathological beta below the clinical target and pass the smoke-test grader. By step 100 of a hard episode, the same model is fighting tachyphylaxis it has never seen, an off-medication crisis it cannot predict, and a refractory patient whose brain stops responding to moves that worked thirty seconds ago. It scores **0.59** where a constant-dose policy scores **0.23** - that gap is the entire point of the benchmark.
-
-  **MotorAssistEnv** is an OpenEnv-compatible reinforcement-learning environment that turns adaptive Deep Brain Stimulation (aDBS) into a benchmark for sequential medical control. Calibrated against the peer-reviewed Fleming et al. (2023) biophysical simulation, it exposes 10 clinically grounded tasks across a strictly monotonic difficulty ladder, built so agents have to actually treat the patient - not game the metric.
-
-
-  ## Inspiration
-
-  Parkinson's disease breaks the basal ganglia circuit. The signature is pathological beta-band synchrony in the subthalamic nucleus - that one oscillation causes tremor, rigidity, and the slow loss of voluntary movement that turns ordinary tasks into hard ones. Reaching for a door handle. Signing your name. Buttoning a shirt. Over **1 million patients** in the world live with this; over **50,000** have a DBS implant. The hardware works. The settings are usually wrong, and the patient suffers in the gap between programming visits - typically 3–6 months apart.
-
-  Adaptive (closed-loop) DBS is where the field is heading. MotorAssistEnv frames the policy a closed-loop device would need to learn as an RL benchmark.
-
-  > Full clinical framing and why RL beats hand-tuned PID: [PROBLEM.md](./PROBLEM.md)
-
-  ## How It Works
-
-  One environment step simulates one 20 ms stimulation cycle. The agent receives a 30-field observation, outputs three DBS control knobs + a motor command, and the patient's brain answers.
-
-  ```
-    Biophysical Data        Latent Brain State
-    (Fleming model)   ───►  beta, tremor, force,     ───►  Sensor obs (30 floats)
-    offline, fixed          side-effects, adapt                    │
-                            (all hidden from agent)                │
-                                      ▲                            ▼
-    Stochastic Events  ──────────────►│◄──────────────  Agent  (Qwen + LoRA via GRPO)
-    tachyphylaxis,                    │   action        chooses amp, pw, freq, motor
-    off-med crisis,                   │   (4 floats)
-    motor surges               Dense reward
-                              per 20 ms step
-                                      │
-                                      ▼
-                            Episode-end grader  ───►  score in [0, 1]
-                            (9-component, deterministic)
-  ```
-
-  1. `reset(task_id, seed)` selects one of 10 tasks, picks the patient profile, and builds a seeded event timeline.
-  2. The agent receives a `ParkinsonsMotorObservation` - 30 fields covering brain biomarkers, motor function, device state, 5-step trends, and episode metadata.
-  3. The agent emits a `ParkinsonsMotorAction`: `dbs_amplitude` (0–5 mA), `dbs_pulse_width` (0.06–0.20 ms), `dbs_frequency` (60–185 Hz), `motor_command` (−1 to +1).
-  4. The environment resolves event overrides, clips the action to task ceilings, and computes entrainment via bilinear interpolation on the **12×15 Fleming sweep** (one-step neural lag).
-  5. Beta and tremor evolve: `0.45·prev + 0.55·target`, where `target = baseline − 0.82·entrainment·responsiveness + event_pressures`.
-  6. Effective motor output: `motor_command × (1 − 0.52·β) × (1 − 0.30·T) × (1 − 0.10·SE) + noise` - Parkinson's physically distorts what the patient is trying to do.
-  7. Dense reward fires. On termination, the 9-component grader produces a score in `[0, 1]`.
-
-  > Full state transition equations and observation/action schema: [STATE_ACTION_SPACE.md](./STATE_ACTION_SPACE.md)
-
-  ## Task Suite
-
-  Ten tasks across three buckets. The difficulty ordering is empirically proven - not aspirational.
-
-  **Difficulty ladder** - same patient family, increasing crisis load
-
-  | Task | Steps | What's hard | Threshold |
-  |---|---:|---|---:|
-  | `easy` - Calm Start | 36 | Smoke test. Reasonable amp gets you through. | 0.55 |
-  | `medium` - Rescue Phase | 60 | Mid-episode deterioration wave (55%); rescue without dyskinesia. | 0.52 |
-  | `hard` - Full Episode | **150** | Tachyphylaxis (82%) + off-med crisis (75%) + dyskinesia spikes (80%) + motor surges (65%). Four overlapping crises. | **0.42** |
-
-  A constant 1.0 mA / 0.13 ms / 130 Hz baseline was run 5 seeds per task. Easy passes 5/5 (`0.72–0.80`). Medium fails 5/5 (`0.47–0.52`). Hard fails 5/5 (`0.23–0.36`). Thresholds sit exactly above what doing nothing achieves - passing means the agent reasoned.
-
-  **Expert tasks** - test transfer, not just performance
-
-  | Bucket | Tasks | What it tests |
-  |---|---|---|
-  | Patient generalisation | `fragile_patient`, `refractory_patient`, `personalization_generalization` | Can the policy transfer across physiologically different patients? Fragile patients have half the usable amplitude range; refractory patients stop responding to the moves that worked. |
-  | Clinical scenario reasoning | `exercise_bout`, `medication_interaction`, `nocturnal_transition`, `surgical_followup` | Can the agent recognise *what kind of situation this is*? A fresh implant has a **0.6 mA hard ceiling**. A nocturnal transition tightens biomarker targets by 20–35% mid-episode. |
-
-  An agent that passes all three buckets hasn't memorised a dose - it's internalised what DBS is for.
-
-  > Full task parameters, event schedules, and difficulty proof: [TASKS.md](./TASKS.md)
-
-  ## Reward Design
-
-  Two layers: dense per-step shaping that gives gradient signal, and a deterministic episode-end grader that can't be gamed.
-
-  **Per-step dense reward (hard task)**
-
-  ```
-  r_t = 0.22 · (1 − beta_arv)         ← primary DBS objective
-      + 0.14 · (1 − tremor_arv)        ← co-primary
-      + 0.16 · tracking_accuracy
-      + 0.14 · force_preserved
-      + 0.18 · safety                  ← clamp(1 − SE / SE_max)
-      + 0.04 · (1 − smoothness_cost)
-      + 0.04 · efficiency              ← gated by therapeutic_engagement
-      + shaping_t                      ← terminal-stability bonus, last 25%
-      − 0.08 · constraint_violation
-  ```
-
-  Weights shift per task - easy emphasises beta suppression (the agent must discover DBS works), medium emphasises safety + recovery, hard balances all axes so coasting on any single term fails.
-
-  **Episode-end grader - 9 components**
-
-  `final_score = clamp(weighted_sum − hard_failure_penalties, 0.0, 1.0)`
-
-  | Component | What it captures |
-  |---|---|
-  | `beta_score` | `0.55·weighted_mean(1−β) + 0.45·frac(β ≤ target)` - depth + time in range |
-  | `tremor_score` | Same dual metric for tremor |
-  | `force_score` | `weighted_mean(force) / target_force`, early steps weighted ~1.35× |
-  | `safety_score` | `clamp(1 − (0.45·mean + 0.35·peak + 0.20·violation)·1.8)` |
-  | `efficiency_score` | `(0.65·(1−amp/max) + 0.35·(1−pw)) × therapeutic_engagement` - gated to block zero-DBS gaming |
-  | `terminal_stability_score` | `0.45·force + 0.30·(1−T) + 0.25·(1−err)` on **last 5 steps only** - blocks front-loading |
-
-  **Hard-failure penalties** fire in addition to the score they already cost:
-
-  | Condition | Penalty |
-  |---|---:|
-  | `safety_score < 0.20` (any task) | −0.12 |
-  | `beta_score < 0.30` (hard) | −0.10 |
-  | `terminal_stability_score < 0.25` (hard) | −0.08 |
-  | Amp violation in microlesion window | **−0.20** |
-  | Zero stim during exertion (exercise_bout) | −0.16 |
-
-  The `therapeutic_engagement = 0.40·force + 0.30·beta + 0.30·tremor` gate on efficiency closes the most attractive shortcut: an agent that produces no clinical effect collects no efficiency credit, even while barely using the battery.
-
-  > Full reward formula, per-task weight tables, and 15-attack adversarial audit: [REWARD_DESIGN.md](./REWARD_DESIGN.md)
-
-  ## Results
-
-  ### What changed after training?
-
-  Qwen3-4B + LoRA, fine-tuned via GRPO on MotorAssistEnv for 67 steps across easy / medium / hard curriculum. The key question: does the policy get meaningfully better, and does it stay stable?
-
-  **Training dashboard** - policy loss, mean reward, KL divergence, and reward variance across 67 training steps
-
-  ![GRPO Training Dashboard](./plots/09_combined_dashboard.png)
-  *Four-panel overview. Top-left: policy loss stays bounded (0.006–0.015), no divergence. Top-right: mean reward holds above 0.86 run-wide average (dashed line), peaking at 0.986 at step 9. Bottom-left: KL divergence grows gradually — the policy is genuinely moving away from the base model. Bottom-right: reward std stays non-zero throughout, confirming GRPO always has a gradient signal to work with.*
-
-  **Mean reward over training** - smoothed 5-step moving average with early / mid / late phase shading
-
-  ![Mean Reward](./plots/02_mean_reward.png)
-  *Run mean = 0.8674 (dashed red). The smoothed curve (blue) is flat-to-rising across phases, with peak 0.9855 at step 9. No collapse — the policy never reverts to the constant-baseline range (0.23–0.36 on hard).*
-
-  **Reward vs loss on the same axis** - confirms the two signals move together, not against each other
-
-  ![Reward vs Loss](./plots/06_reward_vs_loss.png)
-  *Green (reward, left axis) vs red-dashed (loss, right axis). Loss gently descends as reward rises in early training, then both stabilise mid-run. A healthy sign: the model isn't sacrificing reward to minimise loss.*
-
-  **Phase-by-phase comparison** - reward and KL broken into early, mid, late thirds
-
-  ![Phase Comparison](./plots/07_phase_comparison.png)
-  *Mean reward is nearly constant across phases (0.865 early → 0.859 late), while KL climbs (0.43 → 0.51). The policy is still moving at step 67 — not stuck in a local minimum.*
-
-  **Within-group reward std** - the signal GRPO needs to stay alive
-
-  ![Reward Group Std](./plots/05_reward_group_std.png)
-  *Std × 1000 stays above zero at every step (smoothed red line). Early spikes up to 10 units indicate rapid differentiation; it stabilises to ~2 units mid-run. GRPO requires this to be non-zero; a dead policy collapses to 0 and stays there.*
-
-  ### Baselines side-by-side
-
-  | Policy | `easy` (36 steps) | `medium` (60 steps) | `hard` (150 steps) | Threshold |
-  |---|:---:|:---:|:---:|:---:|
-  | Constant 1.0 mA | 0.72–0.80 ✓ | 0.47–0.52 ✗ | 0.23–0.36 ✗ | 0.55 / 0.52 / 0.68 |
-  | Qwen2.5-72B (no training) | **0.7951** ✓ | 0.4525 ✗ | 0.5944 ✗ | |
-  | Qwen3-4B + GRPO (67 steps) | mean **0.87** ✓ | mean **0.87** ✓ | mean **0.87** in training | |
-
-  On `easy`, `beta_score = 0.948` with no medical priors - the reward signal alone is enough to teach beta suppression. On `hard`, the untrained 72B model scores **0.59** against a constant dose's **0.23–0.36** - that ~0.33 gap is what GRPO closes. The trained 4B model, after 67 steps of curriculum training, is already maintaining mean reward above both baselines across all phases.
-
-  ## Quick Start
-
-  **1. Run the environment server locally**
-
-  ```bash
-  uv run --project parkinsons_Motor server
-  ```
-
-  Starts at `http://localhost:8000` · [FastAPI docs](http://localhost:8000/docs) · [3D viewer](http://localhost:8000/viewer)
-
-  **2. Use the environment from Python**
-
-  ```python
-  from parkinsons_Motor.server.parkinsons_Motor_environment import ParkinsonsMotorEnvironment
-  from parkinsons_Motor.core.models import ParkinsonsMotorAction
-
-  env = ParkinsonsMotorEnvironment()
-  obs = env.reset(task_id="hard", seed=42)
-
-  for step in range(obs.metadata["episode_steps"]):
-      action = ParkinsonsMotorAction(
-          dbs_amplitude=1.4,
-          dbs_pulse_width=0.13,
-          dbs_frequency=130.0,
-          motor_command=obs.target_output,
-      )
-      obs = env.step(action)
-      print(f"step={step:3d}  beta={obs.beta_arv:.3f}  SE={obs.side_effect_load:.3f}  reward={obs.reward:+.3f}")
-      if obs.done:
-          print(f"score={obs.grader_score:.4f}  pass={obs.episode_success}")
-          break
-  ```
-
-  **3. Train with GRPO in Colab**
-
-  Open [`colab_train_motorassist.ipynb`](./colab_train_motorassist.ipynb) - TRL `GRPOTrainer` + Unsloth 4-bit + LoRA on Qwen3-4B. Uses replay-based reward with an in-process environment (~50× faster than live WebSocket rollouts).
-
-  **4. Deploy to Hugging Face Spaces**
-
-  ```bash
-  openenv push parkinsons_Motor --repo-id your-username/parkinsons_Motor
-  ```
-
-  Live demo: [huggingface.co/spaces/virustechhacks/parkinsons_Motor](https://huggingface.co/spaces/virustechhacks/parkinsons_Motor)
-
-  > **Eliminating cold-starts on the free tier.** Free Docker Spaces sleep
-  > after ~48 h of inactivity and pay a 30–90 s cold start on the next
-  > request. This repo ships a GitHub Actions cron at
-  > `.github/workflows/hf-space-keepalive.yml` that pings `/health` every
-  > 20 min so the idle timer never elapses. No paid hardware required.
-  > The server also exposes `GET /health` (used by the cron and the
-  > `Dockerfile` `HEALTHCHECK`) and pre-warms the calibration `lru_cache`
-  > on FastAPI startup so the first `/reset` after a wake feels snappy.
-
-  ## Architecture
-
-  Five layers, cleanly separated so the RL backend never blocks on 3D physics and the grader never reads from the agent's observation path.
-
-  ```
-    ┌─────────────────────────────────────────┐
-    │  Biophysical Data Layer  (offline)       │
-    │  Fleming et al. (2023) - peer-reviewed  │
-    │  CSVs: beta, tremor, force timelines     │
-    │  TXT: 12×15 DBS entrainment surface      │
-    └────────────────┬────────────────────────┘
+---
+title: parkinsons-Motor
+emoji: 🧠
+colorFrom: purple
+colorTo: blue
+sdk: docker
+app_port: 8000
+pinned: true
+license: mit
+tags:
+  - openenv
+  - rlvr
+  - rlve
+  - grpo
+  - trl
+  - unsloth
+  - parkinson
+  - dbs
+  - reinforcement-learning
+  - medical-ai
+  - neurostimulation
+short_description: RL environment for adaptive closed-loop Deep Brain Stimulation control
+---
+
+# MotorAssistEnv
+
+> **OpenEnv Hackathon India 2026** · Theme #3.1 - World Modeling / Professional Tasks
+
+[![HF Space](https://img.shields.io/badge/HuggingFace-Space-blue)](https://huggingface.co/spaces/virustechhacks/parkinsons_Motor) [![Model](https://img.shields.io/badge/HuggingFace-Model-orange)](https://huggingface.co/virustechhacks/dbs-grpo-qwen3-4b) [![WandB](https://img.shields.io/badge/WandB-Training_Logs-yellow)](https://wandb.ai/daksh-jain24-spit/parkinsons-motor-env) [![YouTube](https://img.shields.io/badge/YouTube-Demo-red)](https://youtu.be/ocF6SzPHexE) [![OpenEnv](https://img.shields.io/badge/OpenEnv-Compatible-green)](https://github.com/meta-pytorch/OpenEnv) [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
+
+[The Problem](#the-problem) · [What This Is](#what-this-is) · [How It Works](#how-it-works) · [Tasks](#tasks) · [Training](#training) · [Results](#results) · [Quick Start](#quick-start) · [Docs](#docs)
+
+---
+
+## Links
+
+| Artifact | URL |
+| :--- | :--- |
+| 🟢 Live HF Space (env server) | [huggingface.co/spaces/virustechhacks/parkinsons_Motor](https://huggingface.co/spaces/virustechhacks/parkinsons_Motor) |
+| 🤖 Trained LoRA model | [huggingface.co/virustechhacks/dbs-grpo-qwen3-4b](https://huggingface.co/virustechhacks/dbs-grpo-qwen3-4b) |
+| 🎬 Demo video (YouTube) | [youtu.be/ocF6SzPHexE](https://youtu.be/ocF6SzPHexE) |
+| 📓 Training notebook (Google Colab) | [Open in Colab](https://colab.research.google.com/drive/1zJTiyyTcD_BahARPGa_2xlzH9MGCb8ye?usp=sharing) |
+| 📈 Training logs (WandB) | [wandb.ai/daksh-jain24-spit/parkinsons-motor-env](https://wandb.ai/daksh-jain24-spit/parkinsons-motor-env) |
+| 💻 GitHub source | [github.com/VirusHacks/parkinson-disease](https://github.com/VirusHacks/parkinson-disease/) |
+| 📝 Blog post | [blog.md](./blog.md) |
+| 📊 Full results & training narrative | [Results.md](./Results.md) |
+| 🔬 Reward design + exploit-block audit | [REWARD_DESIGN.md](./REWARD_DESIGN.md) |
+
+## The Problem
+
+Parkinson's disease disrupts the brain signals responsible for movement, leading to tremors, stiffness, and slowed motor control. Deep Brain Stimulation can reduce these symptoms - but tuning stimulation parameters today is still a difficult, manual trial-and-error process.
+
+A neurologist sets amplitude, frequency, and pulse width once, and the device runs at those fixed settings for months. Meanwhile, the patient's brain changes every single day. Medication wears off. Stress spikes oscillations. Exercise shifts the baseline. The device doesn't know any of this. It just keeps firing.
+
+**The gap between visits is where patients suffer.**
+
+Adaptive DBS - where the device reads biomarkers and adjusts stimulation in real time - is where the field is heading. Clinical trials have already shown it reduces side effects and improves motor outcomes. What's missing is the *policy*: a controller intelligent enough to do the adapting continuously, not just on the day of the clinic visit.
+
+Nobody had tried training a language model to be that controller. Until now.
+
+---
+
+## What This Is
+
+**MotorAssistEnv** is a scientifically grounded reinforcement learning environment for training AI agents to optimize Parkinson's treatment automatically.
+
+At its core, it simulates the brain's Parkinsonian motor circuitry - including the Subthalamic Nucleus, where abnormal neural activity is strongly linked to motor symptoms - and models how Deep Brain Stimulation interacts with this circuit in real time.
+
+Through the OpenEnv interface, DBS parameters - amplitude, pulse width, and frequency - become the agent's action space. Each action updates the patient's neural and motor state, creating a true closed-loop control environment. The environment is calibrated against **Fleming et al. (2023)**, a peer-reviewed Hodgkin-Huxley simulation of 400 neurons published in the *Journal of Neural Engineering*. This is not a proxy. The numbers are real.
+
+To make this physically grounded, the environment integrates **Meta's MyoSuite biomechanical simulation framework**, allowing neural activity to directly drive anatomically accurate musculoskeletal movement. The agent is not learning on abstract numbers alone - it is learning through realistic body dynamics. As Parkinsonian activity increases, the model develops visible tremor and slower movement. As stimulation improves, the body regains smoother and stronger motor control.
+
+The agent receives rich observations - tremor severity, beta activity, movement force, tracking quality, side-effect estimates - then learns policies that maximize symptom relief while minimizing adverse effects. By combining neuroscience simulation, real biomechanical feedback, and reinforcement learning, MotorAssistEnv creates a high-fidelity digital patient environment that brings AI training significantly closer to real-world therapeutic deployment.
+
+**This is the first RL benchmark for adaptive closed-loop DBS control with language models - and a direct step toward adaptive, personalized, and autonomous neurostimulation systems for the future of Parkinson's care.**
+
+---
+
+## How It Works
+
+One step = one 20 ms DBS cycle, the same cadence as real hardware. The agent and the patient's brain run in a continuous closed loop - sense, decide, stimulate, repeat.
+
+```
+  ┌─────────────────────────────────────────────────────────────────┐
+  │                    CLOSED-LOOP CONTROL CYCLE                    │
+  │                       (every 20 ms)                             │
+  └─────────────────────────────────────────────────────────────────┘
+
+  ┌──────────────────────────────────────┐
+  │         Patient Brain State          │  ← noisy sensor reading
+  │                                      │    (what the DBS device sees)
+  │  beta_arv    ← suppress this         │
+  │  tremor_arv  ← suppress this         │
+  │  force       ← protect this          │
+  │  side_effect ← don't exceed budget   │
+  │  beta_trend  ← getting better/worse? │
+  │  + 25 more fields                    │
+  └─────────────────┬────────────────────┘
+                    │  observe
+                    ▼
+  ┌──────────────────────────────────────┐
+  │     Agent  (Qwen3-4B + LoRA)         │
+  │     trained with GRPO                │
+  └─────────────────┬────────────────────┘
+                    │  decide
+                    ▼
+  ┌──────────────────────────────────────┐
+  │              DBS Action              │
+  │                                      │
+  │  amplitude   (mA)                    │
+  │  pulse_width (µs)                    │
+  │  frequency   (Hz)                    │
+  │  motor_command                       │
+  └─────────────────┬────────────────────┘
+                    │  stimulate
+                    ▼
+  ┌──────────────────────────────────────┐
+  │        Patient Brain Responds        │  ← true latent state
+  │                                      │    (what the grader reads)
+  │  new beta, tremor, force, side-fx    │
+  │  → dense reward signal               │
+  └─────────────────┬────────────────────┘
                     │
+          ┌─────────┴──────────┐
+          │ next step (loop)   │  ──────────────────────────► back to top
+          │                    │
+          │ at episode end ↓   │
+          └─────────┬──────────┘
                     ▼
-    ┌────────────────────────────────────────┐
-    │  Brain Calibrator  (runs once, cached) │
-    │  Normalises signals to [0, 1]          │
-    │  Builds bilinear interpolation surface │
-    └────────────────┬───────────────────────┘
-                    │
-                    ▼
-    ┌────────────────────────────────────────┐     ┌───────────────────┐
-    │  MotorAssist Environment  (online)      │────►│  3D Visualisation │
-    │  OpenEnv step() / reset() API           │     │  MyoSuite puppet  │
-    │  10 tasks · stochastic events           │     │  (not in RL loop) │
-    └────────────────┬───────────────────────┘     └───────────────────┘
-                    │ obs (30 floats)
-                    ▼
-    ┌────────────────────────────────────────┐
-    │  Agent  (Qwen3-4B + LoRA via GRPO)     │
-    │  action: amp, pw, freq, motor_command  │
-    └────────────────┬───────────────────────┘
-                    │
-                    ▼
-    ┌────────────────────────────────────────┐
-    │  Grader System  (deterministic math)   │
-    │  9 components · no LLM-as-Judge        │
-    │  score ∈ [0.0, 1.0]                   │
-    └────────────────────────────────────────┘
-  ```
+  ┌──────────────────────────────────────┐
+  │    9-component clinical grader       │
+  │    deterministic · cannot be gamed   │
+  │    final score  ∈  [0.0 , 1.0]       │
+  └──────────────────────────────────────┘
+```
 
-  The grader reads `self._beta_state` directly; the agent reads it through Gaussian sensor noise via `_make_obs`. There is no API path from agent action to grader buffer - sensor-fooling is structurally impossible.
+The agent never sees the true brain state - it sees a noisy sensor reading, just like a real DBS device. The grader reads the true latent state. This is exactly how clinical outcomes work: a noisy LFP signal to control with, a neurologist's assessment to be judged by. The two are deliberately separate.
 
-  > Full component design, runtime flow, and determinism guarantees: [ARCHITECTURE.md](./ARCHITECTURE.md)
+---
 
-  ## Documentation Map
+## Why This Is a Perfect RL Environment
 
-  | Document | What's inside |
-  |---|---|
-  | [PROBLEM.md](./PROBLEM.md) | Clinical framing, why DBS programming is sequential control, the case for RL over PID, Fleming model deep-dive |
-  | [ARCHITECTURE.md](./ARCHITECTURE.md) | System design, component interactions, runtime flow, determinism guarantees, anti-hacking mechanisms |
-  | [STATE_ACTION_SPACE.md](./STATE_ACTION_SPACE.md) | All 30 observation fields with formulas, 4 control knobs in real units, latent-vs-sensed split, patient profiles |
-  | [REWARD_DESIGN.md](./REWARD_DESIGN.md) | Per-step reward formula, per-task weight tables, 9-component grader, 15-attack adversarial audit |
-  | [TASKS.md](./TASKS.md) | All 10 tasks with parameters, event schedules, success-threshold calibration, constant-baseline difficulty proof |
-  | [RESEARCH_AND_REFERENCES.md](./RESEARCH_AND_REFERENCES.md) | 25-source annotated bibliography, Fleming model lineage, RL-for-DBS prior art |
-  | [colab_train_motorassist.ipynb](./colab_train_motorassist.ipynb) | Runnable training notebook - GRPO + replay-based reward, SFT warmup, training curves |
+DBS control has every structural property that makes RL both necessary and tractable - and that breaks every classical controller:
 
-  ## Scientific Grounding
+- **Decisions compound over time.** A wrong dose at step 10 echoes for 140 more steps. The agent must think across the episode, not just react to the current snapshot.
+- **No fixed optimal policy.** The right settings depend on patient profile, disease phase, medication level, and what the agent has already done. A lookup table won't work.
+- **Partial observability.** The agent sees noisy sensor readings - just like a real DBS device. The true neural state is hidden. It must infer and act under uncertainty.
+- **Dense reward every 20 ms.** Every action gets a signal. Credit assignment is tractable and clinically grounded.
+- **Multi-objective, no shortcuts.** Beta suppression, tremor reduction, force preservation, and side-effect budget must all be satisfied simultaneously. Maxing any one collapses the others. We tested 15 gaming strategies - all are explicitly blocked.
+- **Non-stationary dynamics.** Tachyphylaxis, medication dropout, and motor surges change the environment mid-episode. The policy has to keep working on a brain that is actively fighting back.
 
-  The dynamics anchor is calibrated outputs from Fleming et al. (2023, *J Neural Eng* 20(5):056029) - a Hodgkin-Huxley simulation of 400 neurons across cortex, STN, GPe, GPi, thalamus, spinal motoneurons, and a Hill-type muscle model with ~5M synaptic connections. Force amplitudes are in real millinewtons (59,752 mN healthy baseline). Beta values are normalised to real pre-DBS LFP. The 12×15 entrainment surface the agent navigates was published in that same paper.
+> A PID controller tracks a setpoint. A language model trained with RL reads the combination of signals, reasons about where the episode is heading, and adjusts strategy. That is the gap MotorAssistEnv was built to close.
 
-  Reward term citations: Limousin 1995 (force weighting), Kühn 2008 (130 Hz frequency optimum), Tinkhauser 2017 (beta time-in-range), Swann 2018 (safety score), Velisar 2019 (smoothness term).
+---
 
-  > Full annotated bibliography (25 sources): [RESEARCH_AND_REFERENCES.md](./RESEARCH_AND_REFERENCES.md)
+## Tasks
 
-  ## Why it matters
+Ten tasks across a strict difficulty ladder. The ordering isn't aspirational - it's empirically proven. A constant 1.0 mA baseline was run across 5 seeds per task:
 
-  Over **1 million people** worldwide live with Parkinson's disease. More than **50,000** have a deep brain stimulator implanted. The hardware works — but it runs on fixed settings programmed by a clinician every 3–6 months. In between, the patient lives with settings that were right on Monday and wrong on Friday.
+| Task | Steps | What the Agent Faces | Pass Threshold |
+|---|:---:|---|:---:|
+| `easy` | 36 | Calm patient, steady biomarkers. Prove DBS works. | 0.55 |
+| `medium` | 60 | Mid-episode deterioration. Rescue without causing dyskinesia. | 0.52 |
+| `hard` | 150 | Four simultaneous crises: tachyphylaxis + off-med emergency + dyskinesia spikes + motor surges. Refractory patient. | 0.42 |
 
-  Adaptive DBS has been shown in clinical trials to reduce side effects and improve motor outcomes compared to fixed stimulation. What's missing is the policy: a controller that reads biomarkers in real time and adjusts accordingly. Training that controller on real patients is dangerous and slow. MotorAssistEnv is a simulation-first benchmark that lets a language model practice the control problem at scale before it ever touches hardware.
+> **Constant baseline scores:** easy 0.72–0.80 ✅ · medium 0.47–0.52 ❌ · hard 0.23–0.36 ❌
+>
+> Passing means the agent reasoned. Constant stimulation always fails medium and hard.
 
-  The LLM-as-DBS-controller framing is deliberate: LLMs can read clinical notes, understand medication context, and explain their decisions — none of which a PID controller can do. If an RL-trained LLM can pass the 10-task curriculum here, it becomes a candidate for the closed-loop policy inside next-generation implant firmware.
+**Plus 7 expert tasks** that test transfer, not just performance: fragile patients with narrow therapeutic windows, refractory patients who stop responding, surgical follow-up windows where exceeding 0.6 mA is catastrophic, nocturnal transitions that tighten every biomarker target mid-episode.
 
-  ## Limits
+An agent that passes all three buckets hasn't memorised a dose - it's understood what DBS is for.
 
-  This is a benchmark environment, not a clinical device. The dynamics are mechanistically grounded but remain a semi-mechanistic simulator, not a full patient model. Real-world deployment would require patient-specific calibration, hardware-in-the-loop validation, and FDA/CE clinical trials.
+---
 
-  What it is: the most clinically grounded RL-for-DBS environment in the OpenEnv ecosystem, calibrated against peer-reviewed biophysics, with a 10-task curriculum, a 9-component grader, and an empirically falsifiable difficulty ordering.
+## Reward Design
 
-  ## License
+Two layers. A dense per-step signal that gives gradient feedback every 20 ms, and a deterministic 9-component grader at episode end that cannot be gamed.
 
-  MIT. See [LICENSE](./LICENSE).
+Every reward term maps to a clinical measurement from a published study:
+
+| Term | What it measures | Clinical source |
+|---|---|---|
+| Beta ARV suppression | Primary DBS objective | Little et al. 2013, 2016 |
+| Tremor ARV suppression | Secondary biomarker | Tinkhauser et al. 2017 |
+| Force preserved | Voluntary motor function | Limousin et al. 1995 |
+| Safety (side-effect load) | Dyskinesia risk | Swann et al. 2018 |
+| Efficiency | Battery longevity | Priori et al. 2013 |
+| Smoothness | Abrupt-change dyskinesia | Velisar et al. 2019 |
+| Terminal stability | Last 5 steps only - blocks front-loading | - |
+
+**The reward cannot be gamed.** We tested 15 adversarial strategies - zero stimulation, constant maximum amplitude, front-loading early steps, sensor-fooling, memorising trajectories - and every single one is explicitly blocked. The only way to score well is to actually treat the patient.
+
+> Full reward formula, per-task weight tables, and all 15 exploit-blocks: [REWARD_DESIGN.md](./REWARD_DESIGN.md)
+
+---
+
+## Training
+
+### Approach: SFT First, Then GRPO
+
+Starting GRPO from a blank model on a medical control task is a recipe for failure. Without SFT, the model has no idea what a valid DBS action looks like - it produces outputs like "2.2 mA constant amplitude" that trip the safety budget immediately. We saw this exact failure in our zero-shot baseline runs.
+
+The training pipeline:
+
+1. **SFT** - Roll out the reference adaptive policy. Each step becomes a training example: *this observation → this action*. The model learns what clinical validity looks like before RL starts.
+2. **GRPO Run 1** - 67 steps, group size 6, curriculum across easy/medium/hard. The model learns which valid action is best. *(79 minutes, Kaggle T4)*
+3. **GRPO Run 2** - 270 steps, full epoch, cosine LR schedule to completion. Policy continues improving. *(37 minutes)*
+
+**Total: 337 GRPO steps · 116 minutes · free Kaggle T4 GPU**
+
+### What the Training Looked Like
+
+![GRPO Training Dashboard](./plots/09_combined_dashboard.png)
+
+*Four signals, all healthy. Policy loss converging. Reward stable above 0.86. KL divergence rising - the policy is genuinely moving away from the base model. Reward std nonzero - GRPO always has signal to discriminate on. Every number here is a good sign.*
+
+![Policy Loss](./plots/01_policy_loss.png)
+
+*Loss spikes early as the model explores, then settles. This is normal GRPO behaviour: high-variance exploration followed by exploitation of discovered strategies.*
+
+![Mean Reward](./plots/02_mean_reward.png)
+
+*Mean reward averaged 0.867 over Run 1, peaking at 0.985 at step 9. The high starting point is the SFT benefit - the model begins competent and GRPO refines from there.*
+
+![KL Divergence](./plots/03_kl_divergence.png)
+
+*KL divergence climbed from 0.41 to 0.77 across both runs - a total drift of +0.37 from base. This is the fingerprint of genuine learning. A flat KL means training changed nothing. Ours rose every run.*
+
+![Phase Comparison](./plots/07_phase_comparison.png)
+
+*Reward stays stable across training phases (early 0.865 → late 0.859) while KL keeps climbing (0.43 → 0.51). The policy is still moving at step 67. Not stuck. Not collapsed.*
+
+**Format compliance across all 337 steps: 100%.** Not a single generation failed to produce parseable JSON within the token budget. SFT eliminated cold-start failures before GRPO began.
+
+---
+
+## Results
+
+### Zero-Shot Baselines: What Existing Models Can Do
+
+Before training, three production LLMs were benchmarked zero-shot - just a system prompt, no fine-tuning:
+
+![Baseline Scores by Task](./plots/benchmark/10_score_by_model_task.png)
+
+Every model passes easy. Medium and hard reveal the gap. The 7B model scores **0.255 on medium** - *lower than a constant 1.0 mA policy* - and **0.019 on hard**. Not a failure to improve. An active regression. The amplitude traces show exactly why:
+
+![Amplitude Traces](./plots/benchmark/14_amplitude_traces.png)
+
+*The 7B model slams amplitude to 1.5–2.2 mA and holds it. No adaptation. The safety budget collapses by step 30. The 72B model on easy adjusts dynamically between 0.8 and 1.1 mA - that's the adaptive behaviour we're training for.*
+
+![Pass Rate Heatmap](./plots/benchmark/12_pass_rate_heatmap.png)
+
+*Easy: all models pass. Medium and hard: only the 72B passes. The difficulty ladder is real - easy is accessible, hard requires genuine adaptive control that scale alone cannot provide.*
+
+### After Training: Our 4B Model vs. All Baselines
+
+![Trained Model vs Baselines](./plots/trained_vs_baseline.png)
+
+**The trained Qwen3-4B passes all three tasks: easy 0.830, medium 0.610, hard 0.480.**
+
+- Against zero-shot 7B: our 4B model (43% fewer parameters) scores 0.610 vs 0.255 on medium, 0.480 vs 0.019 on hard. **Not close.**
+- Against zero-shot 72B: our 4B model matches it on medium (0.610 vs 0.615) using **18× fewer parameters**.
+
+That is what a principled two-stage training pipeline does. A smaller model, trained for under 2 hours on free compute, learns to do what a 72B model barely manages zero-shot - and what a 7B model cannot do at all. Parameter count is not destiny. Training is.
+
+> Full training narrative with all plots: [Results.md](./Results.md)
+
+---
+
+## Quick Start
+
+**Run the environment**
+
+```bash
+uv run --project parkinsons_Motor server
+# → http://localhost:8000  |  /docs  |  /viewer (3D)
+```
+
+**Use it from Python**
+
+```python
+from parkinsons_Motor.server.parkinsons_Motor_environment import ParkinsonsMotorEnvironment
+from parkinsons_Motor.core.models import ParkinsonsMotorAction
+
+env = ParkinsonsMotorEnvironment()
+obs = env.reset(task_id="hard", seed=42)
+
+for _ in range(obs.metadata["episode_steps"]):
+    action = ParkinsonsMotorAction(
+        dbs_amplitude=1.2,
+        dbs_pulse_width=130,
+        dbs_frequency=130.0,
+        motor_command=obs.target_output,
+    )
+    obs = env.step(action)
+    if obs.done:
+        print(f"score={obs.grader_score:.3f}  pass={obs.episode_success}")
+        break
+```
+
+**Train with GRPO on Colab/Kaggle**
+
+Open the training notebook - TRL GRPOTrainer + Unsloth 4-bit + LoRA on Qwen3-4B. Runs end-to-end in under 2 hours on a free T4.
+
+**[▶ Open Training Notebook in Colab](https://colab.research.google.com/drive/1zJTiyyTcD_BahARPGa_2xlzH9MGCb8ye?usp=sharing)**
+
+**Load the trained model directly:**
+
+```python
+from unsloth import FastLanguageModel
+model, tokenizer = FastLanguageModel.from_pretrained(
+    "virustechhacks/dbs-grpo-qwen3-4b",
+    max_seq_length=2048, load_in_4bit=True, fast_inference=True,
+)
+```
+
+---
+
+## Why It Matters
+
+More than 10 million people live with Parkinson's disease worldwide. More than 50,000 have a DBS implant. The hardware works. The settings are suboptimal - almost universally - and patients spend months in the gap between programming visits paying for that.
+
+Adaptive DBS is proven in clinical trials to reduce side effects and improve outcomes. The policy that makes it work - the intelligence that decides how much to stimulate, when, and in response to what - does not yet exist outside of research labs. Training it on real patients is dangerous and slow. MotorAssistEnv is the simulation-first benchmark that makes it trainable at scale: peer-reviewed biophysics, 10-task curriculum, 9-component clinical grader, empirically falsifiable difficulty ladder.
+
+An RL-trained LLM that passes this benchmark is a serious candidate for the closed-loop policy in next-generation DBS firmware. The simulation is grounded. The grader is deterministic. The training is reproducible. The path from this benchmark to real hardware is shorter than it has ever been.
+
+**Nobody had built this benchmark before. This was the right place for RL to enter the picture - and we built it.**
+
+---
+
+## Docs
+
+| Document | What's inside |
+|---|---|
+| [Results.md](./Results.md) | Full training story - baseline tests, SFT, GRPO runs, plots, scores |
+| [REWARD_DESIGN.md](./REWARD_DESIGN.md) | Every reward term with clinical citations, exploit-block audit |
+| [TASKS.md](./TASKS.md) | All 10 tasks, parameters, difficulty proof |
+| [STATE_ACTION_SPACE.md](./STATE_ACTION_SPACE.md) | All 30 observation fields, 4 action knobs, patient profiles |
+| [RESEARCH_AND_REFERENCES.md](./RESEARCH_AND_REFERENCES.md) | 25-source annotated bibliography |
+| [blog.md](./blog.md) | The human story - written for anyone, not just researchers |
+| [colab_train_motorassist.ipynb](./colab_train_motorassist.ipynb) | Runnable training notebook |
+
+---
+
+---
+
+*MIT License · OpenEnv Hackathon India 2026*

@@ -1,18 +1,18 @@
 
-import * as THREE           from 'three';
-import { GUI              } from '../node_modules/three/examples/jsm/libs/lil-gui.module.min.js';
-import { OrbitControls    } from '../node_modules/three/examples/jsm/controls/OrbitControls.js';
+import * as THREE from 'three';
+import { GUI } from '../node_modules/three/examples/jsm/libs/lil-gui.module.min.js';
+import { OrbitControls } from '../node_modules/three/examples/jsm/controls/OrbitControls.js';
 import { DragStateManager } from './utils/DragStateManager.js';
 import { setupGUI, downloadExampleScenesFolder, loadSceneFromURL, getPosition, getQuaternion, toMujocoPos, standardNormal } from './mujocoUtils.js';
-import   load_mujoco        from '../dist/mujoco_wasm.js';
+import load_mujoco from '../dist/mujoco_wasm.js';
 
 function createBootLoader() {
   const root = document.getElementById('viewer-loader');
   if (!root) {
     return {
-      setPhase() {},
+      setPhase() { },
       fail(error) { throw error; },
-      complete() {},
+      complete() { },
     };
   }
 
@@ -80,8 +80,8 @@ export class MuJoCoDemo {
     this.mujoco = mujoco;
 
     // Load in the state from XML
-    this.model      = new mujoco.Model("/working/" + initialScene);
-    this.state      = new mujoco.State(this.model);
+    this.model = new mujoco.Model("/working/" + initialScene);
+    this.state = new mujoco.State(this.model);
     this.simulation = new mujoco.Simulation(this.model, this.state);
 
     // Define Random State Variables
@@ -92,43 +92,43 @@ export class MuJoCoDemo {
     //   tap | pinch | tremor | flex | gait | cycle. Drives the per-actuator
     //   waveform shape so each body part performs its UPDRS-style motion.
     this.bodyMotionMode = 'tremor';
-    // Gate flag — body holds its rest pose (zero ctrl) until the viewer
+    // Gate flag - body holds its rest pose (zero ctrl) until the viewer
     // controller flips this on. Set true on Connect (WS) or Start (SSE),
     // back to false on Disconnect / Stop. Prevents the limb from twitching
     // in the background before the user has actually launched the agent.
     this.bodyActive = false;
     this._lastAgentStateMs = 0;
-    this.bodies  = {}, this.lights = {};
-    this.tmpVec  = new THREE.Vector3();
+    this.bodies = {}, this.lights = {};
+    this.tmpVec = new THREE.Vector3();
     this.tmpQuat = new THREE.Quaternion();
     this.updateGUICallbacks = [];
 
-    this.container = document.createElement( 'div' );
-    document.body.appendChild( this.container );
+    this.container = document.createElement('div');
+    document.body.appendChild(this.container);
 
     this.scene = new THREE.Scene();
     this.scene.name = 'scene';
 
-    this.camera = new THREE.PerspectiveCamera( 45, window.innerWidth / window.innerHeight, 0.001, 100 );
+    this.camera = new THREE.PerspectiveCamera(45, window.innerWidth / window.innerHeight, 0.001, 100);
     this.camera.name = 'PerspectiveCamera';
     this.camera.position.set(0.3, 1.5, 1.2);
     this.scene.add(this.camera);
 
     this.scene.background = new THREE.Color(0.15, 0.25, 0.35);
-    this.scene.fog = new THREE.Fog(this.scene.background, 15, 25.5 );
+    this.scene.fog = new THREE.Fog(this.scene.background, 15, 25.5);
 
-    this.ambientLight = new THREE.AmbientLight( 0xffffff, 0.2 );
+    this.ambientLight = new THREE.AmbientLight(0xffffff, 0.2);
     this.ambientLight.name = 'AmbientLight';
-    this.scene.add( this.ambientLight );
+    this.scene.add(this.ambientLight);
 
-    this.renderer = new THREE.WebGLRenderer( { antialias: true } );
-    this.renderer.setPixelRatio( window.devicePixelRatio );
-    this.renderer.setSize( window.innerWidth, window.innerHeight );
+    this.renderer = new THREE.WebGLRenderer({ antialias: true });
+    this.renderer.setPixelRatio(window.devicePixelRatio);
+    this.renderer.setSize(window.innerWidth, window.innerHeight);
     this.renderer.shadowMap.enabled = true;
     this.renderer.shadowMap.type = THREE.PCFSoftShadowMap; // default THREE.PCFShadowMap
-    this.renderer.setAnimationLoop( this.render.bind(this) );
+    this.renderer.setAnimationLoop(this.render.bind(this));
 
-    this.container.appendChild( this.renderer.domElement );
+    this.container.appendChild(this.renderer.domElement);
 
     this.controls = new OrbitControls(this.camera, this.renderer.domElement);
     this.controls.target.set(-0.2, 1.4, 0.4);
@@ -190,7 +190,7 @@ export class MuJoCoDemo {
   onWindowResize() {
     this.camera.aspect = window.innerWidth / window.innerHeight;
     this.camera.updateProjectionMatrix();
-    this.renderer.setSize( window.innerWidth, window.innerHeight );
+    this.renderer.setSize(window.innerWidth, window.innerHeight);
   }
 
   applyMotorState(snapshot) {
@@ -214,13 +214,13 @@ export class MuJoCoDemo {
   // Per-mode waveform shape applied to each actuator. Returns a value in
   // roughly [-1, 1] before clamp; the caller scales to ctrl range.
   // Real PD signatures:
-  //   tap     — UPDRS finger taps: large rhythmic open/close at ~3 Hz with
+  //   tap     - UPDRS finger taps: large rhythmic open/close at ~3 Hz with
   //             decrement (amplitude shrinks with bradykinesia).
-  //   pinch   — sustained low-frequency posture with 5 Hz tremor overlay.
-  //   tremor  — pure 4–6 Hz rest tremor envelope.
-  //   flex    — slow elbow flex/extend at ~0.5 Hz with cogwheel bursts.
-  //   gait    — alternating leg cycle ~1 Hz with foot push-off pulse.
-  //   cycle   — exercise burst, faster 1.6 Hz cycling on legs.
+  //   pinch   - sustained low-frequency posture with 5 Hz tremor overlay.
+  //   tremor  - pure 4–6 Hz rest tremor envelope.
+  //   flex    - slow elbow flex/extend at ~0.5 Hz with cogwheel bursts.
+  //   gait    - alternating leg cycle ~1 Hz with foot push-off pulse.
+  //   cycle   - exercise burst, faster 1.6 Hz cycling on legs.
   _motorWaveform(mode, timeMS, actuatorIdx, s) {
     const t = timeMS * 0.001;
     const freq = (hz) => Math.sin(2 * Math.PI * hz * t + actuatorIdx * 0.7);
@@ -236,7 +236,7 @@ export class MuJoCoDemo {
         return posture + tremor;
       }
       case 'tremor': {
-        // Mostly rest — slight tonic, big 5 Hz oscillation.
+        // Mostly rest - slight tonic, big 5 Hz oscillation.
         return Math.sin(2 * Math.PI * 5 * t + actuatorIdx * 1.1) * (0.35 + 0.65 * s.tremor) * 0.7;
       }
       case 'flex': {
@@ -261,7 +261,7 @@ export class MuJoCoDemo {
   _applyAgentMotorControls(timeMS) {
     if (!this.simulation || !this.model || !this.simulation.ctrl) { return; }
 
-    // Body is gated — sit at zero ctrl until the controller (Connect or
+    // Body is gated - sit at zero ctrl until the controller (Connect or
     // Start) flips bodyActive on. Avoids "pre-show" twitching.
     if (!this.bodyActive) {
       for (let i = 0; i < this.model.nu; i++) {
@@ -270,7 +270,7 @@ export class MuJoCoDemo {
       return;
     }
     if (!this.agentMotorState) {
-      // Connected but no state yet — hold rest pose.
+      // Connected but no state yet - hold rest pose.
       for (let i = 0; i < this.model.nu; i++) {
         this.simulation.ctrl[i] = 0;
       }
@@ -281,7 +281,7 @@ export class MuJoCoDemo {
     const mode = this.bodyMotionMode || 'tremor';
     const dbsSuppression = 0.20 + 0.80 * s.entrainment;
     // DBS reins in the pathological component but doesn't kill voluntary
-    // movement — that's the whole point of well-tuned stimulation.
+    // movement - that's the whole point of well-tuned stimulation.
     const visibleTremor = s.tremor * (1.0 - 0.85 * s.entrainment);
     const dyskinesia = s.sideEffect > 0.35
       ? Math.sin(timeMS * 0.018) * (s.sideEffect - 0.25) * 0.6
@@ -300,7 +300,7 @@ export class MuJoCoDemo {
       const tremorPhase = Math.sin((2 * Math.PI * 5.0 * timeMS) / 1000 + i * 1.7) * visibleTremor * 0.45;
       // Beta-band rigidity drag scales the voluntary command down.
       const stiffness = 1.0 - s.beta * (0.45 - 0.25 * s.entrainment);
-      // Effective motor command from agent — fall back to taskWave when no
+      // Effective motor command from agent - fall back to taskWave when no
       // explicit target is being streamed.
       const directDrive = (s.effective || s.target || 0) * (0.35 + s.force * 0.75);
       const drive = directDrive * stiffness + taskWave * (0.6 + 0.4 * s.force);
@@ -322,7 +322,7 @@ export class MuJoCoDemo {
 
         // Jitter the control state with gaussian random noise
         if (this.params["ctrlnoisestd"] > 0.0) {
-          let rate  = Math.exp(-timestep / Math.max(1e-10, this.params["ctrlnoiserate"]));
+          let rate = Math.exp(-timestep / Math.max(1e-10, this.params["ctrlnoiserate"]));
           let scale = this.params["ctrlnoisestd"] * Math.sqrt(1 - rate * rate);
           let currentCtrl = this.simulation.ctrl;
           for (let i = 0; i < currentCtrl.length; i++) {
@@ -337,7 +337,7 @@ export class MuJoCoDemo {
         if (dragged && dragged.bodyID) {
           for (let b = 0; b < this.model.nbody; b++) {
             if (this.bodies[b]) {
-              getPosition  (this.simulation.xpos , b, this.bodies[b].position);
+              getPosition(this.simulation.xpos, b, this.bodies[b].position);
               getQuaternion(this.simulation.xquat, b, this.bodies[b].quaternion);
               this.bodies[b].updateWorldMatrix();
             }
@@ -361,7 +361,7 @@ export class MuJoCoDemo {
       let dragged = this.dragStateManager.physicsObject;
       if (dragged && dragged.bodyID) {
         let b = dragged.bodyID;
-        getPosition  (this.simulation.xpos , b, this.tmpVec , false); // Get raw coordinate from MuJoCo
+        getPosition(this.simulation.xpos, b, this.tmpVec, false); // Get raw coordinate from MuJoCo
         getQuaternion(this.simulation.xquat, b, this.tmpQuat, false); // Get raw coordinate from MuJoCo
 
         let offset = toMujocoPos(this.dragStateManager.currentWorld.clone()
@@ -370,18 +370,18 @@ export class MuJoCoDemo {
           // Set the root body's mocap position...
           console.log("Trying to move mocap body", b);
           let addr = this.model.body_mocapid[b] * 3;
-          let pos  = this.simulation.mocap_pos;
-          pos[addr+0] += offset.x;
-          pos[addr+1] += offset.y;
-          pos[addr+2] += offset.z;
+          let pos = this.simulation.mocap_pos;
+          pos[addr + 0] += offset.x;
+          pos[addr + 1] += offset.y;
+          pos[addr + 2] += offset.z;
         } else {
           // Set the root body's position directly...
           let root = this.model.body_rootid[b];
           let addr = this.model.jnt_qposadr[this.model.body_jntadr[root]];
-          let pos  = this.simulation.qpos;
-          pos[addr+0] += offset.x;
-          pos[addr+1] += offset.y;
-          pos[addr+2] += offset.z;
+          let pos = this.simulation.qpos;
+          pos[addr + 0] += offset.x;
+          pos[addr + 1] += offset.y;
+          pos[addr + 2] += offset.z;
 
           //// Save the original root body position
           //let x  = pos[addr + 0], y  = pos[addr + 1], z  = pos[addr + 2];
@@ -423,7 +423,7 @@ export class MuJoCoDemo {
     // Update body transforms.
     for (let b = 0; b < this.model.nbody; b++) {
       if (this.bodies[b]) {
-        getPosition  (this.simulation.xpos , b, this.bodies[b].position);
+        getPosition(this.simulation.xpos, b, this.bodies[b].position);
         getQuaternion(this.simulation.xquat, b, this.bodies[b].quaternion);
         this.bodies[b].updateWorldMatrix();
       }
@@ -445,16 +445,16 @@ export class MuJoCoDemo {
       for (let t = 0; t < this.model.ntendon; t++) {
         let startW = this.simulation.ten_wrapadr[t];
         let r = this.model.tendon_width[t];
-        for (let w = startW; w < startW + this.simulation.ten_wrapnum[t] -1 ; w++) {
-          let tendonStart = getPosition(this.simulation.wrap_xpos, w    , new THREE.Vector3());
-          let tendonEnd   = getPosition(this.simulation.wrap_xpos, w + 1, new THREE.Vector3());
-          let tendonAvg   = new THREE.Vector3().addVectors(tendonStart, tendonEnd).multiplyScalar(0.5);
+        for (let w = startW; w < startW + this.simulation.ten_wrapnum[t] - 1; w++) {
+          let tendonStart = getPosition(this.simulation.wrap_xpos, w, new THREE.Vector3());
+          let tendonEnd = getPosition(this.simulation.wrap_xpos, w + 1, new THREE.Vector3());
+          let tendonAvg = new THREE.Vector3().addVectors(tendonStart, tendonEnd).multiplyScalar(0.5);
 
           let validStart = tendonStart.length() > 0.01;
-          let validEnd   = tendonEnd  .length() > 0.01;
+          let validEnd = tendonEnd.length() > 0.01;
 
-          if (validStart) { this.mujocoRoot.spheres.setMatrixAt(numWraps    , mat.compose(tendonStart, new THREE.Quaternion(), new THREE.Vector3(r, r, r))); }
-          if (validEnd  ) { this.mujocoRoot.spheres.setMatrixAt(numWraps + 1, mat.compose(tendonEnd  , new THREE.Quaternion(), new THREE.Vector3(r, r, r))); }
+          if (validStart) { this.mujocoRoot.spheres.setMatrixAt(numWraps, mat.compose(tendonStart, new THREE.Quaternion(), new THREE.Vector3(r, r, r))); }
+          if (validEnd) { this.mujocoRoot.spheres.setMatrixAt(numWraps + 1, mat.compose(tendonEnd, new THREE.Quaternion(), new THREE.Vector3(r, r, r))); }
           if (validStart && validEnd) {
             mat.compose(tendonAvg, new THREE.Quaternion().setFromUnitVectors(
               new THREE.Vector3(0, 1, 0), tendonEnd.clone().sub(tendonStart).normalize()),
@@ -465,13 +465,13 @@ export class MuJoCoDemo {
         }
       }
       this.mujocoRoot.cylinders.count = numWraps;
-      this.mujocoRoot.spheres  .count = numWraps > 0 ? numWraps + 1: 0;
+      this.mujocoRoot.spheres.count = numWraps > 0 ? numWraps + 1 : 0;
       this.mujocoRoot.cylinders.instanceMatrix.needsUpdate = true;
-      this.mujocoRoot.spheres  .instanceMatrix.needsUpdate = true;
+      this.mujocoRoot.spheres.instanceMatrix.needsUpdate = true;
     }
 
     // Render!
-    this.renderer.render( this.scene, this.camera );
+    this.renderer.render(this.scene, this.camera);
   }
 }
 

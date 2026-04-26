@@ -19,13 +19,13 @@ tasks:
 
   # ---- Expert tasks --------------------------------------------------------
   - id: fragile_patient
-    description: "Tight safety budget (0.26) on a sensitive patient — find and hold a precise therapeutic window (64 steps)"
+    description: "Tight safety budget (0.26) on a sensitive patient - find and hold a precise therapeutic window (64 steps)"
     difficulty: expert
   - id: refractory_patient
     description: "Drug-resistant patient with weak entrainment, recurring tachyphylaxis, requires pulsed strategies (120 steps)"
     difficulty: expert
   - id: personalization_generalization
-    description: "Mixed patient profiles with stochastic events — degrade gracefully across fragile/balanced/responsive/refractory (90 steps)"
+    description: "Mixed patient profiles with stochastic events - degrade gracefully across fragile/balanced/responsive/refractory (90 steps)"
     difficulty: expert
   - id: exercise_bout
     description: "Sustained high-motor-demand exercise burst with possible post-exertion dyskinesia spike (70 steps)"

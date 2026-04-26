@@ -18,11 +18,11 @@ const STEPS = [
     ),
   },
   {
-    title: 'OpenEnv Controls — drive the agent',
+    title: 'OpenEnv Controls - drive the agent',
     selector: '.openenv-dock',
     placement: 'right',
     body: (
-      'Pick a task from the Task dropdown — each task swaps the 3D body ' +
+      'Pick a task from the Task dropdown - each task swaps the 3D body ' +
       'model (finger, hand, leg, elbow) to match the clinical motion. ' +
       'Click Connect to open a session. Then tweak DBS params (Amp mA, ' +
       'PW ms, Freq Hz) and press Step. Each Step prints reward + signal ' +
@@ -30,7 +30,7 @@ const STEPS = [
     ),
   },
   {
-    title: 'Body model — UPDRS-style motion',
+    title: 'Body model - UPDRS-style motion',
     selector: 'canvas',
     placement: 'top',
     body: (
@@ -41,14 +41,14 @@ const STEPS = [
     ),
   },
   {
-    title: 'Agent Panel — autonomous control',
+    title: 'Agent Panel - autonomous control',
     selector: '.agent-panel',
     placement: 'left',
     body: (
       'Pick an agent (Auto / HF Qwen / Local Heuristic) and click Start ' +
       'Agent to stream a full episode. Live signal bars track Beta, ' +
       'Tremor, DBS, Force, Side FX, Track. Event chips fire mid-episode ' +
-      '(L-DOPA OFF, Dyskinesia, Tachyphylaxis) — the agent must react.'
+      '(L-DOPA OFF, Dyskinesia, Tachyphylaxis) - the agent must react.'
     ),
   },
 ];

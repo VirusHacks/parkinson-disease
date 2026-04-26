@@ -20,7 +20,7 @@ from parkinsons_Motor.server.parkinsons_Motor_environment import ParkinsonsMotor
 
 
 TASK_LIMITS = {
-    # Public tier — keep demo runs short enough to feel snappy.
+    # Public tier - keep demo runs short enough to feel snappy.
     "easy": 36,
     "beta_suppression": 36,
     "calm_start": 36,
@@ -29,7 +29,7 @@ TASK_LIMITS = {
     "rescue_phase": 60,
     "hard": 100,
     "full_episode": 100,
-    # Expert tier — capped to keep demo episodes bounded.
+    # Expert tier - capped to keep demo episodes bounded.
     "fragile_patient": 64,
     "refractory_patient": 90,
     "personalization_generalization": 90,
@@ -66,7 +66,7 @@ TASK_CONTEXT = {
     "fragile_patient": "Fragile window: tight side-effect budget. Stay below ~1.4 mA, recover quickly from spikes.",
     "refractory_patient": "Drug-resistant patient: high baseline beta and tremor; needs sustained but smooth higher-amplitude DBS.",
     "personalization_generalization": "Mixed patient profile per episode: read responses early, adapt amplitude to that patient.",
-    "exercise_bout": "Exercise burst: motor demand spikes — be ready for tracking surges and wider pulse widths briefly.",
+    "exercise_bout": "Exercise burst: motor demand spikes - be ready for tracking surges and wider pulse widths briefly.",
     "medication_interaction": "L-DOPA cycle interacts with DBS: lower amplitude near medication peaks, raise during troughs.",
     "nocturnal_transition": "Sleep transition: very low amplitude required; avoid driving over-stimulation overnight.",
     "surgical_followup": "Post-implant follow-up: tolerance and impedance shifts; favor smooth, conservative changes.",
@@ -297,9 +297,9 @@ def _build_rationale(task_id: str, obs: dict, action: ParkinsonsMotorAction) -> 
     if task_id in ("hard", "full_episode") and action.dbs_amplitude < 1.0:
         return f"The episode is in a maintenance window, holding a lighter dose at {action.dbs_amplitude:.2f} mA."
     if task_id == "nocturnal_transition":
-        return f"Sleep window — keeping DBS gentle at {action.dbs_amplitude:.2f} mA to avoid over-stimulation."
+        return f"Sleep window - keeping DBS gentle at {action.dbs_amplitude:.2f} mA to avoid over-stimulation."
     if task_id == "exercise_bout":
-        return f"Exercise burst — pushing {action.dbs_amplitude:.2f} mA to keep tracking through the motor demand."
+        return f"Exercise burst - pushing {action.dbs_amplitude:.2f} mA to keep tracking through the motor demand."
     return f"Control is staying smooth at {action.dbs_amplitude:.2f} mA while tracking the target movement."
 
 

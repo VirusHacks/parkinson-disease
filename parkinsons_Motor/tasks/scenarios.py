@@ -32,7 +32,7 @@ TASK_FRAGILE_PATIENT = DBSTask(
     name="Fragile Patient",
     description=(
         "Safety-constrained control on a fragile patient. The side-effect "
-        "budget is tight (0.26) and the patient's sensitivity is 1.4× — "
+        "budget is tight (0.26) and the patient's sensitivity is 1.4× - "
         "aggressive stimulation quickly violates safety constraints while "
         "under-stimulation leaves tremor uncontrolled. The agent must find and "
         "hold a precise therapeutic window across 64 steps."
@@ -63,7 +63,7 @@ TASK_REFRACTORY_PATIENT = DBSTask(
         "0.88×) with faster symptom progression and recurring tachyphylaxis. "
         "Brute-force high amplitude accumulates side effects without "
         "proportional benefit. The agent must use pulsed stimulation patterns "
-        "— moderate dose, rests when stable, push during escalation — to "
+        "- moderate dose, rests when stable, push during escalation - to "
         "extract therapeutic value from a refractory system across a 120-step "
         "episode."
     ),

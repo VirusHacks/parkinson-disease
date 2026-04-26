@@ -1,5 +1,5 @@
 """
-local_benchmark.py  —  Zero-dependency local environment tester
+local_benchmark.py  -  Zero-dependency local environment tester
 ================================================================
 Runs the built-in heuristic baseline policies directly against
 ParkinsonsMotorEnvironment (no Docker, no server, no API key needed).

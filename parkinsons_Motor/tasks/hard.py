@@ -1,10 +1,10 @@
-"""Hard task — long-horizon full-session DBS management.
+"""Hard task - long-horizon full-session DBS management.
 
 Clinical intent: 150-step extended session that traverses onset, escalation,
 crisis, and late-episode stability. Multiple stochastic disturbances may fire:
 dyskinesia spikes, tachyphylaxis (tolerance), off-medication crises, and
 voluntary motor surges. Sensor noise is significant. The controller must pace
-itself across the full horizon — a brute-force or template policy will collapse
+itself across the full horizon - a brute-force or template policy will collapse
 the safety budget early or under-respond to a late crisis.
 """
 

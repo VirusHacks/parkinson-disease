@@ -1,7 +1,7 @@
 #!/usr/bin/env python
 """End-to-end dry-run of the replay-based GRPO training surface.
 
-Verifies — without a GPU / transformers / TRL — that:
+Verifies - without a GPU / transformers / TRL - that:
 
   1. ``LocalEnvFactory`` builds a fresh in-process env.
   2. ``collect_prompt_dataset`` rolls the heuristic policy and emits
@@ -11,7 +11,7 @@ Verifies — without a GPU / transformers / TRL — that:
   4. The reward function:
        * gives a *strictly higher* reward to a valid-JSON completion than to
          a malformed one (the whole point of the format bonus),
-       * is deterministic — same inputs ⇒ same scalar,
+       * is deterministic - same inputs ⇒ same scalar,
        * never crashes when it sees ill-formed completions.
   5. The module's public API is exposed via ``parkinsons_Motor.training``.
   6. ``parkinsons_Motor.train.make_rollout_func`` still imports (the legacy
@@ -52,7 +52,7 @@ def _fail(msg: str) -> None:
 # ---------------------------------------------------------------------------
 # Stub tokenizer: mimics tokenizer.apply_chat_template tightly enough that
 # ``apply_chat_template(...)`` in train.py picks the right control path. We
-# don't tokenize anything — the dataset rows just need a string ``prompt``.
+# don't tokenize anything - the dataset rows just need a string ``prompt``.
 # ---------------------------------------------------------------------------
 
 class StubTokenizer:
@@ -99,7 +99,7 @@ def _test_local_env_factory() -> None:
         "Observation must expose reward + done fields"
     _ok(f"factory builds fresh envs; reset(easy, seed=7) → reward={o.reward:.3f} done={o.done}")
 
-    # The factory should be picklable — TRL may cross-process serialise it.
+    # The factory should be picklable - TRL may cross-process serialise it.
     import pickle
     blob = pickle.dumps(fac)
     fac2 = pickle.loads(blob)
@@ -139,7 +139,7 @@ def _test_collect_prompt_dataset() -> List[dict]:
         history = json.loads(r["history_actions"])
         assert isinstance(history, list), "history_actions must decode to a list"
         assert len(history) == r["step_idx"], (
-            f"step_idx={r['step_idx']} but history has {len(history)} entries — "
+            f"step_idx={r['step_idx']} but history has {len(history)} entries - "
             "they must match for replay to recreate the right state."
         )
     _ok("history_actions is JSON-decodable and length matches step_idx for every row")
@@ -192,11 +192,11 @@ def _test_replay_reward_fn(rows: List[dict]) -> None:
 
     assert r_valid > r_invalid, (
         f"valid completion ({r_valid:+.3f}) must score strictly higher than "
-        f"garbage ({r_invalid:+.3f}) — otherwise the format bonus isn't biting."
+        f"garbage ({r_invalid:+.3f}) - otherwise the format bonus isn't biting."
     )
     _ok("valid JSON outranks garbage completion (format bonus is biting)")
 
-    # Determinism — same inputs must give the same scalar twice.
+    # Determinism - same inputs must give the same scalar twice.
     rewards_again = reward_fn(
         completions=[valid_completion, garbage_completion],
         task_id=[row["task_id"], row["task_id"]],
@@ -223,7 +223,7 @@ def _test_replay_reward_fn(rows: List[dict]) -> None:
     )
     _ok("reward_fn handles both string and list-of-messages completion shapes")
 
-    # Missing mandatory dataset kwargs must fail loudly — a silent zero-reward
+    # Missing mandatory dataset kwargs must fail loudly - a silent zero-reward
     # would re-introduce the dead-policy collapse we're trying to avoid.
     try:
         reward_fn(completions=[valid_completion])

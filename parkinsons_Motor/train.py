@@ -7,25 +7,25 @@
 """
 Runtime training surface for the Parkinson's Motor (DBS) OpenEnv environment.
 
-This module hosts everything GRPO actually invokes during a training run —
+This module hosts everything GRPO actually invokes during a training run -
 prompting, action parsing, LLM rollout against the live env, reward
 composition, episode logging, and the GRPO ``rollout_func`` factory.
 Plotting and LLM-driven evaluation live in dedicated submodules of
 :mod:`parkinsons_Motor.training` (and are re-exported from here for
 backwards-compatibility with the existing notebook import block):
 
-    parkinsons_Motor.training.plots     — plot_training_dashboard,
+    parkinsons_Motor.training.plots     - plot_training_dashboard,
                                           plot_training_loss,
                                           plot_baseline_vs_trained,
                                           compare_trajectories,
                                           save_training_plots
-    parkinsons_Motor.training.llm_eval  — sanity_check_rollout,
+    parkinsons_Motor.training.llm_eval  - sanity_check_rollout,
                                           evaluate_model_on_task,
                                           evaluate_model_suite,
                                           eval_with_adapter_disabled
-    parkinsons_Motor.training.evaluation         — EvaluationSuite (offline)
-    parkinsons_Motor.training.trajectory         — DBSTrajectory(Dataset)
-    parkinsons_Motor.training.clinical_benchmark — literature comparisons
+    parkinsons_Motor.training.evaluation         - EvaluationSuite (offline)
+    parkinsons_Motor.training.trajectory         - DBSTrajectory(Dataset)
+    parkinsons_Motor.training.clinical_benchmark - literature comparisons
 
 Public surface (kept identical to earlier versions so the notebook's
 ``from parkinsons_Motor.train import …`` block keeps working unchanged):
@@ -113,8 +113,8 @@ You are an expert closed-loop DBS controller managing Parkinsonian motor symptom
 Every step is a short clinical control decision: suppress pathological activity, preserve movement,
 avoid overstimulation, and keep enough safety budget for the remainder of the episode.
 
-OUTPUT FORMAT — read carefully:
-Reply with **exactly one JSON object and nothing else** — no prose, no markdown, no code fences,
+OUTPUT FORMAT - read carefully:
+Reply with **exactly one JSON object and nothing else** - no prose, no markdown, no code fences,
 no explanation, no <think> blocks. Just the JSON, in this exact shape:
 
 {"dbs_amplitude": <float>, "dbs_pulse_width": <float>, "dbs_frequency": <float>}
@@ -123,9 +123,9 @@ Hard constraints (the deterministic grader rejects violations):
 - amplitude in mA [0.0, 5.0]; pulse_width in ms [0.06, 0.20]; frequency in Hz [60, 185].
 - Use pulse_width=0.13 and frequency=130 unless safety demands otherwise.
 - Smooth amplitude changes; avoid jumps > 0.3 mA per step.
-- Do NOT include motor_command — that field is ignored.
+- Do NOT include motor_command - that field is ignored.
 
-Clinical priorities (ranked, apply silently — do NOT explain in output):
+Clinical priorities (ranked, apply silently - do NOT explain in output):
 1. Prevent overstimulation: gamma_arv > 0.55 OR side_effect_load near budget => reduce.
 2. Don't undertreat: tremor_arv > 0.55 OR beta_arv > 0.60 => at least 1.2 mA.
 3. Symptoms worsening + safety acceptable => +0.10-0.15 mA.
@@ -134,16 +134,16 @@ Clinical priorities (ranked, apply silently — do NOT explain in output):
 """).strip()
 
 TASK_CONTEXT: Dict[str, str] = {
-    "easy":   "EASY — responsive patient, no events. Stabilize quickly, taper to maintenance.",
-    "medium": "MEDIUM — balanced patient, mid-episode deterioration possible. Decisive rescue, then taper.",
-    "hard":   "HARD — refractory patient, multi-crisis 150-step run. Pace safety budget; expect tachyphylaxis + off-med crisis.",
-    "fragile_patient":              "FRAGILE — narrow safety window. Stay conservative; gamma rises fast.",
-    "refractory_patient":           "REFRACTORY — low responsiveness. Push amplitude harder while watching gamma.",
-    "personalization_generalization": "PERSONALIZATION — patient drawn from a held-out cohort.",
-    "exercise_bout":                "EXERCISE BOUT — transient motor demand spike mid-episode.",
-    "medication_interaction":       "MEDICATION INTERACTION — L-DOPA on/off cycle modulates baseline.",
-    "nocturnal_transition":         "NOCTURNAL — setpoint slowly tapers; avoid late-episode overstim.",
-    "surgical_followup":            "SURGICAL FOLLOWUP — recent lead repositioning; entrainment is noisy.",
+    "easy":   "EASY - responsive patient, no events. Stabilize quickly, taper to maintenance.",
+    "medium": "MEDIUM - balanced patient, mid-episode deterioration possible. Decisive rescue, then taper.",
+    "hard":   "HARD - refractory patient, multi-crisis 150-step run. Pace safety budget; expect tachyphylaxis + off-med crisis.",
+    "fragile_patient":              "FRAGILE - narrow safety window. Stay conservative; gamma rises fast.",
+    "refractory_patient":           "REFRACTORY - low responsiveness. Push amplitude harder while watching gamma.",
+    "personalization_generalization": "PERSONALIZATION - patient drawn from a held-out cohort.",
+    "exercise_bout":                "EXERCISE BOUT - transient motor demand spike mid-episode.",
+    "medication_interaction":       "MEDICATION INTERACTION - L-DOPA on/off cycle modulates baseline.",
+    "nocturnal_transition":         "NOCTURNAL - setpoint slowly tapers; avoid late-episode overstim.",
+    "surgical_followup":            "SURGICAL FOLLOWUP - recent lead repositioning; entrainment is noisy.",
 }
 
 # Keys we cherry-pick from the obs dict for the "STATE" block in the prompt.
@@ -222,17 +222,17 @@ def build_user_prompt(
     obs = _obs_to_dict(obs)
     flags: List[str] = []
     if obs.get("tremor_arv", 0) > 0.55 or obs.get("beta_arv", 0) > 0.60:
-        flags.append("[!] symptoms HIGH — maintain >= 1.2 mA")
+        flags.append("[!] symptoms HIGH - maintain >= 1.2 mA")
     if obs.get("side_effect_load", 0) > 0.36:
-        flags.append("[!] safety budget being spent — reduce amp")
+        flags.append("[!] safety budget being spent - reduce amp")
     if obs.get("gamma_arv", 0) > 0.55:
-        flags.append("[!] gamma high — overstimulation")
+        flags.append("[!] gamma high - overstimulation")
     if obs.get("beta_trend", 0) > 0.01 and obs.get("tremor_trend", 0) > 0.01:
-        flags.append("[^] both signals worsening — increase")
+        flags.append("[^] both signals worsening - increase")
     # Use 6-space joins so the interpolated multi-line blocks keep the same
     # leading whitespace as the surrounding template; otherwise textwrap.dedent
     # re-anchors to col 0 and second/third lines come out flush-left.
-    flag_str = "\n      ".join(flags) if flags else "normal — adaptive control"
+    flag_str = "\n      ".join(flags) if flags else "normal - adaptive control"
     recent = "\n      ".join(list(history)[-3:]) if history else "(first step)"
 
     state_lines = "\n      ".join(
@@ -276,12 +276,12 @@ def apply_chat_template(
         every group member uses the same fallback action, GRPO advantages
         collapse to zero, and ``clipped_ratio`` stays at 1.0 forever.
       - The bio-experiment hackathon **winner** ([mhtruong1031/OpenENV-Hackathon])
-        used ``MAX_COMPLETION_TOKENS=160`` for the same reason — short, JSON-only
+        used ``MAX_COMPLETION_TOKENS=160`` for the same reason - short, JSON-only
         completions are the only way GRPO's group-relative advantages stay
         well-conditioned with a 4B model.
 
     Pass ``enable_thinking=True`` explicitly when you want to **demo** the
-    chain-of-thought behavior (e.g. in the sample-trajectory eval cell — so
+    chain-of-thought behavior (e.g. in the sample-trajectory eval cell - so
     judges can see the reward mechanism punishing reasoning-hack attempts).
 
     Qwen3 templates accept ``enable_thinking`` as a kwarg; we silently fall
@@ -328,7 +328,7 @@ def parse_action(text: str) -> Optional[Dict[str, float]]:
         return None
     answer = re.sub(r"<think>.*?</think>", "", text, flags=re.DOTALL)
     if not answer.strip():
-        answer = text  # all of it was inside <think> — fall back to full text
+        answer = text  # all of it was inside <think> - fall back to full text
     answer = _strip_code_fences(answer)
 
     candidates = list(_JSON_RE.finditer(answer))
@@ -361,7 +361,7 @@ def make_action(
 ) -> ParkinsonsMotorAction:
     """Coerce a parsed dict into a clipped, well-formed action.
 
-    Always sets ``motor_command = clip(target_output, -1, 1)`` — the LLM is
+    Always sets ``motor_command = clip(target_output, -1, 1)`` - the LLM is
     only responsible for the three DBS knobs.
     """
     target = float(max(-1.0, min(1.0, target_output)))
@@ -385,7 +385,7 @@ def heuristic_action(
     task_id: str = "easy",
     last_amp: Optional[float] = None,
 ) -> ParkinsonsMotorAction:
-    """A simple clinical-priority heuristic — useful as a teacher / baseline.
+    """A simple clinical-priority heuristic - useful as a teacher / baseline.
 
     Mirrors the priorities encoded in `SYSTEM_PROMPT`:
       1. Reduce on overstimulation (gamma high or safety budget burning).
@@ -669,7 +669,7 @@ def compute_reward(
 class MotorAssistReward:
     """Lookup-style GRPO reward (mirrors `OpenEnvReward` from the bio-env winner).
 
-    The actual env replay happens inside the rollout function — this callable
+    The actual env replay happens inside the rollout function - this callable
     just surfaces precomputed reward components from kwargs back to GRPO. If
     nothing was precomputed (e.g. the user is testing the reward in isolation),
     it returns zeros instead of crashing.
@@ -787,7 +787,7 @@ def make_rollout_func(
     The returned function plays one full episode against the remote env per
     incoming "prompt", in the order given by ``episodes`` (each replicated
     ``num_generations`` times so a GRPO group sees identical env conditions
-    with different policy samples — the same trick the kube-sre-gym winner
+    with different policy samples - the same trick the kube-sre-gym winner
     used).
     """
     schedule: List[Tuple[str, Optional[int]]] = []
@@ -835,7 +835,7 @@ def make_rollout_func(
                 # one row per incoming prompt so GRPO doesn't get a length mismatch
                 # (which silently zero-pads the group and kills the gradient).
                 logger.warning(
-                    "ROLLOUT FAILED  task=%s seed=%s env_error=%r — emitting "
+                    "ROLLOUT FAILED  task=%s seed=%s env_error=%r - emitting "
                     "placeholder row with reward_total=%.2f so GRPO group stays aligned.",
                     task_id, seed, traj.env_error, ENVIRONMENT_ERROR_PENALTY,
                 )
@@ -884,9 +884,9 @@ def make_rollout_func(
 # re-exported here so the existing `from parkinsons_Motor.train import …`
 # block in the notebook keeps working without modification.
 #
-#   * parkinsons_Motor.training.plots     — dashboards, base-vs-trained
+#   * parkinsons_Motor.training.plots     - dashboards, base-vs-trained
 #                                            comparison, trajectory overlay
-#   * parkinsons_Motor.training.llm_eval  — sanity_check_rollout,
+#   * parkinsons_Motor.training.llm_eval  - sanity_check_rollout,
 #                                            evaluate_model_on_task,
 #                                            evaluate_model_suite,
 #                                            eval_with_adapter_disabled

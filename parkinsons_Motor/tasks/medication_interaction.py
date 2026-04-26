@@ -1,16 +1,16 @@
-"""Medication-interaction task — coupled DBS + L-DOPA dynamics.
+"""Medication-interaction task - coupled DBS + L-DOPA dynamics.
 
 Clinical scenario
 -----------------
 A guaranteed off-medication crisis occurs in the first half of the episode as
-levodopa wears off. Symptoms worsen quickly — the agent must pre-empt with
+levodopa wears off. Symptoms worsen quickly - the agent must pre-empt with
 extra DBS while the medication phase is still falling. After the crisis, a
 likely dyskinesia spike (~65%) marks the medication coming back on; brute-force
 DBS in that window over-treats the patient.
 
 Why it is hard
 --------------
-* Phase-aware control is required — `medication_phase` is the dominant signal.
+* Phase-aware control is required - `medication_phase` is the dominant signal.
 * The wrong response during the dyskinesia window costs more safety than
   under-stimulation during the off-med crisis.
 """
@@ -26,7 +26,7 @@ def get_medication_interaction_task() -> DBSTask:
         name="Medication Interaction",
         description=(
             "100-step session coupled to the L-DOPA cycle. An off-medication "
-            "crisis is guaranteed in the first half — symptoms worsen as the "
+            "crisis is guaranteed in the first half - symptoms worsen as the "
             "drug wears off and the agent must compensate proactively. A "
             "dyskinesia spike commonly follows in the second half as medication "
             "returns. Phase-aware control wins this task; reactive policies "

@@ -20,5 +20,5 @@
 
 | Seed | Steps | Score | Pass | Mean amp (mA) | Max amp (mA) | Events fired |
 |---:|---:|---:|---:|---:|---:|---|
-| 0 | 6/36 | 0.7929 | PASS | 1.075 | 1.200 | — |
+| 0 | 6/36 | 0.7929 | PASS | 1.075 | 1.200 | - |
 

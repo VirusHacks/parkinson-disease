@@ -19,18 +19,18 @@ class ParkinsonsMotorEnv(
     enabling efficient multi-step interactions with lower latency.
     Each client instance has its own dedicated environment session.
 
-    Example — local server:
+    Example - local server:
         >>> env = ParkinsonsMotorEnv(base_url="http://localhost:8000")
         >>> result = await env.reset()
         >>> result = await env.step(ParkinsonsMotorAction(dbs_amplitude=1.0))
         >>> await env.close()
 
-    Example — Docker image:
+    Example - Docker image:
         >>> env = await ParkinsonsMotorEnv.from_docker_image("parkinsons-motor:latest")
         >>> result = await env.reset()
         >>> await env.close()
 
-    Example — Hugging Face Space:
+    Example - Hugging Face Space:
         >>> env = await ParkinsonsMotorEnv.from_url("https://<your-space>.hf.space")
         >>> result = await env.reset()
         >>> await env.close()
