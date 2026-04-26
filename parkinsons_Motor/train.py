@@ -5,56 +5,60 @@
 # LICENSE file in the root directory of this source tree.
 
 """
-Training utilities for the Parkinson's Motor (DBS) OpenEnv environment.
+Runtime training surface for the Parkinson's Motor (DBS) OpenEnv environment.
 
-Public surface (mirrors the winning OpenEnv hackathon notebooks
-`kube_sre_gym.train` and `training_script` from the Bio Experiment env):
+This module hosts everything GRPO actually invokes during a training run —
+prompting, action parsing, LLM rollout against the live env, reward
+composition, episode logging, and the GRPO ``rollout_func`` factory.
+Plotting and LLM-driven evaluation live in dedicated submodules of
+:mod:`parkinsons_Motor.training` (and are re-exported from here for
+backwards-compatibility with the existing notebook import block):
+
+    parkinsons_Motor.training.plots     — plot_training_dashboard,
+                                          plot_training_loss,
+                                          plot_baseline_vs_trained,
+                                          compare_trajectories,
+                                          save_training_plots
+    parkinsons_Motor.training.llm_eval  — sanity_check_rollout,
+                                          evaluate_model_on_task,
+                                          evaluate_model_suite,
+                                          eval_with_adapter_disabled
+    parkinsons_Motor.training.evaluation         — EvaluationSuite (offline)
+    parkinsons_Motor.training.trajectory         — DBSTrajectory(Dataset)
+    parkinsons_Motor.training.clinical_benchmark — literature comparisons
+
+Public surface (kept identical to earlier versions so the notebook's
+``from parkinsons_Motor.train import …`` block keeps working unchanged):
 
     from parkinsons_Motor.train import (
         # constants
-        SYSTEM_PROMPT,
-        TASK_CONTEXT,
-        INVALID_ACTION_PENALTY,
-        ENVIRONMENT_ERROR_PENALTY,
+        SYSTEM_PROMPT, TASK_CONTEXT,
+        INVALID_ACTION_PENALTY, ENVIRONMENT_ERROR_PENALTY,
         DEFAULT_REWARD_WEIGHTS,
 
         # prompt + chat helpers
-        build_user_prompt,
-        apply_chat_template,
+        build_user_prompt, apply_chat_template,
 
         # action helpers
-        parse_action,
-        make_action,
-        heuristic_action,
+        parse_action, make_action, heuristic_action,
 
         # generation + rollout
-        llm_generate,
-        rollout_episode,
-        rollout_episode_async,
+        llm_generate, rollout_episode, rollout_episode_async, Trajectory,
 
         # reward
-        compute_reward,
-        MotorAssistReward,
-        reward_total,
-        reward_grader,
-        reward_dense,
-        reward_format,
+        compute_reward, MotorAssistReward,
+        reward_total, reward_grader, reward_dense, reward_format,
 
         # GRPO glue
-        make_rollout_func,
-        make_episode_logger,
+        make_rollout_func, make_episode_logger,
 
-        # plots
-        plot_training_dashboard,
-        plot_training_loss,
-        plot_baseline_vs_trained,
-        compare_trajectories,
-        save_training_plots,
+        # plots             (re-exported from parkinsons_Motor.training.plots)
+        plot_training_dashboard, plot_training_loss,
+        plot_baseline_vs_trained, compare_trajectories, save_training_plots,
 
-        # eval
-        evaluate_model_on_task,
-        evaluate_model_suite,
-        eval_with_adapter_disabled,   # base model on the same seeds, no retraining
+        # eval              (re-exported from parkinsons_Motor.training.llm_eval)
+        evaluate_model_on_task, evaluate_model_suite,
+        eval_with_adapter_disabled, sanity_check_rollout,
     )
 
 The module is import-safe with or without torch / matplotlib / pandas installed.
@@ -69,13 +73,11 @@ import asyncio
 import csv
 import json
 import logging
-import os
 import re
-import statistics
 import textwrap
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Any, Callable, Dict, Iterable, List, Mapping, Optional, Sequence, Tuple, Union
+from typing import Any, Callable, Dict, List, Mapping, Optional, Sequence, Tuple, Union
 
 from .client import ParkinsonsMotorEnv
 from .core.models import ParkinsonsMotorAction, ParkinsonsMotorObservation
@@ -111,19 +113,19 @@ You are an expert closed-loop DBS controller managing Parkinsonian motor symptom
 Every step is a short clinical control decision: suppress pathological activity, preserve movement,
 avoid overstimulation, and keep enough safety budget for the remainder of the episode.
 
-You MAY think step by step inside <think>...</think> if helpful, but your response MUST end with
-exactly one valid JSON object on its own final line, in this exact shape:
+OUTPUT FORMAT — read carefully:
+Reply with **exactly one JSON object and nothing else** — no prose, no markdown, no code fences,
+no explanation, no <think> blocks. Just the JSON, in this exact shape:
 
 {"dbs_amplitude": <float>, "dbs_pulse_width": <float>, "dbs_frequency": <float>}
 
-Hard constraints (the deterministic grader will reject violations):
+Hard constraints (the deterministic grader rejects violations):
 - amplitude in mA [0.0, 5.0]; pulse_width in ms [0.06, 0.20]; frequency in Hz [60, 185].
 - Use pulse_width=0.13 and frequency=130 unless safety demands otherwise.
 - Smooth amplitude changes; avoid jumps > 0.3 mA per step.
-- The JSON object MUST be the last non-empty line. No prose, markdown, or fences after it.
 - Do NOT include motor_command — that field is ignored.
 
-Clinical priorities (ranked):
+Clinical priorities (ranked, apply silently — do NOT explain in output):
 1. Prevent overstimulation: gamma_arv > 0.55 OR side_effect_load near budget => reduce.
 2. Don't undertreat: tremor_arv > 0.55 OR beta_arv > 0.60 => at least 1.2 mA.
 3. Symptoms worsening + safety acceptable => +0.10-0.15 mA.
@@ -262,13 +264,28 @@ def apply_chat_template(
     system: str,
     user: str,
     *,
-    enable_thinking: bool = True,
+    enable_thinking: bool = False,
 ) -> str:
     """Render a Qwen-style chat template ready to feed to .generate().
 
-    Qwen3 templates support an ``enable_thinking`` kwarg that controls whether
-    the assistant turn opens with ``<think>``; we pass it through and silently
-    fall back for tokenizers (Qwen2, Llama, ...) that don't accept it.
+    ``enable_thinking`` defaults to **False** for training/rollout because:
+      - Qwen3-4B with thinking ON regularly emits 800-1500 tokens of
+        ``<think>...</think>`` before the JSON action.
+      - At any sane ``max_new_tokens`` budget (256, 512, 1024) the cap fires
+        mid-thinking, the JSON never lands, ``parse_action`` returns ``None``,
+        every group member uses the same fallback action, GRPO advantages
+        collapse to zero, and ``clipped_ratio`` stays at 1.0 forever.
+      - The bio-experiment hackathon **winner** ([mhtruong1031/OpenENV-Hackathon])
+        used ``MAX_COMPLETION_TOKENS=160`` for the same reason — short, JSON-only
+        completions are the only way GRPO's group-relative advantages stay
+        well-conditioned with a 4B model.
+
+    Pass ``enable_thinking=True`` explicitly when you want to **demo** the
+    chain-of-thought behavior (e.g. in the sample-trajectory eval cell — so
+    judges can see the reward mechanism punishing reasoning-hack attempts).
+
+    Qwen3 templates accept ``enable_thinking`` as a kwarg; we silently fall
+    back for tokenizers (Qwen2, Llama, ...) that don't.
     """
     msgs = [{"role": "system", "content": system}, {"role": "user", "content": user}]
     try:
@@ -503,8 +520,15 @@ async def rollout_episode_async(
     max_new_tokens: int = 256,
     max_prompt_length: int = 1024,
     fallback_to_heuristic_on_invalid: bool = False,
+    enable_thinking: bool = False,
 ) -> Trajectory:
-    """Play one full episode against a remote ParkinsonsMotorEnv (async)."""
+    """Play one full episode against a remote ParkinsonsMotorEnv (async).
+
+    ``enable_thinking`` defaults to ``False`` so Qwen3-4B emits the JSON
+    action directly instead of burning the entire budget on a ``<think>``
+    block. Flip it on for evaluation / demo runs where you want to show
+    the chain-of-thought to judges.
+    """
     traj = Trajectory(task_id=task_id, seed=seed)
     env = ParkinsonsMotorEnv(base_url=env_url)
     await env.__aenter__()
@@ -519,7 +543,9 @@ async def rollout_episode_async(
         for step in range(1, max_turns + 1):
             obs_dict = _obs_to_dict(obs)
             user = build_user_prompt(step, obs_dict, task_id, traj.history)
-            prompt = apply_chat_template(tokenizer, SYSTEM_PROMPT, user)
+            prompt = apply_chat_template(
+                tokenizer, SYSTEM_PROMPT, user, enable_thinking=enable_thinking
+            )
 
             # CRITICAL: model.generate() is a blocking sync call. Running it
             # directly inside this coroutine starves the asyncio event loop, so
@@ -754,6 +780,7 @@ def make_rollout_func(
     fallback_to_heuristic_on_invalid: bool = True,
     max_new_tokens: int = 256,
     max_prompt_length: int = 1024,
+    enable_thinking: bool = False,
 ) -> Callable[..., Dict[str, List[Any]]]:
     """Build the GRPO ``rollout_func`` callable.
 
@@ -798,6 +825,7 @@ def make_rollout_func(
                 max_new_tokens=max_new_tokens,
                 max_prompt_length=max_prompt_length,
                 fallback_to_heuristic_on_invalid=fallback_to_heuristic_on_invalid,
+                enable_thinking=enable_thinking,
             )
             breakdown = compute_reward(traj, weights=reward_weights)
             if log_episode:
@@ -846,687 +874,39 @@ def make_rollout_func(
 
 
 # ─────────────────────────────────────────────────────────────────────────────
-# 7. Plots
+# 7. Plots & LLM-evaluation (re-exported from parkinsons_Motor.training)
 # ─────────────────────────────────────────────────────────────────────────────
-
-_TASK_THRESHOLDS: Dict[str, float] = {
-    "easy": 0.55, "medium": 0.52, "hard": 0.68,
-}
-
-
-def plot_training_dashboard(
-    csv_path: Union[str, Path],
-    png_path: Union[str, Path],
-    train_tasks: Optional[Sequence[str]] = None,
-    title: str = "MotorAssistEnv — GRPO training",
-) -> Path:
-    """Render a 2x2 dashboard (total / grader / per-task / decomposition).
-
-    Mirrors `plot_rewards` from the kube-sre-gym winner but with one extra
-    axis (per-task curves) since our env is a curriculum.
-    """
-    try:
-        import matplotlib.pyplot as plt
-        import pandas as pd
-    except ImportError as exc:  # pragma: no cover
-        raise RuntimeError("matplotlib + pandas required for plot_training_dashboard") from exc
-    csv_path = Path(csv_path)
-    png_path = Path(png_path)
-    png_path.parent.mkdir(parents=True, exist_ok=True)
-
-    df = pd.read_csv(csv_path)
-    if train_tasks is None:
-        train_tasks = list(dict.fromkeys(df["task_id"].astype(str).tolist()))
-
-    fig, axes = plt.subplots(2, 2, figsize=(13, 8))
-    axes = axes.ravel()
-
-    axes[0].plot(df["step"], df["reward_total"], marker="o", linewidth=1, label="total")
-    axes[0].plot(df["step"], df["reward_total"].rolling(5, min_periods=1).mean(),
-                 label="5-ep mean", color="black")
-    axes[0].set(title="Total reward", xlabel="episode", ylabel="reward")
-    axes[0].legend(); axes[0].grid(alpha=0.3)
-
-    axes[1].plot(df["step"], df["grader_score"], marker="o", linewidth=1, color="tab:green")
-    axes[1].plot(df["step"], df["grader_score"].rolling(5, min_periods=1).mean(), color="black")
-    for tid, thr in _TASK_THRESHOLDS.items():
-        if tid in train_tasks:
-            axes[1].axhline(thr, ls=":", alpha=0.6, label=f"{tid} threshold ({thr:.2f})")
-    axes[1].set(title="Grader score (deterministic, [0,1])", xlabel="episode", ylabel="score")
-    axes[1].set_ylim(-0.05, 1.05)
-    axes[1].legend(fontsize=8); axes[1].grid(alpha=0.3)
-
-    palette = ["tab:blue", "tab:orange", "tab:red", "tab:purple", "tab:brown", "tab:pink"]
-    for i, task_id in enumerate(train_tasks):
-        sub = df[df["task_id"] == task_id]
-        if len(sub):
-            axes[2].plot(sub["step"], sub["grader_score"].rolling(3, min_periods=1).mean(),
-                         label=task_id, color=palette[i % len(palette)],
-                         marker="o", linewidth=1.4)
-    axes[2].set(title="Grader by task (3-ep rolling)", xlabel="episode", ylabel="grader score")
-    axes[2].set_ylim(-0.05, 1.05)
-    axes[2].legend(fontsize=8); axes[2].grid(alpha=0.3)
-
-    bar_x = df["step"]
-    axes[3].bar(bar_x, df["reward_grader"],          label="grader",  alpha=0.85)
-    axes[3].bar(bar_x, df["reward_dense"],           label="dense",   alpha=0.55)
-    axes[3].bar(bar_x, df["reward_format"],          label="format",  alpha=0.45)
-    axes[3].bar(bar_x, df["reward_invalid_penalty"], label="invalid penalty", alpha=0.45)
-    axes[3].set(title="Reward decomposition per episode", xlabel="episode", ylabel="component")
-    axes[3].legend(fontsize=8); axes[3].grid(alpha=0.3)
-
-    fig.suptitle(title, fontweight="bold")
-    fig.tight_layout(rect=(0, 0, 1, 0.97))
-    fig.savefig(png_path, dpi=130)
-    plt.close(fig)
-    return png_path
-
-
-def plot_training_loss(
-    log_history: Sequence[Mapping[str, Any]],
-    png_path: Union[str, Path],
-    title: str = "MotorAssistEnv — GRPO training (loss & policy stats)",
-) -> Path:
-    """Plot loss + reward + KL + grad_norm from ``trainer.state.log_history``.
-
-    Judges explicitly ask for "loss AND reward plots" — the
-    ``training_dashboard`` covers reward decomposition; this one covers the
-    optimization side (policy loss, KL anchor, gradient norm).
-
-    ``log_history`` is the list TRL writes after every logging step:
-    each row is a dict that may contain ``loss``, ``reward``, ``kl``,
-    ``grad_norm``, ``learning_rate`` and a ``step`` key.
-    """
-    try:
-        import matplotlib.pyplot as plt
-    except ImportError as exc:  # pragma: no cover
-        raise RuntimeError("matplotlib required for plot_training_loss") from exc
-    png_path = Path(png_path)
-    png_path.parent.mkdir(parents=True, exist_ok=True)
-
-    def _series(key: str) -> Tuple[List[int], List[float]]:
-        xs: List[int] = []
-        ys: List[float] = []
-        for i, row in enumerate(log_history):
-            if not isinstance(row, Mapping):
-                continue
-            v = row.get(key)
-            if v is None:
-                continue
-            try:
-                ys.append(float(v))
-                xs.append(int(row.get("step", i)))
-            except (TypeError, ValueError):
-                continue
-        return xs, ys
-
-    fig, axes = plt.subplots(2, 2, figsize=(13, 8))
-    axes = axes.ravel()
-
-    for ax, (key, color, title_) in zip(
-        axes,
-        [
-            ("loss",        "tab:blue",   "Policy loss"),
-            ("reward",      "tab:green",  "Mean reward (per logging step)"),
-            ("kl",          "tab:purple", "KL divergence to reference"),
-            ("grad_norm",   "tab:orange", "Gradient norm"),
-        ],
-    ):
-        xs, ys = _series(key)
-        if xs:
-            ax.plot(xs, ys, marker="o", linewidth=1.2, color=color)
-            ax.set(title=title_, xlabel="training step", ylabel=key)
-            ax.grid(alpha=0.3)
-        else:
-            ax.text(0.5, 0.5, f"no '{key}' values in log_history",
-                    ha="center", va="center", color="grey", transform=ax.transAxes)
-            ax.set(title=title_); ax.set_axis_off()
-
-    fig.suptitle(title, fontweight="bold")
-    fig.tight_layout(rect=(0, 0, 1, 0.97))
-    fig.savefig(png_path, dpi=130)
-    plt.close(fig)
-    return png_path
-
-
-def plot_baseline_vs_trained(
-    baseline_results: Sequence[Mapping[str, Any]],
-    trained_results: Sequence[Mapping[str, Any]],
-    png_path: Union[str, Path],
-    *,
-    thresholds: Optional[Mapping[str, float]] = None,
-    title: str = "Base vs trained — grader score by task",
-) -> Path:
-    """Side-by-side bar chart comparing two ``evaluate_model_suite`` outputs.
-
-    Judges explicitly ask for "multiple runs on the same axes so the comparison
-    is obvious". This is that plot.
-
-    Each input is a list of per-task dicts with at least ``task_id``,
-    ``mean_score``, ``std_score`` (the shape ``evaluate_model_suite`` returns).
-    """
-    try:
-        import matplotlib.pyplot as plt
-        import numpy as np
-    except ImportError as exc:  # pragma: no cover
-        raise RuntimeError("matplotlib + numpy required for plot_baseline_vs_trained") from exc
-
-    png_path = Path(png_path)
-    png_path.parent.mkdir(parents=True, exist_ok=True)
-    thresholds = dict(thresholds or _TASK_THRESHOLDS)
-
-    base_by_task    = {r["task_id"]: r for r in baseline_results}
-    trained_by_task = {r["task_id"]: r for r in trained_results}
-    tasks = [t for t in (list(base_by_task.keys()) + list(trained_by_task.keys()))]
-    seen: List[str] = []
-    for t in tasks:
-        if t not in seen:
-            seen.append(t)
-    tasks = seen
-
-    base_means    = [float(base_by_task.get(t, {}).get("mean_score", 0.0)) for t in tasks]
-    base_stds     = [float(base_by_task.get(t, {}).get("std_score", 0.0))  for t in tasks]
-    trained_means = [float(trained_by_task.get(t, {}).get("mean_score", 0.0)) for t in tasks]
-    trained_stds  = [float(trained_by_task.get(t, {}).get("std_score", 0.0))  for t in tasks]
-    base_pass     = [float(base_by_task.get(t, {}).get("pass_rate", 0.0)) for t in tasks]
-    trained_pass  = [float(trained_by_task.get(t, {}).get("pass_rate", 0.0)) for t in tasks]
-
-    x = np.arange(len(tasks))
-    w = 0.36
-
-    fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(13, 5.2))
-
-    ax1.bar(x - w / 2, base_means,    w, yerr=base_stds,    capsize=4,
-            label="base",    color="tab:gray", alpha=0.85)
-    ax1.bar(x + w / 2, trained_means, w, yerr=trained_stds, capsize=4,
-            label="trained", color="tab:green", alpha=0.85)
-    for i, t in enumerate(tasks):
-        thr = thresholds.get(t)
-        if thr is not None:
-            ax1.hlines(thr, i - w, i + w, colors="black", linestyles=":", linewidth=1.2)
-            ax1.text(i, thr + 0.015, f"thr {thr:.2f}", ha="center", fontsize=8, color="black")
-    for i, (b, tr) in enumerate(zip(base_means, trained_means)):
-        delta = tr - b
-        ax1.annotate(
-            f"{delta:+.2f}",
-            xy=(i + w / 2, max(b, tr) + 0.04),
-            ha="center", fontsize=9,
-            color="tab:green" if delta > 0 else "tab:red", weight="bold",
-        )
-    ax1.set(xlabel="task", ylabel="grader score (deterministic, [0,1])",
-            title="Mean grader score ± std (5 seeds per bar)")
-    ax1.set_xticks(x); ax1.set_xticklabels(tasks)
-    ax1.set_ylim(-0.05, 1.1)
-    ax1.legend(loc="upper right"); ax1.grid(alpha=0.3, axis="y")
-
-    ax2.bar(x - w / 2, [p * 100 for p in base_pass],    w,
-            label="base",    color="tab:gray",  alpha=0.85)
-    ax2.bar(x + w / 2, [p * 100 for p in trained_pass], w,
-            label="trained", color="tab:green", alpha=0.85)
-    ax2.set(xlabel="task", ylabel="pass rate (%)",
-            title="Pass rate by task (success_threshold from TASKS.md)")
-    ax2.set_xticks(x); ax2.set_xticklabels(tasks)
-    ax2.set_ylim(0, 105)
-    ax2.legend(loc="upper right"); ax2.grid(alpha=0.3, axis="y")
-
-    fig.suptitle(title, fontweight="bold")
-    fig.tight_layout(rect=(0, 0, 1, 0.95))
-    fig.savefig(png_path, dpi=130)
-    plt.close(fig)
-    return png_path
-
-
-def compare_trajectories(
-    base_traj: Union[Trajectory, Mapping[str, Any]],
-    trained_traj: Union[Trajectory, Mapping[str, Any]],
-    png_path: Union[str, Path],
-    *,
-    title: Optional[str] = None,
-) -> Path:
-    """Overlay base-vs-trained per-step traces from one episode each.
-
-    Judges explicitly ask for "before/after behavior" as qualitative evidence —
-    this is that plot. We extract amplitude / β / tremor / side-effect-load
-    from the ``history`` strings written by ``rollout_episode_async``.
-    """
-    try:
-        import matplotlib.pyplot as plt
-    except ImportError as exc:  # pragma: no cover
-        raise RuntimeError("matplotlib required for compare_trajectories") from exc
-    png_path = Path(png_path)
-    png_path.parent.mkdir(parents=True, exist_ok=True)
-
-    def _parse(traj: Union[Trajectory, Mapping[str, Any]]) -> Dict[str, List[float]]:
-        if isinstance(traj, Trajectory):
-            history = traj.history
-            task_id = traj.task_id
-            seed    = traj.seed
-            grader  = traj.grader_score
-            success = traj.episode_success
-        else:
-            history = list(traj.get("history") or [])
-            task_id = str(traj.get("task_id", ""))
-            seed    = traj.get("seed")
-            grader  = float(traj.get("grader_score", 0.0))
-            success = bool(traj.get("episode_success", False))
-
-        out: Dict[str, List[float]] = {
-            "step": [], "amp": [], "beta": [], "tremor": [], "se": [], "reward": [],
-        }
-        for line in history:
-            try:
-                parts = dict(p.split("=", 1) for p in line.replace("=>", "").split() if "=" in p)
-            except Exception:
-                continue
-            if "step" not in parts:
-                continue
-            try:
-                out["step"].append(int(parts["step"]))
-                out["amp"].append(float(parts.get("amp", 0)))
-                out["beta"].append(float(parts.get("beta", 0)))
-                out["tremor"].append(float(parts.get("tremor", 0)))
-                out["se"].append(float(parts.get("se", 0)))
-                out["reward"].append(float(parts.get("r", 0)))
-            except (TypeError, ValueError):
-                continue
-        out["task_id"] = task_id  # type: ignore[assignment]
-        out["seed"]    = seed     # type: ignore[assignment]
-        out["grader"]  = grader   # type: ignore[assignment]
-        out["success"] = success  # type: ignore[assignment]
-        return out
-
-    base = _parse(base_traj)
-    tr   = _parse(trained_traj)
-
-    fig, axes = plt.subplots(2, 2, figsize=(13, 8))
-    axes = axes.ravel()
-
-    for ax, key, ylabel, ylim in [
-        (axes[0], "amp",    "DBS amplitude (mA)",      None),
-        (axes[1], "beta",   "β-band ARV [0,1]",        (0, 1)),
-        (axes[2], "tremor", "tremor ARV [0,1]",        (0, 1)),
-        (axes[3], "se",     "side-effect load [0,1]",  (0, 1)),
-    ]:
-        if base["step"]:
-            ax.plot(base["step"], base[key], color="tab:gray",
-                    label=f"base (grader={base['grader']:.2f})", linewidth=1.6)
-        if tr["step"]:
-            ax.plot(tr["step"], tr[key], color="tab:green",
-                    label=f"trained (grader={tr['grader']:.2f})", linewidth=1.8)
-        ax.set(xlabel="step (20 ms each)", ylabel=ylabel, title=ylabel.split(" (")[0])
-        if ylim:
-            ax.set_ylim(*ylim)
-        ax.legend(fontsize=8); ax.grid(alpha=0.3)
-
-    task_id = base.get("task_id") or tr.get("task_id") or "?"   # type: ignore[assignment]
-    seed    = base.get("seed") if base.get("seed") is not None else tr.get("seed")
-    full_title = title or f"Before vs after training — task=`{task_id}` seed={seed}"
-    fig.suptitle(full_title, fontweight="bold")
-    fig.tight_layout(rect=(0, 0, 1, 0.96))
-    fig.savefig(png_path, dpi=130)
-    plt.close(fig)
-    return png_path
-
-
-def save_training_plots(
-    csv_path: Union[str, Path],
-    output_dir: Union[str, Path],
-    train_tasks: Optional[Sequence[str]] = None,
-    *,
-    log_history: Optional[Sequence[Mapping[str, Any]]] = None,
-    baseline_results: Optional[Sequence[Mapping[str, Any]]] = None,
-    trained_results: Optional[Sequence[Mapping[str, Any]]] = None,
-    base_trajectory: Optional[Union[Trajectory, Mapping[str, Any]]] = None,
-    trained_trajectory: Optional[Union[Trajectory, Mapping[str, Any]]] = None,
-) -> Dict[str, Path]:
-    """Save every plot we know how to draw. Returns ``{name: path}``.
-
-    Name kept identical to the bio-env winner's ``save_training_plots`` so the
-    notebook surface looks the same. Optional inputs let you add the loss
-    panel, the base-vs-trained bars, and a sample trajectory overlay in a
-    single call.
-    """
-    output_dir = Path(output_dir)
-    output_dir.mkdir(parents=True, exist_ok=True)
-
-    paths: Dict[str, Path] = {}
-    paths["dashboard"] = plot_training_dashboard(
-        csv_path,
-        output_dir / "training_dashboard.png",
-        train_tasks=train_tasks,
-    )
-    if log_history:
-        paths["loss"] = plot_training_loss(
-            log_history,
-            output_dir / "training_loss.png",
-        )
-    if baseline_results and trained_results:
-        paths["comparison"] = plot_baseline_vs_trained(
-            baseline_results,
-            trained_results,
-            output_dir / "eval_comparison.png",
-        )
-    if base_trajectory is not None and trained_trajectory is not None:
-        paths["trajectory"] = compare_trajectories(
-            base_trajectory,
-            trained_trajectory,
-            output_dir / "trajectory_compare.png",
-        )
-    return paths
-
-
-# ─────────────────────────────────────────────────────────────────────────────
-# 8. Eval
-# ─────────────────────────────────────────────────────────────────────────────
-
-def _amp_from_history(line: str) -> Optional[float]:
-    if "amp=" not in line:
-        return None
-    try:
-        return float(line.split("amp=", 1)[1].split(" ", 1)[0])
-    except Exception:  # pragma: no cover
-        return None
-
-
-def eval_with_adapter_disabled(
-    model: Any,
-    tokenizer: Any,
-    env_url: str,
-    tasks: Sequence[str],
-    seeds: Sequence[int],
-    **kwargs: Any,
-) -> List[Dict[str, Any]]:
-    """Evaluate the **base** model (LoRA disabled) on the same tasks/seeds.
-
-    This is what makes the "before vs after" comparison meaningful: same
-    weights, same seeds, only the LoRA adapter is toggled off via PEFT's
-    ``disable_adapter`` context. If the model has no PEFT adapter (e.g. a
-    fresh ``FastLanguageModel.from_pretrained`` before LoRA is attached),
-    this falls back to a plain evaluate so the function is always safe to call.
-    """
-    disable_ctx = getattr(model, "disable_adapter", None)
-    if callable(disable_ctx):
-        with disable_ctx():
-            return evaluate_model_suite(
-                model, tokenizer, env_url, tasks, seeds, **kwargs
-            )
-    return evaluate_model_suite(model, tokenizer, env_url, tasks, seeds, **kwargs)
-
-
-def _warm_up_generation(
-    model: Any,
-    tokenizer: Any,
-    *,
-    max_new_tokens: int = 16,
-) -> None:
-    """One throwaway generation so the env doesn't pay the CUDA-compile cost
-    on its very first step (which can add 8-15 s and cause WebSocket timeouts).
-    """
-    if torch is None:  # pragma: no cover
-        return
-    try:
-        prompt = "ping"
-        inputs = tokenizer(prompt, return_tensors="pt")
-        device = next(model.parameters()).device
-        inputs = {k: v.to(device) for k, v in inputs.items()}
-        with torch.inference_mode():
-            model.generate(
-                **inputs,
-                max_new_tokens=max_new_tokens,
-                do_sample=False,
-                pad_token_id=tokenizer.eos_token_id,
-            )
-    except Exception as exc:  # pragma: no cover
-        logger.debug("GPU warm-up generation skipped (%s)", exc)
-
-
-def sanity_check_rollout(
-    model: Any,
-    tokenizer: Any,
-    env_url: str,
-    *,
-    task_id: str = "easy",
-    seed: int = 0,
-    max_turns: int = 4,
-    temperature: float = 0.7,
-    max_new_tokens: int = 256,
-    max_prompt_length: int = 1280,
-    raise_on_failure: bool = True,
-    warm_up: bool = True,
-    retry_on_env_error: bool = True,
-) -> Dict[str, Any]:
-    """Run ONE short rollout and verify the LLM→env loop is healthy.
-
-    Use this BEFORE training to catch the five most common failure modes:
-      1. completions never produce parseable JSON (cap too small / wrong template)
-      2. env never returns a non-zero step reward (URL wrong / task broken)
-      3. all rollouts emit identical actions (no reward variance => GRPO can't learn)
-      4. env errors silently (ENVIRONMENT_ERROR_PENALTY appears in every step)
-      5. **WebSocket keepalive timeouts during long generations** (sync call
-         in async coroutine — fixed in ``rollout_episode_async`` via
-         ``asyncio.to_thread``; this check verifies the fix actually landed)
-
-    Prints raw completion + parsed action + per-step env reward + final grader,
-    and (by default) raises ``RuntimeError`` on a hard failure so the notebook
-    cell turns red instead of letting you waste an hour on a flat training run.
-
-    ``warm_up`` runs one throwaway generation first so CUDA kernels are
-    compiled before we open the env (otherwise the first real step pays
-    +8-15 s of compile time and the env's keepalive can fire).
-
-    ``retry_on_env_error`` will re-attempt the rollout once if the first
-    attempt failed with an env error (HF Spaces sometimes 503 on cold start).
-    """
-    if warm_up:
-        print("[warm-up] compiling CUDA kernels with one throwaway generation ...")
-        _warm_up_generation(model, tokenizer)
-
-    # ── Pre-rollout: trace ONE completion offline so we can show the raw text
-    # if parsing fails. This is the only way to tell apart "thinking ate the
-    # budget" vs "model wrote markdown around the JSON" vs "wrong template".
-    print(f"\n=== sanity_check_rollout  task={task_id}  seed={seed}  turns={max_turns} ===")
-    print("\n[trace] generating one completion offline (no env call) to inspect raw text ...")
-    try:
-        _trace_obs = {
-            "beta_arv": 0.55, "tremor_arv": 0.45, "side_effect_load": 0.10,
-            "gamma_arv": 0.30, "beta_trend": 0.02, "tremor_trend": 0.01,
-            "target_output": 0.0, "side_effect_rate": 0.0,
-        }
-        _trace_user = build_user_prompt(1, _trace_obs, task_id, [])
-        _trace_prompt = apply_chat_template(tokenizer, SYSTEM_PROMPT, _trace_user)
-        _trace_text, _trace_p, _trace_c = llm_generate(
-            model, tokenizer, _trace_prompt,
-            max_new_tokens=max_new_tokens,
-            temperature=temperature,
-            max_prompt_length=max_prompt_length,
-        )
-        _trace_parsed = parse_action(_trace_text)
-        _completion_token_count = len(_trace_c) if _trace_c is not None else 0
-        _hit_cap = _completion_token_count >= max_new_tokens
-        _has_think_open = "<think>" in _trace_text
-        _has_think_close = "</think>" in _trace_text
-        _has_json_brace = "{" in _trace_text and "}" in _trace_text
-        _preview = _trace_text if len(_trace_text) <= 800 else (_trace_text[:600] + " ... [truncated] ... " + _trace_text[-200:])
-
-        print(f"  completion tokens       : {_completion_token_count} / {max_new_tokens}  "
-              f"({'HIT CAP' if _hit_cap else 'ok'})")
-        print(f"  has <think> ... </think>: open={_has_think_open}  close={_has_think_close}")
-        print(f"  has any JSON-like {{...}}: {_has_json_brace}")
-        print(f"  parse_action result     : {_trace_parsed}")
-        print("  --- raw completion (preview) ---")
-        for line in _preview.split("\n"):
-            print(f"  | {line}")
-        print("  --- end preview ---")
-
-        if _trace_parsed is None:
-            print("\n  [diagnosis] parse failed. Most likely cause:")
-            if _hit_cap and _has_think_open and not _has_think_close:
-                print("    * The thinking block did NOT finish before max_new_tokens. "
-                      "Bump MAX_COMPLETION_LENGTH (try 1024 or 1536) or "
-                      "set enable_thinking=False in apply_chat_template.")
-            elif _has_json_brace and not _trace_parsed:
-                print("    * Model wrote JSON-like text but the regex/json.loads rejected it. "
-                      "Check for code fences, smart quotes, trailing commas, or comments.")
-            elif not _has_json_brace:
-                print("    * Model emitted prose with no JSON object at all. "
-                      "Check the chat template / SYSTEM_PROMPT — the model isn't following the format.")
-            else:
-                print("    * Unclear — inspect the preview above.")
-    except Exception as exc:
-        print(f"  [trace] generation crashed: {exc!r}  — falling through to env rollout anyway")
-
-    traj = rollout_episode(
-        model, tokenizer, env_url,
-        task_id=task_id, seed=seed,
-        max_turns=max_turns,
-        temperature=temperature,
-        max_new_tokens=max_new_tokens,
-        max_prompt_length=max_prompt_length,
-        fallback_to_heuristic_on_invalid=False,  # we WANT to see parse failures here
-    )
-
-    if retry_on_env_error and traj.env_error and len(traj.rewards) == 0:
-        print(f"\n[retry] first attempt failed with env_error={traj.env_error!r}; retrying once ...")
-        import time as _time
-        _time.sleep(3.0)
-        traj = rollout_episode(
-            model, tokenizer, env_url,
-            task_id=task_id, seed=seed,
-            max_turns=max_turns,
-            temperature=temperature,
-            max_new_tokens=max_new_tokens,
-            max_prompt_length=max_prompt_length,
-            fallback_to_heuristic_on_invalid=False,
-        )
-
-    n_steps        = len(traj.rewards)
-    n_invalid      = traj.invalid_count
-    parseable_pct  = (sum(traj.parsed) / max(1, len(traj.parsed))) * 100
-    rewards_nonzero = sum(1 for r in traj.rewards if abs(r) > 1e-9)
-
-    print(f"  steps run               : {n_steps} / {max_turns}")
-    print(f"  parseable JSON          : {sum(traj.parsed)} / {len(traj.parsed)}  ({parseable_pct:.0f}%)")
-    print(f"  invalid_count           : {n_invalid}")
-    print(f"  steps with non-0 reward : {rewards_nonzero} / {n_steps}")
-    print(f"  dense reward (mean)     : {traj.dense_reward_mean:+.4f}")
-    print(f"  grader_score            : {traj.grader_score:.4f}")
-    print(f"  episode_success         : {traj.episode_success}")
-    print(f"  env_error               : {traj.env_error!r}")
-    if traj.history:
-        print(f"  first step trace        : {traj.history[0]}")
-        print(f"  last  step trace        : {traj.history[-1]}")
-
-    failures: List[str] = []
-    if traj.env_error:
-        failures.append(f"env raised: {traj.env_error}")
-    if n_steps == 0:
-        failures.append("zero env steps completed")
-    if parseable_pct < 50.0:
-        failures.append(
-            f"only {parseable_pct:.0f}% of completions parsed as JSON — "
-            "increase max_new_tokens, tighten SYSTEM_PROMPT, or check the chat template"
-        )
-    if n_steps > 0 and rewards_nonzero == 0:
-        failures.append(
-            "every env step returned reward=0 — the env may be broken, the seed may be invalid, "
-            "or the task_id may not be registered server-side"
-        )
-
-    if failures:
-        msg = "SANITY CHECK FAILED:\n  - " + "\n  - ".join(failures)
-        print("\n" + msg)
-        if raise_on_failure:
-            raise RuntimeError(msg)
-    else:
-        print("\nSANITY CHECK PASSED — LLM produces parseable JSON, env returns rewards, no errors.")
-
-    return {
-        "n_steps":         n_steps,
-        "parseable_pct":   parseable_pct,
-        "invalid_count":   n_invalid,
-        "rewards_nonzero": rewards_nonzero,
-        "grader_score":    traj.grader_score,
-        "env_error":       traj.env_error,
-        "history":         list(traj.history),
-        "failures":        failures,
-    }
-
-
-def evaluate_model_on_task(
-    model: Any,
-    tokenizer: Any,
-    env_url: str,
-    task_id: str,
-    seeds: Sequence[int],
-    *,
-    max_turns: int = 30,
-    temperature: float = 0.0,
-    max_new_tokens: int = 256,
-    max_prompt_length: int = 1024,
-) -> Dict[str, Any]:
-    """Run multiple seeds against one task and return aggregated stats."""
-    scores: List[float] = []
-    successes = 0
-    mean_amps: List[float] = []
-    raw: List[Dict[str, Any]] = []
-    for s in seeds:
-        traj = rollout_episode(
-            model, tokenizer, env_url,
-            task_id=task_id, seed=int(s),
-            max_turns=max_turns,
-            temperature=temperature,
-            max_new_tokens=max_new_tokens,
-            max_prompt_length=max_prompt_length,
-        )
-        scores.append(traj.grader_score)
-        successes += int(traj.episode_success)
-        amps = [a for a in (_amp_from_history(ln) for ln in traj.history) if a is not None]
-        mean_amps.append(sum(amps) / len(amps) if amps else 0.0)
-        raw.append(traj.to_dict())
-    return {
-        "task_id":      task_id,
-        "n_seeds":      len(seeds),
-        "mean_score":   statistics.mean(scores) if scores else 0.0,
-        "std_score":    statistics.pstdev(scores) if len(scores) > 1 else 0.0,
-        "min_score":    min(scores) if scores else 0.0,
-        "max_score":    max(scores) if scores else 0.0,
-        "pass_rate":    (successes / len(seeds)) if seeds else 0.0,
-        "successes":    successes,
-        "mean_amp_ma":  statistics.mean(mean_amps) if mean_amps else 0.0,
-        "rollouts":     raw,
-    }
-
-
-def evaluate_model_suite(
-    model: Any,
-    tokenizer: Any,
-    env_url: str,
-    tasks: Sequence[str],
-    seeds: Sequence[int],
-    *,
-    max_turns_per_task: Optional[Mapping[str, int]] = None,
-    temperature: float = 0.0,
-    max_new_tokens: int = 256,
-    max_prompt_length: int = 1024,
-) -> List[Dict[str, Any]]:
-    """Evaluate one model on a set of (task, seed) pairs and return per-task results."""
-    max_turns_per_task = max_turns_per_task or {}
-    out: List[Dict[str, Any]] = []
-    for task_id in tasks:
-        result = evaluate_model_on_task(
-            model, tokenizer, env_url, task_id, seeds,
-            max_turns=max_turns_per_task.get(task_id, 30),
-            temperature=temperature,
-            max_new_tokens=max_new_tokens,
-            max_prompt_length=max_prompt_length,
-        )
-        out.append(result)
-        logger.info(
-            "EVAL %-10s n=%d  mean=%.3f +/- %.3f  pass=%.0f%%  amp=%.2f mA",
-            task_id, result["n_seeds"], result["mean_score"], result["std_score"],
-            result["pass_rate"] * 100, result["mean_amp_ma"],
-        )
-    return out
+#
+# These two surfaces (plotting + LLM-driven evaluation) live in dedicated
+# modules inside the parkinsons_Motor.training subpackage now, mirroring
+# the architecture used by the OpenEnv-Hackathon bio-experiment winner
+# ([mhtruong1031/OpenENV-Hackathon] training/). The functions are
+# re-exported here so the existing `from parkinsons_Motor.train import …`
+# block in the notebook keeps working without modification.
+#
+#   * parkinsons_Motor.training.plots     — dashboards, base-vs-trained
+#                                            comparison, trajectory overlay
+#   * parkinsons_Motor.training.llm_eval  — sanity_check_rollout,
+#                                            evaluate_model_on_task,
+#                                            evaluate_model_suite,
+#                                            eval_with_adapter_disabled
+#
+# We import at the bottom of the module (after every primitive these
+# functions need is defined) so circular-import risk is avoided.
+
+from .training.plots import (
+    plot_training_dashboard,
+    plot_training_loss,
+    plot_baseline_vs_trained,
+    compare_trajectories,
+    save_training_plots,
+)
+from .training.llm_eval import (
+    eval_with_adapter_disabled,
+    evaluate_model_on_task,
+    evaluate_model_suite,
+    sanity_check_rollout,
+)
 
 
 # ─────────────────────────────────────────────────────────────────────────────
