@@ -1,13 +1,12 @@
 // Judge-facing guided tour. Four popups walk through what each panel does.
-// Auto-shows on first visit (localStorage gates re-show); a help bubble
-// bottom-right relaunches it on demand.
-
-const TOUR_KEY = 'motorassist.tourSeenV2';
+// Auto-shows on every fresh load *after* all 3D assets have finished
+// downloading (otherwise the spotlight anchors would be missing on slow
+// Hugging Face cold starts). A help bubble bottom-right relaunches it.
 
 const STEPS = [
   {
     title: 'Brain — live signal simulation',
-    selector: '#brain-panel-anchor',
+    selector: '.brain-panel',
     fallbackSelector: 'canvas',
     placement: 'right',
     body: (
@@ -66,18 +65,62 @@ class GuidedTour {
     this.spotlight = null;
     this._reposition = this._reposition.bind(this);
     this._buildHelpButton();
-    if (!this._hasSeen()) {
-      window.setTimeout(() => this.start(), 1800);
-    }
+    // Auto-start on every load, but only once the 3D assets and UI are in
+    // the DOM. The previous fixed 1.8s delay raced the slow Hugging Face
+    // cold-start: on first visits the GLTF brain (~5MB) and MuJoCo WASM
+    // were still streaming when the tour fired, so anchors were missing
+    // and users never saw the steps. We now wait for explicit ready
+    // signals (`motorassist:loader-hidden`, `motorassist:brain-ready`)
+    // and DOM presence of the openenv-dock + agent-panel before opening.
+    this._autoStartWhenReady();
   }
 
-  _hasSeen() {
-    try { return window.localStorage.getItem(TOUR_KEY) === '1'; }
-    catch { return false; }
+  // Resolves only when:
+  //   - the bootstrap loader has hidden itself (`motorassist:loader-hidden`),
+  //   - the brain overlay has finished loading meshes (`motorassist:brain-ready`),
+  //   - the MuJoCo body viewer global is live (`window.myoDemo`),
+  //   - the viewer-controller has appended `.agent-panel` and `.openenv-dock`,
+  //   - and a real `<canvas>` is in the DOM.
+  // Falls back after a hard ceiling so a partial failure (e.g. brain GLTF
+  // 404) doesn't permanently block the tour.
+  _waitForReady() {
+    const HARD_CEILING_MS = 60000;
+    const POLL_MS = 200;
+    const start = Date.now();
+    const loaderEl = () => document.getElementById('viewer-loader');
+    const loaderGone = () => {
+      if (window.motorAssistLoaderHidden) { return true; }
+      const el = loaderEl();
+      return !el || el.classList.contains('is-hidden');
+    };
+    const domReady = () =>
+      !!document.querySelector('.agent-panel') &&
+      !!document.querySelector('.openenv-dock') &&
+      !!document.querySelector('canvas');
+    const brainReady = () => !!(window.motorAssistBrain && (window.motorAssistBrain.ready || window.motorAssistBrain.brainRoot));
+    const bodyReady = () => !!window.myoDemo;
+    return new Promise((resolve) => {
+      const tick = () => {
+        if (loaderGone() && domReady() && brainReady() && bodyReady()) {
+          resolve(true);
+          return;
+        }
+        if (Date.now() - start > HARD_CEILING_MS) {
+          resolve(false);
+          return;
+        }
+        window.setTimeout(tick, POLL_MS);
+      };
+      tick();
+    });
   }
 
-  _markSeen() {
-    try { window.localStorage.setItem(TOUR_KEY, '1'); } catch {}
+  async _autoStartWhenReady() {
+    await this._waitForReady();
+    // Small grace delay so layout has a frame to settle after the loader
+    // fades out, otherwise the first popup positions against a transient
+    // rect (e.g. .brain-panel still has its loading text width).
+    window.setTimeout(() => this.start(), 350);
   }
 
   _buildHelpButton() {
@@ -97,7 +140,6 @@ class GuidedTour {
   }
 
   stop() {
-    this._markSeen();
     if (this.overlay) {
       this.overlay.remove();
       this.overlay = null;

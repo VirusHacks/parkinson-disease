@@ -30,12 +30,14 @@ Usage:
 
 import asyncio
 import json
+import logging
 import os
+import time
 from pathlib import Path
 
 from fastapi import Request
 from pydantic import BaseModel, Field
-from fastapi.responses import HTMLResponse, RedirectResponse
+from fastapi.responses import HTMLResponse, JSONResponse, RedirectResponse
 from fastapi.responses import StreamingResponse
 from fastapi.staticfiles import StaticFiles
 
@@ -78,12 +80,67 @@ _viewer_html_path = _static_dir / "myosuite_demo" / "index.html"
 _viewer_bundle_path = _static_dir / "myosuite_demo" / "dist" / "mujoco_wasm.js"
 _demo_sessions = DemoSessionManager()
 
+# Process boot timestamp — used by /health to report uptime so a keepalive
+# pinger (e.g. GitHub Actions cron) can tell whether it just woke a cold
+# Space (uptime < ~120s) or hit a warm one.
+_BOOT_TIME = time.monotonic()
+_log = logging.getLogger("parkinsons_Motor.server")
+
 
 @app.middleware("http")
 async def redirect_legacy_space_routes(request: Request, call_next):
     if request.url.path in {"", "/", "/web"}:
         return RedirectResponse(url="/viewer", status_code=307)
     return await call_next(request)
+
+
+@app.get("/health", include_in_schema=False)
+async def health() -> JSONResponse:
+    """Cheap liveness probe.
+
+    Used by:
+      - the Docker HEALTHCHECK declared in the Dockerfile,
+      - the GitHub Actions cron that keeps the free HF Space awake,
+      - the viewer frontend if it wants to confirm the backend is up
+        before opening a WebSocket / SSE stream.
+
+    Stays intentionally O(1): no env construction, no calibration I/O,
+    no LLM client. If this returns 200 the Space is awake; nothing more
+    is implied.
+    """
+    return JSONResponse(
+        {
+            "status": "ok",
+            "uptime_s": round(time.monotonic() - _BOOT_TIME, 2),
+            "env_name": "parkinsons_Motor",
+        },
+        headers={"Cache-Control": "no-store"},
+    )
+
+
+@app.on_event("startup")
+async def _prewarm_calibration() -> None:
+    """Move the one-time calibration I/O off the user's first /reset.
+
+    `calibrate()` is `lru_cache`d, so the cost is paid exactly once per
+    process. Doing it here means the cost lands during Docker cold-start
+    (which is already slow and unattributed) instead of inside the first
+    `/reset` request after a wake — making the first user interaction
+    feel snappy. Failures are non-fatal: the env will still self-heal
+    on first call.
+    """
+
+    def _warm() -> None:
+        try:
+            try:
+                from parkinsons_Motor.core.calibration import calibrate  # type: ignore
+            except ImportError:
+                from core.calibration import calibrate  # type: ignore
+            calibrate()
+        except Exception as exc:  # pragma: no cover - best effort
+            _log.warning("calibration prewarm failed (will lazy-load on first reset): %s", exc)
+
+    await asyncio.to_thread(_warm)
 
 
 class ViewerDemoStartRequest(BaseModel):

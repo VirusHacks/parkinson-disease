@@ -521,10 +521,13 @@ class BrainOverlay {
     spec.forEach((s) => {
       const mat = new THREE.MeshBasicMaterial({
         color: s.baseColor, transparent: true, opacity: 0.0,
-        blending: THREE.AdditiveBlending, depthWrite: false,
+        blending: THREE.AdditiveBlending, depthWrite: false, depthTest: false,
       });
       const mesh = new THREE.Mesh(new THREE.SphereGeometry(s.radius, 16, 16), mat);
       mesh.position.set(...s.pos);
+      // Render after the brain mesh so the additive glow always sits on top,
+      // even for deep nuclei (STN) that would otherwise be occluded.
+      mesh.renderOrder = 10;
       this.pivot.add(mesh);
       this._hotspots.push({ mesh, region: s.region, side: s.side });
     });
@@ -547,9 +550,10 @@ class BrainOverlay {
       const tubeGeo = new THREE.TubeGeometry(curve, 48, 0.008, 8, false);
       const tubeMat = new THREE.MeshBasicMaterial({
         color: p.color, transparent: true, opacity: 0.0,
-        blending: THREE.AdditiveBlending, depthWrite: false,
+        blending: THREE.AdditiveBlending, depthWrite: false, depthTest: false,
       });
       const tube = new THREE.Mesh(tubeGeo, tubeMat);
+      tube.renderOrder = 11;
       this.pivot.add(tube);
       this._nerves.push({ id: p.id, side: p.side, curve, tube, mat: tubeMat, baseColor: new THREE.Color(p.color) });
 
@@ -558,9 +562,10 @@ class BrainOverlay {
       for (let k = 0; k < 2; k++) {
         const apMat = new THREE.MeshBasicMaterial({
           color: 0xffd0a8, transparent: true, opacity: 0.0,
-          blending: THREE.AdditiveBlending, depthWrite: false,
+          blending: THREE.AdditiveBlending, depthWrite: false, depthTest: false,
         });
         const apMesh = new THREE.Mesh(new THREE.SphereGeometry(0.022, 10, 10), apMat);
+        apMesh.renderOrder = 12;
         this.pivot.add(apMesh);
         this._actionPotentials.push({
           curve, mesh: apMesh, mat: apMat,

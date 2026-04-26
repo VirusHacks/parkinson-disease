@@ -216,6 +216,15 @@
 
   Live demo: [huggingface.co/spaces/virustechhacks/parkinsons_Motor](https://huggingface.co/spaces/virustechhacks/parkinsons_Motor)
 
+  > **Eliminating cold-starts on the free tier.** Free Docker Spaces sleep
+  > after ~48 h of inactivity and pay a 30–90 s cold start on the next
+  > request. This repo ships a GitHub Actions cron at
+  > `.github/workflows/hf-space-keepalive.yml` that pings `/health` every
+  > 20 min so the idle timer never elapses. No paid hardware required.
+  > The server also exposes `GET /health` (used by the cron and the
+  > `Dockerfile` `HEALTHCHECK`) and pre-warms the calibration `lru_cache`
+  > on FastAPI startup so the first `/reset` after a wake feels snappy.
+
   ## Architecture
 
   Five layers, cleanly separated so the RL backend never blocks on 3D physics and the grader never reads from the agent's observation path.

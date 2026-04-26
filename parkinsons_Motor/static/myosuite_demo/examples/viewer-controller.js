@@ -204,6 +204,7 @@ class ViewerController {
     const controls = el('div', 'agent-controls');
     this.taskSelect = el('select', 'agent-select');
     populateTaskSelect(this.taskSelect);
+    this.taskSelect.value = 'medium';
 
     this.agentSelect = el('select', 'agent-select');
     [

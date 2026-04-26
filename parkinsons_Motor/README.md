@@ -4,7 +4,7 @@ emoji: 🧠
 colorFrom: indigo
 colorTo: pink
 sdk: docker
-pinned: false
+pinned: true
 app_port: 8000
 base_path: /viewer
 tags:
