@@ -2,12 +2,13 @@ name: Keep HF Space Warm
 
 # Free Hugging Face Docker Spaces sleep after ~48h of inactivity and pay a
 # 30-90s cold start on the next request. This workflow pings the Space every
-# 20 minutes so HF's idle timer never elapses, eliminating cold-starts
+# 6 hours so HF's idle timer never elapses, eliminating cold-starts
 # without any paid hardware.
 #
 # Notes:
-# - GitHub Actions cron may be delayed a few minutes during peak load. The
-#   20-minute cadence absorbs that comfortably (HF needs 48h, not 20min).
+# - GitHub Actions cron may be delayed during peak load. 6h cadence has
+#   huge margin vs HF's 48h idle timer, while keeping minute usage low
+#   and reducing runner-allocation contention seen on tighter cadences.
 # - GitHub auto-disables scheduled workflows after 60 days of repo
 #   inactivity. The manual `workflow_dispatch` trigger lets you re-arm
 #   the schedule with one click from the Actions tab.
@@ -16,16 +17,16 @@ name: Keep HF Space Warm
 
 on:
   schedule:
-    - cron: "*/20 * * * *"
+    - cron: "0 */6 * * *"
   workflow_dispatch: {}
 
 concurrency:
   group: hf-space-keepalive
-  cancel-in-progress: false
+  cancel-in-progress: true
 
 jobs:
   ping:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 5
     env:
       SPACE_URL: https://virustechhacks-parkinsons-motor.hf.space
